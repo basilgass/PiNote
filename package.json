@@ -1,0 +1,49 @@
+{
+  "name": "pinote",
+  "version": "0.0.1",
+  "description": "canvas render to take note for math courses",
+  "keywords": [
+    "scolcours",
+    "canvas",
+    "note"
+  ],
+  "homepage": "https://github.com/basilgass/PiNote#readme",
+  "bugs": {
+    "url": "https://github.com/basilgass/PiNote/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/basilgass/PiNote.git"
+  },
+  "license": "MIT",
+  "author": "Basil Gass",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./vue": "./dist/vue/index.js"
+  },
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "eslint": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.8.0",
+    "globals": "^17.3.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^5.0.0",
+    "vitest": "^1.4.0",
+    "vue-tsc": "^1.8.0"
+  },
+  "dependencies": {
+    "@types/node": "^25.3.0"
+  }
+}

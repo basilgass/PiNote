@@ -1,0 +1,1 @@
+export { default as NoteCanvas } from './NoteCanvas.vue'
