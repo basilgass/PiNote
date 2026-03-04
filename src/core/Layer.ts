@@ -1,14 +1,114 @@
-import type { Stroke } from '../types'
+export interface LayerConfig {
+  name: string;
+  zIndex: number
+}
 
 export class Layer {
-  strokes: Stroke[] = []
-  constructor(public id: string) {}
+  public readonly name: string
+  public readonly canvas: HTMLCanvasElement
+  public readonly ctx: CanvasRenderingContext2D
 
-  addStroke(stroke: Stroke) {
-    this.strokes.push(stroke)
+  private _visible = true
+  private _opacity = 1
+  private _locked = false
+  private _blendMode: GlobalCompositeOperation = 'source-over'
+
+  constructor(container: HTMLDivElement, config: LayerConfig) {
+    this.name = config.name
+
+    // création automatique du canvas
+    const canvas = document.createElement('canvas')
+    canvas.dataset.layer = this.name
+    canvas.width = container.clientWidth
+    canvas.height = container.clientHeight
+    canvas.style.position = 'absolute'
+    canvas.style.top = '0'
+    canvas.style.left = '0'
+    canvas.style.zIndex = config.zIndex.toString()
+    canvas.style.pointerEvents = 'none'
+    canvas.style.backgroundColor =
+        this.name === 'BACKGROUND'
+            ? 'white'
+            : 'transparent'
+
+    container.appendChild(canvas)
+
+    this.canvas = canvas
+    this.ctx = canvas.getContext('2d')!
+
+    this.resize(container)
   }
+
+  // ----------------
+  // resize
+  // ----------------
+  resize(container: HTMLDivElement) {
+    const rect = container.getBoundingClientRect()
+    this.canvas.width = rect.width
+    this.canvas.height = rect.height
+  }
+
+  // ----------------
+  // Visibility
+  // ----------------
+
+  set visible(v: boolean) {
+    this._visible = v
+    this.canvas.style.display = v ? 'block' : 'none'
+  }
+
+  get visible() {
+    return this._visible
+  }
+
+  // ----------------
+  // Opacity
+  // ----------------
+
+  set opacity(value: number) {
+    this._opacity = Math.max(0, Math.min(1, value))
+    this.canvas.style.opacity = this._opacity.toString()
+  }
+
+  get opacity() {
+    return this._opacity
+  }
+
+  // ----------------
+  // Lock
+  // ----------------
+
+  set locked(v: boolean) {
+    this._locked = v
+  }
+
+  get locked() {
+    return this._locked
+  }
+
+  // ----------------
+  // Blend Mode
+  // ----------------
+
+  set blendMode(mode: GlobalCompositeOperation) {
+    this._blendMode = mode
+    this.canvas.style.mixBlendMode = mode
+  }
+
+  get blendMode() {
+    return this._blendMode
+  }
+
+  // ----------------
+  // Drawing helpers
+  // ----------------
 
   clear() {
-    this.strokes = []
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+  }
+
+  exportPNG(): string {
+    return this.canvas.toDataURL('image/png')
   }
 }
+

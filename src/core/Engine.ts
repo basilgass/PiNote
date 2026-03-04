@@ -1,241 +1,228 @@
-import { StrokePoint } from "src/types"
-import { Stroke } from "./Stroke"
+import {BackgroundMode, BackgroundState, Drawable, LayerName, ToolType} from "src/types"
+import {Layer} from "@core/Layer"
+import {drawAxes, drawGrid, drawRuled} from "@core/helper"
+import {Stroke} from "@core/drawable/Stroke"
+import {ShapeFactory, ShapeStartConfig} from "@core/ShapeFactory"
 
 export class Engine {
-  private canvas: HTMLCanvasElement
-  private ctx: CanvasRenderingContext2D
-  private strokes: Stroke[] = []
-  private currentStroke: Stroke | null = null
-  public bezier: boolean = false // <-- toggle global
+    public bezier = false // <-- toggle global
+    private container: HTMLDivElement
+    private overlay!: Layer
+    private readonly localStorageKey = 'pi_note_draft'
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas
-    this.ctx = canvas.getContext('2d')!
-  }
+    private _background: BackgroundState = {mode: 'none'}
 
-  startStroke(stroke: Stroke) {
-    this.currentStroke = stroke
-    this.strokes.push(stroke)
-  }
-
-  addPoint(point: StrokePoint) {
-    if (!this.currentStroke) return
-
-    const stroke = this.currentStroke
-    const pts = stroke.points
-    const last = pts[pts.length - 1]
-
-    // --- interpolation entre le dernier point et le nouveau ---
-    if (last) {
-      const dx = point.x - last.x
-      const dy = point.y - last.y
-      const dist = Math.hypot(dx, dy)
-      const steps = Math.ceil(dist / 2) // ~2px spacing
-
-      for (let i = 1; i <= steps; i++) {
-        const x = last.x + (dx * i) / steps
-        const y = last.y + (dy * i) / steps
-        const t = last.t + ((point.t - last.t) * i) / steps
-        stroke.addPoint({ x, y, t })
-      }
-    } else {
-      stroke.addPoint(point)
-    }
-
-    // --- moving average pour lisser les derniers 3 points ---
-    const n = 3
-    if (stroke.points.length >= n) {
-      const slice = stroke.points.slice(-n)
-      const avgX = slice.reduce((sum, p) => sum + p.x, 0) / n
-      const avgY = slice.reduce((sum, p) => sum + p.y, 0) / n
-      const avgT = slice[slice.length - 1].t
-      // on remplace le dernier point par la moyenne
-      stroke.points[stroke.points.length - 1] = { x: avgX, y: avgY, t: avgT }
-    }
-
-    // redraw stroke courant
-    this.drawStroke(stroke, this.bezier)
-  }
-
-  addPoint_old(point: { x: number; y: number; t: number }) {
-    if (!this.currentStroke) return
-    this.currentStroke.addPoint(point)
-    this.drawStroke(this.currentStroke, this.bezier)
-  }
+    private _tool: ToolType = 'pen'
+    private _currentShape: Drawable | null = null
+    private _shapes: Drawable[] = []
 
 
+    constructor(container: HTMLDivElement) {
+        this.container = container
+        this.container.style.position = 'relative'
 
-  endStroke() {
-    this.currentStroke = null
-  }
-
-  private drawStroke(stroke: Stroke, bezier: boolean = false) {
-    const pts = stroke.points
-    if (pts.length < 2) return
-
-    const ctx = this.ctx
-
-    // --- style général ---
-    ctx.lineWidth = stroke.width
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    // --- outil spécifique ---
-    switch (stroke.tool) {
-      case 'pen':
-        ctx.strokeStyle = stroke.color
-        ctx.globalCompositeOperation = 'source-over'
-        break
-      case 'eraser':
-        ctx.strokeStyle = 'rgba(0,0,0,1)' // couleur ignorée
-        ctx.globalCompositeOperation = 'destination-out'
-        break
-      case 'marker':
-        ctx.strokeStyle = stroke.color
-        ctx.globalAlpha = 0.4
-        ctx.globalCompositeOperation = 'source-over'
-        break
-      case 'brush':
-        ctx.strokeStyle = stroke.color
-        ctx.globalAlpha = 0.8
-        ctx.lineWidth = stroke.width * 1.5
-        ctx.globalCompositeOperation = 'source-over'
-        break
-      case 'highlighter':
-        ctx.strokeStyle = stroke.color
-        ctx.globalAlpha = 0.2
-        ctx.lineWidth = stroke.width * 3
-        ctx.globalCompositeOperation = 'source-over'
-        break
-      case 'line':
-      case 'rect':
-      case 'circle':
-        ctx.strokeStyle = stroke.color
-        ctx.globalCompositeOperation = 'source-over'
-        break
-    }
-
-    ctx.beginPath()
-
-    if (stroke.tool === 'line') {
-      // simple ligne du premier au dernier point
-      const first = pts[0], last = pts[pts.length - 1]
-      ctx.moveTo(first.x, first.y)
-      ctx.lineTo(last.x, last.y)
-    } else if (stroke.tool === 'rect') {
-      const first = pts[0], last = pts[pts.length - 1]
-      ctx.rect(first.x, first.y, last.x - first.x, last.y - first.y)
-    } else if (stroke.tool === 'circle') {
-      const first = pts[0], last = pts[pts.length - 1]
-      const radius = Math.hypot(last.x - first.x, last.y - first.y)
-      ctx.arc(first.x, first.y, radius, 0, Math.PI * 2)
-    } else {
-      // pen / marker / brush / highlighter → Bézier si activé
-      if (!bezier || pts.length < 4) {
-        ctx.moveTo(pts[0].x, pts[0].y)
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-      } else {
-        ctx.moveTo(pts[0].x, pts[0].y)
-        for (let i = 0; i < pts.length - 3; i++) {
-          const p0 = pts[i], p1 = pts[i + 1], p2 = pts[i + 2], p3 = pts[i + 3]
-          const cp1x = p1.x + (p2.x - p0.x) / 6
-          const cp1y = p1.y + (p2.y - p0.y) / 6
-          const cp2x = p2.x - (p3.x - p1.x) / 6
-          const cp2y = p2.y - (p3.y - p1.y) / 6
-          ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+        this._layers = {
+            BACKGROUND: new Layer(this.container, {name: 'BACKGROUND', zIndex: 1}),
+            MAIN: new Layer(this.container, {name: 'MAIN', zIndex: 2}),
+            LAYER: new Layer(this.container, {name: 'LAYER', zIndex: 3}),
         }
-        const last = pts[pts.length - 1]
-        ctx.lineTo(last.x, last.y)
-      }
+
+        this.overlay = new Layer(this.container, {
+            name: 'overlay',
+            zIndex: 99
+        })
+
+        // Resize auto
+        const ro = new ResizeObserver(() => this.resize())
+        ro.observe(this.container)
     }
 
-    ctx.stroke()
-    ctx.globalAlpha = 1 // reset alpha
-    ctx.globalCompositeOperation = 'source-over' // reset compositing
-  }
+    private _mode: BackgroundMode = 'none'
 
-  private drawStroke_old1(stroke: Stroke, bezier: boolean = false) {
-    const pts = stroke.points
-    if (pts.length < 2) return
-
-    const ctx = this.ctx
-    ctx.strokeStyle = stroke.color
-    ctx.lineWidth = stroke.width
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.beginPath()
-
-    if (!bezier || pts.length < 4) {
-      // fallback classique
-      ctx.moveTo(pts[0].x, pts[0].y)
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-    } else {
-      // Catmull-Rom to Bézier
-      ctx.moveTo(pts[0].x, pts[0].y)
-      for (let i = 0; i < pts.length - 3; i++) {
-        const p0 = pts[i]
-        const p1 = pts[i + 1]
-        const p2 = pts[i + 2]
-        const p3 = pts[i + 3]
-
-        const cp1x = p1.x + (p2.x - p0.x) / 6
-        const cp1y = p1.y + (p2.y - p0.y) / 6
-
-        const cp2x = p2.x - (p3.x - p1.x) / 6
-        const cp2y = p2.y - (p3.y - p1.y) / 6
-
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
-      }
-
-      // dernier segment si nécessaire
-      const last = pts[pts.length - 1]
-      ctx.lineTo(last.x, last.y)
+    get mode(): BackgroundMode {
+        return this._mode
     }
 
-    ctx.stroke()
-  }
-
-  private drawStroke_old(stroke: Stroke, bezier: boolean = false) {
-    const pts = stroke.points
-    if (pts.length < 2) return
-
-    const ctx = this.ctx
-
-    ctx.strokeStyle = stroke.color
-    ctx.lineWidth = stroke.width
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    ctx.beginPath()
-
-    if (!bezier) {
-      ctx.moveTo(pts[0].x, pts[0].y)
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-    } else {
-      ctx.moveTo(pts[0].x, pts[0].y)
-      for (let i = 1; i < pts.length - 1; i++) {
-        const xc = (pts[i].x + pts[i + 1].x) / 2
-        const yc = (pts[i].y + pts[i + 1].y) / 2
-        ctx.quadraticCurveTo(pts[i].x, pts[i].y, xc, yc)
-      }
-      const last = pts[pts.length - 1]
-      ctx.lineTo(last.x, last.y)
+    set mode(value: BackgroundMode) {
+        this._mode = value
     }
 
-    ctx.stroke()
-  }
+    private _layers: Record<LayerName, Layer>
 
-  draw(upToTime?: number, bezier?: boolean) {
-    this.clear()
-    for (const stroke of this.strokes) {
-      const pts = upToTime !== undefined ? stroke.getPointsUntil(upToTime) : stroke.points
-      if (pts.length < 2) continue
-      this.drawStroke(stroke, bezier ?? this.bezier)
+    get layers(): Layer[] {
+        return Object.values(this._layers)
     }
-  }
 
-  clear() {
-    this.ctx.fillStyle = '#fff'
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
-  }
+    get shapes(): Drawable[] {
+        return this._shapes
+    }
+
+    private _currentStroke: Stroke | null = null
+
+    get currentStroke(): Stroke | null {
+        return this._currentStroke
+    }
+
+    setBackground(state: BackgroundState) {
+        this._background = state
+        this.renderBackground(state)
+    }
+
+    public resize() {
+        for (const layer of [...Object.values(this._layers), this.overlay]) {
+            layer.resize(this.container)
+        }
+
+        this.renderBackground(this._background)
+
+        this.draw()
+    }
+
+    setLayerVisibility(name: LayerName, visible: boolean) {
+        const layer = this._layers[name]
+        if (!layer) return
+
+        layer.visible = visible
+        layer.canvas.style.display = visible ? 'block' : 'none'
+    }
+
+    getLayer(name: LayerName): Layer {
+        return this._layers[name] ?? this._layers['MAIN']
+    }
+
+    setLayerOpacity(name: LayerName, opacity: number) {
+        const layer = this._layers[name]
+        if (!layer) return
+
+        layer.opacity = opacity
+        layer.canvas.style.opacity = opacity.toString()
+    }
+
+    destroyStroke(index: number, count = 1) {
+        if (index < 0 || index >= this._shapes.length) return
+        if (count <= 0) return
+
+        this._shapes.splice(index, count)
+    }
+
+    startShape(config: ShapeStartConfig) {
+        this._tool = config.tool
+
+        const shape = ShapeFactory.create(this._tool, config)
+
+        this._currentShape = shape
+
+        // Stroke est immédiatement push
+        if (shape instanceof Stroke) {
+            this._shapes.push(shape)
+        }
+
+        return shape
+    }
+
+
+    updateShape(x: number, y: number) {
+        if (!this._currentShape) return
+
+        this.overlay.clear()
+
+        this._currentShape.update?.(x, y)
+        this._currentShape.draw(this.overlay.ctx)
+    }
+
+    endShape() {
+        if (!this._currentShape) return
+
+        const s = this._currentShape
+
+        if (!(s instanceof Stroke)) {
+            this._shapes.push(s)
+        }
+
+        if (s.layer !== null) {
+            const layer = this.getLayer(s.layer)
+            s.draw(layer.ctx)
+        }
+
+        this.overlay.clear()
+        this._currentShape = null
+
+        this.saveLocal()
+    }
+
+    draw(layerName?: string) {
+        this.clearAll()
+
+        for (const shape of this._shapes) {
+            if (!shape.layer) continue
+            if (layerName && shape.layer === layerName) continue
+
+            const layer = this.getLayer(shape.layer)
+            shape.draw(layer.ctx)
+        }
+
+        this.saveLocal()
+    }
+
+    clearLayer(name: LayerName) {
+        const layer = this.getLayer(name)
+
+        if (!layer) return
+
+        layer.clear()
+    }
+
+    clearAll() {
+        for (const layer of Object.values(this._layers)) {
+            if (layer.visible && !layer.locked && layer.name !== 'BACKGROUND') {
+                layer.clear()
+            }
+        }
+    }
+
+    public saveLocal() {
+        const data = this.shapes.map(s => s.toJSON())
+        localStorage.setItem(this.localStorageKey, JSON.stringify(data))
+    }
+
+    public loadLocal() {
+        const raw = localStorage.getItem(this.localStorageKey)
+        if (!raw) return
+
+        const parsed = JSON.parse(raw)
+        this._shapes = parsed.map((s: any) => {
+            const {options, points} = Stroke.fromJSON(s)
+
+            const stroke = new Stroke(options)
+            stroke.points = points
+
+            return stroke
+        })
+
+        this.draw()
+    }
+
+    private renderBackground(state: BackgroundState) {
+        const layer = this._layers['BACKGROUND']
+        const ctx = layer.ctx
+
+        const w = layer.canvas.width
+        const h = layer.canvas.height
+
+        ctx.clearRect(0, 0, w, h)
+
+        switch (state.mode) {
+            case 'grid':
+                drawGrid(ctx, w, h, state.grid!)
+                break
+            case 'ruled':
+                drawRuled(ctx, w, h, state.ruled!)
+                break
+            case 'axes':
+                drawAxes(ctx, w, h, state.axes!)
+                break
+        }
+
+        this.draw()
+    }
 }

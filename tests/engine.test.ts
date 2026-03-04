@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest'
-import { Stroke } from '../src/types/stroke'
-import { Engine } from '../src/core/Engine'
+import {describe, expect, it} from 'vitest'
+import {Stroke} from '../src/types/stroke'
+import {Engine} from '../src/core/Engine'
 
 describe('Engine', () => {
-  it('should add and replay strokes', () => {
+  it('should add and replay shapes', () => {
     const engine = new Engine()
     const s: Stroke = {
       id: '1',
