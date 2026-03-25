@@ -1,7 +1,2 @@
 export * from './Engine'
 export * from './Layer'
-export * from './drawable/Drawable'
-export * from './drawable/Stroke'
-export * from './drawable/Circle'
-export * from './drawable/Line'
-export * from './drawable/Rectangle'

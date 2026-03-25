@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed} from 'vue'
+import {ToolType} from "../../types"
 
 const selectedWidth = defineModel<number>()
 
@@ -12,12 +13,12 @@ const props = defineProps<Props>()
 
 const widths = computed<number[]>(() => {
   switch (props.tool) {
-    case 'pen':
-      return [2, 4, 6]
     case 'highlighter':
       return [8, 12, 16]
     case 'eraser':
       return [10, 20, 30]
+    default:
+      return [2, 4, 6]
   }
 })
 

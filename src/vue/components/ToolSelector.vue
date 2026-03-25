@@ -6,10 +6,9 @@ const selectedTool = defineModel<ToolType>({
   default: 'pen'
 })
 
-const tools: ToolType[] = [
-  'pen', 'highlighter', 'eraser',
-  'line', 'circle', "rectangle"
-]
+const props = withDefaults(defineProps<{ tools?: ToolType[] }>(), {
+  tools: () => ['pen', 'highlighter', 'eraser', 'line', 'segment', 'circle', 'rectangle']
+})
 
 function onSelect(tool: ToolType) {
   selectedTool.value = tool
@@ -19,7 +18,7 @@ function onSelect(tool: ToolType) {
 <template>
 	<div class="tool-selector">
 		<button
-			v-for="tool in tools"
+			v-for="tool in props.tools"
 			:key="tool"
 			class="tool-button"
 			:class="{ active: selectedTool === tool }"
@@ -57,9 +56,42 @@ function onSelect(tool: ToolType) {
 					<path d="M16 3l5 5-9 9H7L2 12l9-9h5z" />
 				</svg>
 
-				<!-- LINE -->
+				<!-- MOVE -->
+				<svg
+					v-else-if="tool === 'move'"
+					viewBox="0 0 24 24"
+					fill="none"
+				>
+					<path
+						d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+
+				<!-- LINE (droite infinie) : ligne bord à bord, points au milieu -->
 				<svg
 					v-else-if="tool === 'line'"
+					viewBox="0 0 24 24"
+				>
+					<line
+						x1="2"
+						y1="22"
+						x2="22"
+						y2="2"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+					/>
+					<circle cx="8" cy="16" r="2.5" fill="currentColor" />
+					<circle cx="16" cy="8" r="2.5" fill="currentColor" />
+				</svg>
+
+				<!-- SEGMENT : ligne bornée, points aux extrémités -->
+				<svg
+					v-else-if="tool === 'segment'"
 					viewBox="0 0 24 24"
 				>
 					<line
@@ -71,6 +103,8 @@ function onSelect(tool: ToolType) {
 						stroke-width="2"
 						stroke-linecap="round"
 					/>
+					<circle cx="4" cy="20" r="2.5" fill="currentColor" />
+					<circle cx="20" cy="4" r="2.5" fill="currentColor" />
 				</svg>
 
 				<!-- CIRCLE -->

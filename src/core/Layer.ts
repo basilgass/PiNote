@@ -43,9 +43,8 @@ export class Layer {
   // resize
   // ----------------
   resize(container: HTMLDivElement) {
-    const rect = container.getBoundingClientRect()
-    this.canvas.width = rect.width
-    this.canvas.height = rect.height
+    this.canvas.width = container.offsetWidth
+    this.canvas.height = container.offsetHeight
   }
 
   // ----------------

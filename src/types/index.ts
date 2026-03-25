@@ -6,15 +6,18 @@ export interface StrokePoint {
 }
 
 export type GeomType =
-    | 'line'
+    | 'line'        // droite infinie passant par deux points
+    | 'segment'     // segment borné entre deux points
     | 'rectangle'
     | 'circle'
+    | 'polygon'
 
 export type ToolType =
     | 'pen'
     | 'eraser'
     | 'highlighter'
-    | & GeomType
+    | 'move'
+    | GeomType
 
 
 export interface ToolConfig {
@@ -22,6 +25,7 @@ export interface ToolConfig {
     color: string
     width: number
     layer: LayerName
+    bezier: boolean
 }
 
 interface ToolState {
