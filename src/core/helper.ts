@@ -1,4 +1,4 @@
-import {AxisOptions, GridOptions, OriginMode, RuledOptions} from "../types"
+import {GridOptions, HexOptions, RuledOptions} from "../types"
 
 export function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, opt: GridOptions) {
     const {
@@ -65,125 +65,55 @@ export function drawRuled(ctx: CanvasRenderingContext2D, w: number, h: number, o
     ctx.restore()
 }
 
-export function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number, opt: AxisOptions) {
-    const {
-        origin = {mode: 'center'},
-        color = '#000',
-        lineWidth = 2,
-        arrowSize = 10,
-        tickSize = 0,
-        padding = 0,
-    } = opt
+export function drawHex(ctx: CanvasRenderingContext2D, w: number, h: number, opt: HexOptions) {
+    const { size, color = '#ddd', lineWidth = 1, orientation = 'pointy' } = opt
 
-    const {x, y} =  resolveOrigin(w,  h, padding, origin)
-    const originX = alignPixel(x, lineWidth)
-    const originY = alignPixel(y, lineWidth)
-    const p = padding===0 ? tickSize/3 : padding
+    if (size <= 0) return
 
     ctx.save()
     ctx.strokeStyle = color
     ctx.lineWidth = lineWidth
 
-    // Axe X
-    ctx.beginPath()
-    ctx.moveTo(p, originY)
-    ctx.lineTo(w - p, originY)
-    ctx.stroke()
-    drawArrow(ctx, p, originY, w - p, originY, arrowSize)
-
-    // Axe Y
-    ctx.beginPath()
-    ctx.moveTo(originX, p)
-    ctx.lineTo(originX, h - p)
-    ctx.stroke()
-    drawArrow(ctx, originX, h - p, originX, p, arrowSize)
-
-    if (tickSize) {
-        ctx.lineWidth = 1
-        // Ticks on horizontal axis
-        drawTicksFromOrigin(ctx, originX, p, w-p, tickSize, (x) => {
-            ctx.beginPath()
-            ctx.moveTo(x, originY - 5)
-            ctx.lineTo(x, originY + 5)
-            ctx.stroke()
-        })
-
-        // Ticks on vertical axis
-        drawTicksFromOrigin(ctx, originY, p, h-p, tickSize, (y) => {
-            ctx.beginPath()
-            ctx.moveTo(originX - 5, y)
-            ctx.lineTo(originX + 5, y)
-            ctx.stroke()
-        })
-
+    if (orientation === 'pointy') {
+        // Sommet en haut/bas — hexW = √3·size, espacement lignes = 1.5·size
+        const hexW = Math.sqrt(3) * size
+        const rowH = size * 1.5
+        const cols = Math.ceil(w / hexW) + 2
+        const rows = Math.ceil(h / rowH) + 2
+        for (let row = -1; row < rows; row++) {
+            for (let col = -1; col < cols; col++) {
+                const cx = col * hexW + (row % 2 !== 0 ? hexW / 2 : 0)
+                const cy = row * rowH
+                drawHexagon(ctx, cx, cy, size, Math.PI / 6)
+            }
+        }
+    } else {
+        // Arête horizontale — hexH = √3·size, espacement colonnes = 1.5·size
+        const hexH = Math.sqrt(3) * size
+        const colW = size * 1.5
+        const cols = Math.ceil(w / colW) + 2
+        const rows = Math.ceil(h / hexH) + 2
+        for (let row = -1; row < rows; row++) {
+            for (let col = -1; col < cols; col++) {
+                const cx = col * colW
+                const cy = row * hexH + (col % 2 !== 0 ? hexH / 2 : 0)
+                drawHexagon(ctx, cx, cy, size, 0)
+            }
+        }
     }
 
     ctx.restore()
 }
 
-function resolveOrigin(
-    w: number,
-    h: number,
-    padding: number,
-    origin: OriginMode
-) {
-    switch (origin.mode) {
-        case 'center':
-            return {x: w / 2, y: h / 2}
-
-        case 'bottom':
-            return {x: w / 2, y: h - padding}
-
-        case 'bottom-left':
-            return {x: padding, y: h - padding}
-
-        case 'manual':
-            return {x: origin.x, y: origin.y}
-    }
-}
-
-function drawArrow(
-    ctx: CanvasRenderingContext2D,
-    fromX: number,
-    fromY: number,
-    toX: number,
-    toY: number,
-    size: number
-) {
-    const angle = Math.atan2(toY - fromY, toX - fromX)
-
+function drawHexagon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, angleOffset: number) {
     ctx.beginPath()
-    ctx.moveTo(toX, toY)
-    ctx.lineTo(
-        toX - size * Math.cos(angle - Math.PI / 6),
-        toY - size * Math.sin(angle - Math.PI / 6)
-    )
-    ctx.moveTo(toX, toY)
-    ctx.lineTo(
-        toX - size * Math.cos(angle + Math.PI / 6),
-        toY - size * Math.sin(angle + Math.PI / 6)
-    )
-    ctx.stroke()
-}
-
-function drawTicksFromOrigin(
-    ctx: CanvasRenderingContext2D,
-    origin: number,
-    min: number,
-    max: number,
-    step: number,
-    draw: (v: number) => void
-) {
-    const startIndex = Math.ceil((min - origin) / step)
-    const endIndex   = Math.floor((max - origin) / step)
-
-    for (let i = startIndex; i <= endIndex; i++) {
-        draw(origin + i * step)
+    for (let i = 0; i < 6; i++) {
+        const angle = angleOffset + (i * Math.PI) / 3
+        const x = cx + size * Math.cos(angle)
+        const y = cy + size * Math.sin(angle)
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
     }
-}
-
-function alignPixel(v: number, lineWidth: number) {
-    return lineWidth % 2 === 1
-        ? Math.round(v) + 0.5
-        : Math.round(v)
+    ctx.closePath()
+    ctx.stroke()
 }

@@ -1,8 +1,9 @@
 import {AbstractShape} from "./AbstractShape"
 import {ShapeOptions} from "./Adaptable"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
+import type {IDrawingContext} from "../core/DrawingContext"
 
-export type PolygonPoint = { x: number; y: number }
+export interface PolygonPoint { x: number; y: number }
 
 export interface PolygonConfig {
     points: PolygonPoint[]
@@ -14,6 +15,10 @@ export class Polygon extends AbstractShape {
     closed = false
     cursorPos: PolygonPoint | null = null
 
+    override readonly canBeFilled = true
+    readonly drawingMode = 'multi-click' as const
+    readonly doubleClickTimeout = 300
+
     constructor(config: PolygonConfig, options: Partial<ShapeOptions> = {}) {
         super(options)
         this.points = config.points ?? []
@@ -24,9 +29,86 @@ export class Polygon extends AbstractShape {
         this.points.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 })
     }
 
-    // Appelé à chaque pointermove — met à jour la position du curseur pour le preview
     update(x: number, y: number) {
         this.cursorPos = { x, y }
+    }
+
+    onDrawStart(x: number, y: number, _ctx: IDrawingContext): void {
+        this.addVertex(x, y)
+    }
+
+    onDrawMove(x: number, y: number, ctx: IDrawingContext): boolean {
+        const { x: tx, y: ty, scale } = ctx.viewTransform
+        let finalX = x, finalY = y
+        let snapToFirst = false
+
+        if (this.points.length >= 3) {
+            const first = this.points[0]
+            if (Math.hypot(x - first.x, y - first.y) * scale <= 15) {
+                finalX = first.x
+                finalY = first.y
+                snapToFirst = true
+            }
+        }
+
+        let snapResult = null
+        if (!snapToFirst) {
+            snapResult = ctx.snap(x, y, this.layer)
+            if (snapResult) { finalX = snapResult.x; finalY = snapResult.y }
+        }
+
+        this.update(finalX, finalY)
+
+        const oCtx = ctx.overlayCtx
+        oCtx.save()
+        oCtx.translate(tx, ty)
+        oCtx.scale(scale, scale)
+        this.draw(oCtx)
+
+        if (snapToFirst) {
+            const first = this.points[0]
+            oCtx.beginPath()
+            oCtx.arc(first.x, first.y, 8 / scale, 0, Math.PI * 2)
+            oCtx.strokeStyle = this.color
+            oCtx.lineWidth = 2 / scale
+            oCtx.stroke()
+        } else if (snapResult) {
+            ctx.drawSnapIndicator(snapResult)
+        }
+
+        oCtx.restore()
+        return true
+    }
+
+    onDrawClick(x: number, y: number, ctx: IDrawingContext): 'continue' | 'done' {
+        if (this.points.length >= 3) {
+            const first = this.points[0]
+            if (Math.hypot(x - first.x, y - first.y) * ctx.viewTransform.scale <= 15) {
+                this.closed = true
+                return 'done'
+            }
+        }
+        const snapResult = ctx.snap(x, y, this.layer)
+        this.addVertex(snapResult?.x ?? x, snapResult?.y ?? y)
+        return 'continue'
+    }
+
+    onDrawEnd(): void {
+        this.closed = true
+    }
+
+    hitTest(x: number, y: number, tolerance: number): boolean {
+        if (this.points.length < 2) return false
+        const thresh = this.width / 2 + tolerance
+        for (let i = 0; i < this.points.length - 1; i++) {
+            const a = this.points[i], b = this.points[i + 1]
+            if (AbstractShape.distToSegment(x, y, a.x, a.y, b.x, b.y) <= thresh) return true
+        }
+        if (this.closed && this.points.length >= 3) {
+            const first = this.points[0], last = this.points[this.points.length - 1]
+            if (AbstractShape.distToSegment(x, y, last.x, last.y, first.x, first.y) <= thresh) return true
+        }
+        return false
     }
 
     translate(dx: number, dy: number) {
@@ -54,13 +136,22 @@ export class Polygon extends AbstractShape {
             ? [...this.points, this.cursorPos]
             : this.points
 
-        // Segments validés (traits pleins)
+        // Segments validés
         ctx.beginPath()
         ctx.moveTo(previewPoints[0].x, previewPoints[0].y)
         for (let i = 1; i < this.points.length; i++) {
             ctx.lineTo(previewPoints[i].x, previewPoints[i].y)
         }
+        if (this.closed) ctx.closePath()
+        if (this.fill && this.closed) {
+            ctx.globalAlpha = this.fillOpacity
+            ctx.fillStyle = this.color
+            ctx.fill()
+            ctx.globalAlpha = 1
+        }
+        AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
         ctx.stroke()
+        ctx.setLineDash([])
 
         // Segments de preview (pointillés) : dernier validé → curseur → premier sommet
         if (!this.closed && this.cursorPos && previewPoints.length >= 2) {
@@ -76,16 +167,6 @@ export class Polygon extends AbstractShape {
             ctx.setLineDash([])
         }
 
-        // Polygone finalisé
-        if (this.closed) {
-            ctx.beginPath()
-            ctx.moveTo(this.points[0].x, this.points[0].y)
-            for (let i = 1; i < this.points.length; i++) {
-                ctx.lineTo(this.points[i].x, this.points[i].y)
-            }
-            ctx.closePath()
-            ctx.stroke()
-        }
 
         ctx.restore()
     }

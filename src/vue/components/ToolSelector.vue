@@ -1,18 +1,13 @@
 <script setup lang="ts">
 
-import {ToolType} from "../../types"
+import { ToolType } from "../../types"
+import { useNoteStore } from "../../store/useNoteStore"
 
-const selectedTool = defineModel<ToolType>({
-  default: 'pen'
-})
+const store = useNoteStore()
 
 const props = withDefaults(defineProps<{ tools?: ToolType[] }>(), {
   tools: () => ['pen', 'highlighter', 'eraser', 'line', 'segment', 'circle', 'rectangle']
 })
-
-function onSelect(tool: ToolType) {
-  selectedTool.value = tool
-}
 </script>
 
 <template>
@@ -21,10 +16,22 @@ function onSelect(tool: ToolType) {
 			v-for="tool in props.tools"
 			:key="tool"
 			class="tool-button"
-			:class="{ active: selectedTool === tool }"
-			@click="onSelect(tool)"
+			:class="{ active: store.tool.tool === tool }"
+			@click="store.selectTool(tool)"
 		>
 			<span class="icon-wrapper">
+
+				<!-- SELECT -->
+				<svg
+					v-if="tool === 'select'"
+					viewBox="0 0 24 24"
+					fill="none"
+				>
+					<path
+						d="M5 3l14 9-7 1-4 9L5 3z"
+						fill="currentColor"
+					/>
+				</svg>
 
 				<!-- PEN -->
 				<svg
@@ -107,6 +114,28 @@ function onSelect(tool: ToolType) {
 					<circle cx="20" cy="4" r="2.5" fill="currentColor" />
 				</svg>
 
+				<!-- VECTOR -->
+				<svg
+					v-else-if="tool === 'vector'"
+					viewBox="0 0 24 24"
+					fill="none"
+				>
+					<line
+						x1="4"
+						y1="20"
+						x2="18"
+						y2="6"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+					/>
+					<path
+						d="M18 6l-5 1 4 4z"
+						fill="currentColor"
+						stroke="none"
+					/>
+				</svg>
+
 				<!-- CIRCLE -->
 				<svg
 					v-else-if="tool === 'circle'"
@@ -139,61 +168,22 @@ function onSelect(tool: ToolType) {
 					/>
 				</svg>
 
+				<!-- POLYGON -->
+				<svg
+					v-else-if="tool === 'polygon'"
+					viewBox="0 0 24 24"
+					fill="none"
+				>
+					<polygon
+						points="12,3 21,9 18,20 6,20 3,9"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linejoin="round"
+					/>
+				</svg>
+
 			</span>
 		</button>
 	</div>
 </template>
 
-<style scoped>
-.tool-selector {
-  display: flex;
-  gap: 10px;
-}
-
-.tool-button {
-  border: none;
-  background: transparent;
-  padding: 4px;
-  cursor: pointer;
-}
-
-.icon-wrapper {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
-
-.tool-button svg {
-  width: 18px;
-  height: 18px;
-  color: #555; /* pour currentColor */
-  fill: currentColor; /* utile pour pen / eraser */
-  transition: all 0.15s ease;
-}
-
-.tool-button.active svg {
-  color: #3b82f6;
-}
-
-/* Hover */
-.tool-button:hover .icon-wrapper {
-  border-color: #d1d5db;
-  background: #fafafa;
-}
-
-/* Active */
-.tool-button.active .icon-wrapper {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.08);
-}
-
-.tool-button.active svg {
-  fill: #3b82f6;
-}
-</style>

@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm ls *)",
+      "Bash(npm run *)",
+      "Bash(rm \"C:/Users/basil/.claude/skills/create-tool/SKILL.md\")",
+      "Bash(rmdir \"C:/Users/basil/.claude/skills/create-tool\")",
+      "Bash(npm install *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

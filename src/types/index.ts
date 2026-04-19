@@ -12,11 +12,16 @@ export type GeomType =
     | 'circle'
     | 'polygon'
 
+export type ArrowStyle = 'filled' | 'open'
+export type LineStyle = 'solid' | 'dashed' | 'dotted'
+
 export type ToolType =
     | 'pen'
     | 'eraser'
     | 'highlighter'
     | 'move'
+    | 'select'
+    | 'vector'
     | GeomType
 
 
@@ -43,13 +48,13 @@ export interface LayerInfo {
     opacity: number
 }
 
-export type BackgroundMode = 'grid' | 'ruled' | 'axes' | 'none'
+export type BackgroundMode = 'grid' | 'ruled' | 'hex' | 'none'
 
 export interface BackgroundState {
     mode: BackgroundMode
     grid?: GridOptions
     ruled?: RuledOptions
-    axes?: AxisOptions
+    hex?: HexOptions
 }
 
 export interface GridOptions {
@@ -68,17 +73,9 @@ export interface RuledOptions {
     marginTop?: number
 }
 
-export type OriginMode =
-    | { mode: 'manual', x: number, y: number }
-    | { mode: 'center' }
-    | { mode: 'bottom' }
-    | { mode: 'bottom-left' }
-
-export interface AxisOptions {
-    origin?: OriginMode
+export interface HexOptions {
+    size: number                        // longueur d'un côté en px
+    orientation?: 'pointy' | 'flat'    // sommet en haut (pointy) ou arête horizontale (flat)
     color?: string
     lineWidth?: number
-    arrowSize?: number
-    tickSize?: number
-    padding?: number
 }

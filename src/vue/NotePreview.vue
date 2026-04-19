@@ -94,25 +94,3 @@ onUnmounted(() => {
 	</div>
 </template>
 
-<style scoped>
-.preview-wrapper {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: white;
-}
-
-canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-    cursor: grab;
-    touch-action: none;
-}
-
-canvas:active {
-    cursor: grabbing;
-}
-
-</style>

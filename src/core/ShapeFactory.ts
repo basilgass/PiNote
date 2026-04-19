@@ -1,5 +1,5 @@
 // ShapeFactory.ts
-import {LayerName, ToolType} from "src/types"
+import {ArrowStyle, LayerName, LineStyle, ToolType} from "src/types"
 import {Stroke, StrokeConfig} from "../shapes/Stroke"
 import {Line, LineConfig} from "../shapes/Line"
 import {Segment, SegmentConfig} from "../shapes/Segment"
@@ -18,6 +18,12 @@ export interface ShapeStartConfig {
     width?: number
     layer?: LayerName | null
     createdAt?: number
+    arrowStart?: boolean
+    arrowEnd?: boolean
+    arrowStyle?: ArrowStyle
+    lineStyle?: LineStyle
+    fill?: boolean
+    fillOpacity?: number
 }
 
 // factory industrialisable
@@ -45,6 +51,12 @@ export class ShapeFactory {
             layer: finalLayer,
             color: finalColor,
             width: finalWidth,
+            arrowStart: config.arrowStart,
+            arrowEnd: config.arrowEnd,
+            arrowStyle: config.arrowStyle,
+            lineStyle: config.lineStyle,
+            fill: config.fill,
+            fillOpacity: config.fillOpacity,
         }
 
         switch (tool) {
@@ -68,6 +80,12 @@ export class ShapeFactory {
             case "polygon":
                 return new Polygon((values as PolygonConfig) ?? {points: []}, options)
 
+            case "vector":
+                return new Segment(
+                    (values as SegmentConfig) ?? {x1: x, y1: y, x2: x, y2: y},
+                    { ...options, arrowEnd: options.arrowEnd ?? true }
+                )
+
             default:
                 throw new Error(`Tool not supported: ${tool}`)
         }
@@ -85,6 +103,12 @@ export class ShapeFactory {
                 layer: options.layer,
                 id: options.id,
                 createdAt: options.createdAt,
+                arrowStart: options.arrowStart,
+                arrowEnd: options.arrowEnd,
+                arrowStyle: options.arrowStyle,
+                lineStyle: options.lineStyle,
+                fill: options.fill,
+                fillOpacity: options.fillOpacity,
             }
             return ShapeFactory.create(startConfig, config)
         } catch {

@@ -8,6 +8,7 @@ const props = defineProps<{
   layers: LayerName[]
   canUndo: boolean
   canRedo: boolean
+  activeId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -49,8 +50,8 @@ watch(() => props.shapes, (shapes) => {
 })
 
 const TOOL_LABEL: Record<string, string> = {
-  pen: 'Stylo', highlighter: 'Surligneur', eraser: 'Gomme',
-  line: 'Droite', segment: 'Segment', circle: 'Cercle',
+  pen: 'Stylo', highlighter: 'Surligneur', eraser: 'Gomme', select: 'Sélection',
+  line: 'Droite', segment: 'Segment', vector: 'Vecteur', circle: 'Cercle',
   rectangle: 'Rectangle', polygon: 'Polygone', move: 'Dépl.',
 }
 </script>
@@ -69,7 +70,7 @@ const TOOL_LABEL: Record<string, string> = {
 			</span>
 			<div class="nh-actions">
 				<button
-					class="nh-btn"
+					class="btn"
 					:disabled="!canUndo"
 					title="Annuler"
 					@click="emit('undo')"
@@ -77,7 +78,7 @@ const TOOL_LABEL: Record<string, string> = {
 					↩
 				</button>
 				<button
-					class="nh-btn"
+					class="btn"
 					:disabled="!canRedo"
 					title="Rétablir"
 					@click="emit('redo')"
@@ -85,7 +86,7 @@ const TOOL_LABEL: Record<string, string> = {
 					↪
 				</button>
 				<button
-					class="nh-btn nh-toggle"
+					class="btn btn-sm"
 					@click="isOpen = !isOpen"
 				>
 					{{ isOpen ? '▲' : '▼' }}
@@ -108,7 +109,10 @@ const TOOL_LABEL: Record<string, string> = {
 					v-for="shape in [...shapes].reverse()"
 					:key="shape.id"
 					class="nh-row"
-					:class="{ selected: selectedId === shape.id }"
+					:class="{
+						selected: selectedId === shape.id || activeId === shape.id,
+						active: activeId === shape.id
+					}"
 					@click="selectShape(shape.id)"
 				>
 					<span
@@ -140,158 +144,3 @@ const TOOL_LABEL: Record<string, string> = {
 	</div>
 </template>
 
-<style scoped>
-.nh-root {
-  position: fixed;
-  right: 12px;
-  top: 12px;
-  z-index: 1000;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-  min-width: 180px;
-  font-size: 13px;
-  user-select: none;
-}
-
-.nh-root.closed {
-  min-width: 0;
-  width: fit-content;
-}
-
-.nh-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  gap: 6px;
-}
-
-.nh-title {
-  font-weight: 600;
-  color: #374151;
-  flex: 1;
-}
-
-.nh-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.nh-btn {
-  border: 1px solid #e5e7eb;
-  background: white;
-  border-radius: 6px;
-  padding: 3px 7px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #374151;
-  transition: background 0.15s;
-}
-
-.nh-btn:hover:not(:disabled) {
-  background: #f3f4f6;
-}
-
-.nh-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.nh-toggle {
-  font-size: 10px;
-  padding: 3px 6px;
-}
-
-.nh-body {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.25s ease;
-  width: 0;
-}
-
-.nh-body.open {
-  grid-template-rows: 1fr;
-  width: auto;
-}
-
-.nh-body-inner {
-  overflow: hidden;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.nh-empty {
-  padding: 10px 12px;
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.nh-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  cursor: pointer;
-  border-top: 1px solid #f3f4f6;
-  transition: background 0.12s;
-}
-
-.nh-row:hover {
-  background: #f9fafb;
-}
-
-.nh-row.selected {
-  background: #eff6ff;
-}
-
-.nh-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  border: 1px solid rgba(0,0,0,0.1);
-  flex-shrink: 0;
-}
-
-.nh-tool {
-  flex: 1;
-  color: #374151;
-}
-
-.nh-tool.hidden {
-  opacity: 0.35;
-  text-decoration: line-through;
-}
-
-.nh-icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-size: 13px;
-  opacity: 0.5;
-  transition: opacity 0.12s;
-}
-
-.nh-icon-btn:hover {
-  opacity: 1;
-}
-
-.nh-delete {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-size: 13px;
-  opacity: 0.4;
-  transition: opacity 0.12s, background 0.12s;
-}
-
-.nh-delete:hover {
-  opacity: 1;
-  background: #fee2e2;
-}
-</style>

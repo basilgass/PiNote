@@ -2,6 +2,7 @@ import {StrokePoint, ToolType} from "../types"
 import {AbstractShape} from "./AbstractShape"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions} from "./Adaptable"
+import type {IDrawingContext} from "../core/DrawingContext"
 
 export interface StrokeConfig {
     tool: ToolType
@@ -14,15 +15,19 @@ export class Stroke extends AbstractShape {
     bezier = true
     isIncremental = true
 
-    // P1/A1: cache des points filtrés/lissés, invalidé à chaque addPoint
+    override readonly canHaveArrows = false
+    readonly drawingMode = 'drag' as const
+
     private _cachedPts: StrokePoint[] | null = null
+    private _eraserSnapshot: ImageData | null = null
 
     constructor(
         config: StrokeConfig,
         options: Partial<ShapeOptions> = {}
     ) {
         super(options)
-        this.points = config.points ? config.points : []
+        this.points = config.points ?? []
+        this.bezier = config.bezier ?? true
     }
 
     addPoint(point: StrokePoint) {
@@ -36,12 +41,70 @@ export class Stroke extends AbstractShape {
     }
 
     update(x: number, y: number) {
-        // P3: t capturé via performance.now() pour le futur feature de replay temporel
         this.addPoint({x, y, t: performance.now(), pressure: 1})
+    }
+
+    onDrawStart(_x: number, _y: number, ctx: IDrawingContext): void {
+        if (this.tool === 'eraser' && this.layer) {
+            this._eraserSnapshot = ctx.getLayerSnapshot(this.layer)
+        } else {
+            this.bezier = ctx.bezierEnabled
+        }
+    }
+
+    onDrawPoint(x: number, y: number, t: number): void {
+        this.addPoint({ x, y, t, pressure: 1 })
+    }
+
+    onDrawMove(x: number, y: number, ctx: IDrawingContext): boolean {
+        if (this.tool !== 'eraser') return false
+
+        if (this._eraserSnapshot && this.layer) {
+            ctx.restoreLayerSnapshot(this.layer, this._eraserSnapshot)
+            const layer = ctx.getLayer(this.layer)
+            const { x: tx, y: ty, scale } = ctx.viewTransform
+            const lCtx = layer.ctx
+            lCtx.save()
+            if (this.layer !== 'BACKGROUND') {
+                lCtx.translate(tx, ty)
+                lCtx.scale(scale, scale)
+            }
+            this.draw(lCtx)
+            lCtx.restore()
+        }
+
+        const { x: tx, y: ty, scale } = ctx.viewTransform
+        const oCtx = ctx.overlayCtx
+        oCtx.save()
+        oCtx.translate(tx, ty)
+        oCtx.scale(scale, scale)
+        oCtx.beginPath()
+        oCtx.arc(x, y, this.width / 2, 0, Math.PI * 2)
+        oCtx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
+        oCtx.lineWidth = 1 / scale
+        oCtx.setLineDash([4 / scale, 4 / scale])
+        oCtx.stroke()
+        oCtx.setLineDash([])
+        oCtx.restore()
+        return true
+    }
+
+    onDrawEnd(): void {
+        this._eraserSnapshot = null
     }
 
     getPointsUntil(time: number): StrokePoint[] {
         return this.points.filter(p => p.t <= time)
+    }
+
+    hitTest(x: number, y: number, tolerance: number): boolean {
+        if (this.points.length < 2) return false
+        const thresh = this.width / 2 + tolerance
+        for (let i = 0; i < this.points.length - 1; i++) {
+            const p = this.points[i], q = this.points[i + 1]
+            if (AbstractShape.distToSegment(x, y, p.x, p.y, q.x, q.y) <= thresh) return true
+        }
+        return false
     }
 
     translate(dx: number, dy: number) {
@@ -65,6 +128,7 @@ export class Stroke extends AbstractShape {
 
     draw(ctx: CanvasRenderingContext2D) {
         if (this.points.length < 2) return
+        const scale = Math.abs(ctx.getTransform().a) || 1
         ctx.save()
 
         const pts = this.processedPts  // P1/A1: utilise le cache
@@ -88,6 +152,7 @@ export class Stroke extends AbstractShape {
                 break
         }
 
+        AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
         ctx.beginPath()
 
         if (!this.bezier || pts.length < 4) {
@@ -109,6 +174,29 @@ export class Stroke extends AbstractShape {
         }
 
         ctx.stroke()
+        ctx.setLineDash([])
+
+        // Flèches sur le trait (orientation calculée sur les derniers/premiers points)
+        if (this.arrowStart || this.arrowEnd) {
+            const n = this.points.length
+            const arrowSize = Math.max(this.width * 5, 14)
+            const span = Math.min(5, n - 1)
+            if (this.arrowEnd) {
+                const angle = Math.atan2(
+                    this.points[n - 1].y - this.points[n - 1 - span].y,
+                    this.points[n - 1].x - this.points[n - 1 - span].x
+                )
+                AbstractShape.drawArrowHead(ctx, this.points[n - 1].x, this.points[n - 1].y, angle, arrowSize, this.arrowStyle, this.color, this.width)
+            }
+            if (this.arrowStart) {
+                const angle = Math.atan2(
+                    this.points[0].y - this.points[span].y,
+                    this.points[0].x - this.points[span].x
+                )
+                AbstractShape.drawArrowHead(ctx, this.points[0].x, this.points[0].y, angle, arrowSize, this.arrowStyle, this.color, this.width)
+            }
+        }
+
         ctx.restore()
     }
 

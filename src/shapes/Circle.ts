@@ -13,6 +13,8 @@ export class Circle extends AbstractShape {
     public cy: number
     public radius: number
 
+    override readonly canBeFilled = true
+
     constructor(
         config: CircleConfig,
         options: Partial<ShapeOptions> = {}
@@ -26,12 +28,21 @@ export class Circle extends AbstractShape {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
+        const scale = Math.abs(ctx.getTransform().a) || 1
         ctx.save()
         ctx.beginPath()
         ctx.arc(this.cx, this.cy, this.radius, 0, Math.PI * 2)
+        if (this.fill) {
+            ctx.globalAlpha = this.fillOpacity
+            ctx.fillStyle = this.color
+            ctx.fill()
+            ctx.globalAlpha = 1
+        }
         ctx.strokeStyle = this.color
         ctx.lineWidth = this.width
+        AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
         ctx.stroke()
+        ctx.setLineDash([])
         ctx.restore()
     }
 
@@ -39,6 +50,10 @@ export class Circle extends AbstractShape {
         const dx = x - this.cx
         const dy = y - this.cy
         this.radius = Math.hypot(dx, dy)
+    }
+
+    hitTest(x: number, y: number, tolerance: number): boolean {
+        return Math.abs(Math.hypot(x - this.cx, y - this.cy) - this.radius) <= this.width / 2 + tolerance
     }
 
     translate(dx: number, dy: number) {

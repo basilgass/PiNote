@@ -1,6 +1,7 @@
 import {AbstractShape} from "./AbstractShape"
 import {ShapeOptions} from "./Adaptable"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
+import type {IDrawingContext} from "../core/DrawingContext"
 
 export interface RectangleConfig {
     p1: { x: number; y: number }
@@ -8,13 +9,16 @@ export interface RectangleConfig {
     w: number  // largeur perpendiculaire signée
 }
 
-type Pt = { x: number; y: number }
+interface Pt { x: number; y: number }
 
 export class Rectangle extends AbstractShape {
     p1: Pt
     p2: Pt
     w: number
-    cursorPos: Pt | null = null  // preview phase 1 (arête)
+    cursorPos: Pt | null = null
+
+    override readonly canBeFilled = true
+    readonly drawingMode = 'two-phase' as const
 
     constructor(config: RectangleConfig, options: Partial<ShapeOptions> = {}) {
         super(options)
@@ -30,6 +34,19 @@ export class Rectangle extends AbstractShape {
 
     setP2(x: number, y: number) {
         this.p2 = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
+    }
+
+    onPhaseTransition(x: number, y: number, ctx: IDrawingContext): void {
+        const snapResult = ctx.snap(x, y, this.layer)
+        this.setP2(snapResult?.x ?? x, snapResult?.y ?? y)
+        const { x: tx, y: ty, scale } = ctx.viewTransform
+        const oCtx = ctx.overlayCtx
+        oCtx.save()
+        oCtx.translate(tx, ty)
+        oCtx.scale(scale, scale)
+        this.draw(oCtx)
+        if (snapResult) ctx.drawSnapIndicator(snapResult)
+        oCtx.restore()
     }
 
     update(x: number, y: number) {
@@ -60,6 +77,17 @@ export class Rectangle extends AbstractShape {
             { x: this.p2.x + px, y: this.p2.y + py },
             { x: this.p1.x + px, y: this.p1.y + py },
         ]
+    }
+
+    hitTest(x: number, y: number, tolerance: number): boolean {
+        const corners = this.getCorners()
+        if (!corners) return false
+        const thresh = this.width / 2 + tolerance
+        for (let i = 0; i < 4; i++) {
+            const a = corners[i], b = corners[(i + 1) % 4]
+            if (AbstractShape.distToSegment(x, y, a.x, a.y, b.x, b.y) <= thresh) return true
+        }
+        return false
     }
 
     translate(dx: number, dy: number) {
@@ -100,7 +128,15 @@ export class Rectangle extends AbstractShape {
             ctx.moveTo(corners[0].x, corners[0].y)
             for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y)
             ctx.closePath()
+            if (this.fill) {
+                ctx.globalAlpha = this.fillOpacity
+                ctx.fillStyle = this.color
+                ctx.fill()
+                ctx.globalAlpha = 1
+            }
+            AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
             ctx.stroke()
+            ctx.setLineDash([])
         }
 
         ctx.restore()

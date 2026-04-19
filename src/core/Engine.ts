@@ -1,17 +1,16 @@
 import {Layer} from "@core/Layer"
 import {BackgroundMode, BackgroundState, LayerName, ToolType} from "../types"
-import {Adaptable} from "../shapes/Adaptable"
+import {Adaptable, ShapePatch} from "../shapes/Adaptable"
 import {AbstractShape} from "../shapes/AbstractShape"
-import {Polygon} from "../shapes/Polygon"
-import {Rectangle} from "../shapes/Rectangle"
 import {SnapManager} from "../snap/SnapManager"
 import {ShapeFactory, ShapeStartConfig} from "@core/ShapeFactory"
-import {Stroke} from "../shapes/Stroke"
-import {drawAxes, drawGrid, drawRuled} from "@core/helper"
+import {drawGrid, drawHex, drawRuled} from "@core/helper"
 import {SnapRenderer} from "../snap/visual/SnapRenderer"
+import type {IDrawingContext} from "./DrawingContext"
 
 export class Engine {
     public bezier = false // toggle global
+    private _title: string = ''
 
     private static NO_SNAP_TOOLS = new Set<ToolType>(['pen', 'highlighter', 'eraser'])
 
@@ -21,16 +20,19 @@ export class Engine {
     private _shapes: Adaptable[] = []
     private _currentShape: Adaptable | null = null
     private _background: BackgroundState = { mode: 'none' }
-    private static readonly localStorageKey = 'pi_note_draft'
+    private _pageId = 'default'
+    private _onSaveCallback?: () => void
     private _snapManager: SnapManager = new SnapManager({snapRadius: 10})
     private snapRenderer: SnapRenderer
     private _resizeObserver: ResizeObserver
     private _viewTransform = { x: 0, y: 0, scale: 1 }
-    private _eraserSnapshot: ImageData | null = null
     private _undoStack: Adaptable[] = []
     private _selectedShapeId: string | null = null
+    private _snapGridEnabled = false
+    private _snapGridSize = 80
+    private _gridPreviewTimer: ReturnType<typeof setTimeout> | null = null
 
-    constructor(container: HTMLDivElement) {
+    constructor(container: HTMLDivElement, defaultBackground?: BackgroundState) {
         this.container = container
         this.container.style.position = 'relative'
 
@@ -44,13 +46,34 @@ export class Engine {
 
         this.snapRenderer = new SnapRenderer(this.overlay.ctx)
 
+        if (defaultBackground) this._applyBackground(defaultBackground)
+
         this._resizeObserver = new ResizeObserver(() => this.resize())
         this._resizeObserver.observe(this.container)
+
+        // Grid snap désactivé par défaut
+        this._snapManager.setStrategyEnabled('grid', false)
+    }
+
+    get snapGridEnabled(): boolean { return this._snapGridEnabled }
+    set snapGridEnabled(enabled: boolean) {
+        this._snapGridEnabled = enabled
+        this._snapManager.setStrategyEnabled('grid', enabled)
+    }
+
+    get snapGridSize(): number { return this._snapGridSize }
+    set snapGridSize(size: number) {
+        this._snapGridSize = size
+        this._snapManager.setGridSize(size)
     }
 
     get snapManager(): SnapManager {
         return this._snapManager
     }
+
+    private get _storageKey(): string { return 'pi_note_draft_' + this._pageId }
+    setPageId(id: string) { this._pageId = id }
+    set onSave(cb: () => void) { this._onSaveCallback = cb }
 
     setViewTransform(x: number, y: number, scale: number) {
         this._viewTransform = { x, y, scale }
@@ -61,6 +84,12 @@ export class Engine {
     get layers(): Layer[] { return Object.values(this._layers) }
     get mode(): BackgroundMode { return this._background.mode }
     set mode(value: BackgroundMode) { this._background.mode = value }
+    get title(): string { return this._title }
+    set title(value: string) {
+        this._title = value
+        try { this.saveLocal() } catch { /* ignore */ }
+    }
+    get backgroundState(): BackgroundState { return { ...this._background } }
 
     // --- Shape creation ---
     startShape(config: ShapeStartConfig): Adaptable {
@@ -69,7 +98,6 @@ export class Engine {
 
         if (!Engine.NO_SNAP_TOOLS.has(config.tool)) {
             const snapResult = this.snapManager.snap(config.x, config.y, this._shapes, config.layer)
-
             this.overlay.clear()
             const { x: tx, y: ty, scale } = this._viewTransform
             const ctx = this.overlay.ctx
@@ -78,64 +106,27 @@ export class Engine {
             ctx.scale(scale, scale)
             this.snapRenderer.draw(snapResult)
             ctx.restore()
-
             startX = snapResult?.x ?? config.x
             startY = snapResult?.y ?? config.y
         }
 
-        const shape = ShapeFactory.create({
-            ...config,
-            x: startX,
-            y: startY
-        })
-
-        // P1: bezier assigné ici, ajout à _shapes unifié dans endShape
-        if (shape instanceof Stroke) shape.bezier = this.bezier
-
-        // Snapshot du layer cible pour l'effacement live
-        if (config.tool === 'eraser' && shape.layer !== null) {
-            const layer = this.getLayer(shape.layer)
-            this._eraserSnapshot = layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height)
-        }
-
+        const shape = ShapeFactory.create({ ...config, x: startX, y: startY })
+        shape.onDrawStart?.(startX, startY, this._buildDrawingContext())
         this._currentShape = shape
         return shape
     }
 
-    // Place le deuxième point du rectangle (arête) avec snap. Redessine l'overlay.
-    setRectP2(x: number, y: number) {
-        if (!(this._currentShape instanceof Rectangle)) return
-        const snapResult = this.snapManager.snap(x, y, this._shapes, this._currentShape.layer)
-        this._currentShape.setP2(snapResult?.x ?? x, snapResult?.y ?? y)
+    /** Mode two-phase : transition phase 1 → phase 2 (2e clic). */
+    phaseTransition(x: number, y: number) {
+        if (!this._currentShape?.onPhaseTransition) return
         this.overlay.clear()
-        const { x: tx, y: ty, scale } = this._viewTransform
-        const ctx = this.overlay.ctx
-        ctx.save()
-        ctx.translate(tx, ty)
-        ctx.scale(scale, scale)
-        this._currentShape.draw(ctx)
-        if (snapResult) this.snapRenderer.draw(snapResult)
-        ctx.restore()
+        this._currentShape.onPhaseTransition(x, y, this._buildDrawingContext())
     }
 
-    // Ajoute un sommet au polygone en cours. Retourne true si le polygone se ferme (clic sur premier sommet).
-    addPolygonVertex(x: number, y: number): boolean {
-        if (!(this._currentShape instanceof Polygon)) return false
-        const polygon = this._currentShape
-
-        // Fermeture si clic proche du premier sommet (≥ 3 sommets existants)
-        if (polygon.points.length >= 3) {
-            const first = polygon.points[0]
-            const screenDist = Math.hypot(x - first.x, y - first.y) * this._viewTransform.scale
-            if (screenDist <= 15) {
-                polygon.closed = true
-                return true
-            }
-        }
-
-        const snapResult = this.snapManager.snap(x, y, this._shapes, polygon.layer)
-        polygon.addVertex(snapResult?.x ?? x, snapResult?.y ?? y)
-        return false
+    /** Mode multi-click : traite un clic suivant. Retourne 'done' si la shape est terminée. */
+    handleDrawClick(x: number, y: number): 'continue' | 'done' {
+        if (!this._currentShape?.onDrawClick) return 'continue'
+        return this._currentShape.onDrawClick(x, y, this._buildDrawingContext())
     }
 
     updateShape(x: number, y: number) {
@@ -143,81 +134,10 @@ export class Engine {
 
         this.overlay.clear()
 
-        // Cas polygon : preview curseur + highlight premier sommet si proche
-        if (this._currentShape instanceof Polygon) {
-            const polygon = this._currentShape
-            const { x: tx, y: ty, scale } = this._viewTransform
+        const handled = this._currentShape.onDrawMove?.(x, y, this._buildDrawingContext())
+        if (handled) return
 
-            let finalX = x, finalY = y
-            let snapToFirst = false
-
-            if (polygon.points.length >= 3) {
-                const first = polygon.points[0]
-                const screenDist = Math.hypot(x - first.x, y - first.y) * scale
-                if (screenDist <= 15) {
-                    finalX = first.x
-                    finalY = first.y
-                    snapToFirst = true
-                }
-            }
-
-            let snapResult = null
-            if (!snapToFirst) {
-                snapResult = this.snapManager.snap(x, y, this._shapes, polygon.layer)
-                if (snapResult) { finalX = snapResult.x; finalY = snapResult.y }
-            }
-
-            polygon.update(finalX, finalY)
-
-            const ctx = this.overlay.ctx
-            ctx.save()
-            ctx.translate(tx, ty)
-            ctx.scale(scale, scale)
-            polygon.draw(ctx)
-
-            if (snapToFirst) {
-                const first = polygon.points[0]
-                ctx.beginPath()
-                ctx.arc(first.x, first.y, 8 / scale, 0, Math.PI * 2)
-                ctx.strokeStyle = polygon.color
-                ctx.lineWidth = 2 / scale
-                ctx.stroke()
-            } else if (snapResult) {
-                this.snapRenderer.draw(snapResult)
-            }
-
-            ctx.restore()
-            return
-        }
-
-        // Cas eraser : effacement live sur le layer cible + curseur circulaire sur l'overlay
-        if (this._currentShape.tool === 'eraser') {
-            this._currentShape.update?.(x, y)
-
-            if (this._eraserSnapshot && this._currentShape.layer !== null) {
-                const layer = this.getLayer(this._currentShape.layer)
-                layer.ctx.putImageData(this._eraserSnapshot, 0, 0)
-                const { x: tx, y: ty, scale } = this._viewTransform
-                const lCtx = layer.ctx
-                lCtx.save()
-                if (this._currentShape.layer !== 'BACKGROUND') {
-                    lCtx.translate(tx, ty)
-                    lCtx.scale(scale, scale)
-                }
-                this._currentShape.draw(lCtx)
-                lCtx.restore()
-            }
-
-            const { x: tx, y: ty, scale } = this._viewTransform
-            const oCtx = this.overlay.ctx
-            oCtx.save()
-            oCtx.translate(tx, ty)
-            oCtx.scale(scale, scale)
-            this._drawEraserCursor(oCtx, x, y, (this._currentShape as AbstractShape).width)
-            oCtx.restore()
-            return
-        }
-
+        // Comportement générique : snap + draw sur overlay
         let newX = x
         let newY = y
         const isSnapTool = !Engine.NO_SNAP_TOOLS.has(this._currentShape.tool)
@@ -249,17 +169,12 @@ export class Engine {
         this._currentShape = null
         this.overlay.clear()
 
-        // Libère le snapshot eraser
-        this._eraserSnapshot = null
-
-        // Ignore les shapes dégénérées (simple clic sans déplacement)
         if ((shape as AbstractShape).isEmpty()) return
 
-        // Polygon : marquer comme fermé à la finalisation
-        if (shape instanceof Polygon) shape.closed = true
+        shape.onDrawEnd?.()
 
         this._shapes.push(shape)
-        this._undoStack = []  // tout nouveau shape invalide le redo
+        this._undoStack = []
 
         if (shape.layer !== null) {
             const layer = this.getLayer(shape.layer)
@@ -276,12 +191,30 @@ export class Engine {
             }
         }
 
-        // P5: rollback visuel si saveLocal échoue
         try {
             this.saveLocal()
         } catch {
             this._shapes.pop()
             this.draw()
+        }
+    }
+
+    private _buildDrawingContext(): IDrawingContext {
+        const self = this
+        return {
+            get overlayCtx() { return self.overlay.ctx },
+            snap: (x, y, layer) => self._snapManager.snap(x, y, self._shapes, layer),
+            getLayer: (name) => self.getLayer(name),
+            get viewTransform() { return self._viewTransform },
+            drawSnapIndicator: (result) => { self.snapRenderer.draw(result) },
+            get bezierEnabled() { return self.bezier },
+            getLayerSnapshot: (name) => {
+                const layer = self.getLayer(name)
+                return layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height)
+            },
+            restoreLayerSnapshot: (name, data) => {
+                self.getLayer(name).ctx.putImageData(data, 0, 0)
+            },
         }
     }
 
@@ -347,10 +280,18 @@ export class Engine {
 
     // --- Background ---
     setBackground(state: BackgroundState) {
-        this._background = state
-        // P3/P4: renderBackground ne call plus draw(), appelé explicitement ici
-        this.renderBackground(state)
+        this._applyBackground(state)
+        if (state.mode === 'grid' && state.grid?.size) {
+            this._snapGridSize = state.grid.size
+            this._snapManager.setGridSize(state.grid.size)
+        }
         this.draw()
+        try { this.saveLocal() } catch { /* ignore */ }
+    }
+
+    private _applyBackground(state: BackgroundState) {
+        this._background = state
+        this.renderBackground(state)
     }
 
     private renderBackground(state: BackgroundState) {
@@ -363,22 +304,79 @@ export class Engine {
         switch (state.mode) {
             case 'grid': drawGrid(ctx, w, h, state.grid!); break
             case 'ruled': drawRuled(ctx, w, h, state.ruled!); break
-            case 'axes': drawAxes(ctx, w, h, state.axes!); break
+            case 'hex': drawHex(ctx, w, h, state.hex!); break
         }
         // P3/P4: this.draw() supprimé — l'appelant en est responsable
     }
 
     // --- LocalStorage ---
+    getShapeById(id: string): Adaptable | undefined {
+        return this._shapes.find(s => s.id === id)
+    }
+
+    updateShapeProps(id: string, patch: ShapePatch): void {
+        const shape = this._shapes.find(s => s.id === id)
+        if (!shape) return
+        Object.assign(shape, patch)
+        this.draw()
+        this._drawSelectionOverlay()
+        try { this.saveLocal() } catch { /* ignore */ }
+    }
+
+    resetState() {
+        this._shapes = []
+        this._undoStack = []
+        this._selectedShapeId = null
+        this._title = ''
+        this.overlay.clear()
+        this.clearAll()
+        this._applyBackground({ mode: 'none' })
+    }
+
+    resetAll() {
+        this.resetState()
+        try { this.saveLocal() } catch { /* ignore */ }
+    }
+
+    toJSONData(): object {
+        return { title: this._title, background: this._background, shapes: this._shapes.map(s => s.toJSON()) }
+    }
+
     saveLocal() {
-        const data = this._shapes.map(s => s.toJSON())
-        localStorage.setItem(Engine.localStorageKey, JSON.stringify(data))
+        localStorage.setItem(this._storageKey, JSON.stringify(this.toJSONData()))
+        this._onSaveCallback?.()
+    }
+
+    loadFromJSONData(parsed: any): void {
+        // rétrocompatibilité : ancien format = tableau direct
+        const shapesData: any[] = Array.isArray(parsed) ? parsed : (parsed.shapes ?? [])
+        this._title = Array.isArray(parsed) ? '' : (parsed.title ?? '')
+        if (!Array.isArray(parsed) && parsed.background) {
+            this._applyBackground(parsed.background)
+        }
+
+        let skipped = 0
+        this._shapes = shapesData.map((s: any) => {
+            const shape = ShapeFactory.fromJSON(s)
+            if (!shape) skipped++
+            return shape
+        }).filter((s): s is Adaptable => s !== null)
+
+        if (skipped > 0) {
+            console.warn(`[PiNote] loadFromJSONData: ${skipped} forme(s) ignorée(s) (données invalides ou outil inconnu)`)
+        }
+
+        this._undoStack = []
+        this._selectedShapeId = null
+        this.draw()
+        try { this.saveLocal() } catch { /* ignore */ }
     }
 
     loadLocal() {
-        const raw = localStorage.getItem(Engine.localStorageKey)
+        const raw = localStorage.getItem(this._storageKey)
         if (!raw) return
 
-        let parsed: any[]
+        let parsed: any
         try {
             parsed = JSON.parse(raw)
         } catch {
@@ -386,19 +384,89 @@ export class Engine {
             return
         }
 
-        let skipped = 0
-        // P2: filtre typé au lieu de cast as Adaptable[]
-        this._shapes = parsed.map((s: any) => {
-            const shape = ShapeFactory.fromJSON(s)
-            if (!shape) skipped++
-            return shape
-        }).filter((s): s is Adaptable => s !== null)
+        this.loadFromJSONData(parsed)
+    }
 
-        if (skipped > 0) {
-            console.warn(`[PiNote] loadLocal: ${skipped} forme(s) ignorée(s) (données invalides ou outil inconnu)`)
+    exportPNG(): string {
+        const ref = this._layers.MAIN.canvas
+        const offscreen = document.createElement('canvas')
+        offscreen.width = ref.width
+        offscreen.height = ref.height
+        const ctx = offscreen.getContext('2d')!
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, offscreen.width, offscreen.height)
+        for (const name of ['BACKGROUND', 'MAIN', 'LAYER'] as LayerName[]) {
+            if (this._layers[name].visible) ctx.drawImage(this._layers[name].canvas, 0, 0)
+        }
+        return offscreen.toDataURL('image/png')
+    }
+
+    exportA4(orientation: 'portrait' | 'landscape' | 'auto'): string {
+        const mmToPx = (mm: number) => Math.round(mm / 25.4 * 150) // 150 DPI
+        const margin = mmToPx(15)
+
+        // Bounding box de toutes les shapes visibles
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const shape of this._shapes) {
+            if (shape.hidden || !shape.layer) continue
+            const b = shape.getBounds()
+            if (!b) continue
+            if (b.minX < minX) minX = b.minX
+            if (b.minY < minY) minY = b.minY
+            if (b.maxX > maxX) maxX = b.maxX
+            if (b.maxY > maxY) maxY = b.maxY
+        }
+        if (!isFinite(minX)) return this.exportPNG() // fallback si vide
+
+        const contentW = Math.max(maxX - minX, 1)
+        const contentH = Math.max(maxY - minY, 1)
+
+        const resolved = orientation === 'auto'
+            ? (contentW > contentH ? 'landscape' : 'portrait')
+            : orientation
+        const isPortrait = resolved === 'portrait'
+        const canvasW = mmToPx(isPortrait ? 210 : 297)
+        const canvasH = mmToPx(isPortrait ? 297 : 210)
+
+        const scale = Math.min(
+            (canvasW - 2 * margin) / contentW,
+            (canvasH - 2 * margin) / contentH
+        )
+        const drawW = contentW * scale
+        const drawH = contentH * scale
+        const tx = (canvasW - drawW) / 2 - minX * scale
+        const ty = (canvasH - drawH) / 2 - minY * scale
+
+        const offscreen = document.createElement('canvas')
+        offscreen.width = canvasW
+        offscreen.height = canvasH
+        const ctx = offscreen.getContext('2d')!
+
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, canvasW, canvasH)
+
+        // Fond décoratif sur toute la page A4
+        if (this._background.mode !== 'none') {
+            switch (this._background.mode) {
+                case 'grid':  drawGrid(ctx, canvasW, canvasH, this._background.grid!); break
+                case 'ruled': drawRuled(ctx, canvasW, canvasH, this._background.ruled!); break
+                case 'hex':   drawHex(ctx, canvasW, canvasH, this._background.hex!); break
+            }
         }
 
-        this.draw()
+        // Shapes
+        ctx.save()
+        ctx.translate(tx, ty)
+        ctx.scale(scale, scale)
+        for (const layerName of ['BACKGROUND', 'MAIN', 'LAYER'] as LayerName[]) {
+            if (!this._layers[layerName].visible) continue
+            for (const shape of this._shapes) {
+                if (!shape.hidden && shape.layer === layerName) shape.draw(ctx)
+            }
+        }
+        ctx.restore()
+
+        return offscreen.toDataURL('image/png')
     }
 
     // A5: annule le dessin en cours sans le finaliser ni sauvegarder
@@ -406,18 +474,6 @@ export class Engine {
         if (!this._currentShape) return
         this._currentShape = null
         this.overlay.clear()
-    }
-
-    private _drawEraserCursor(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
-        const s = this._viewTransform.scale
-        ctx.save()
-        ctx.beginPath()
-        ctx.arc(x, y, width / 2, 0, Math.PI * 2)
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
-        ctx.lineWidth = 1 / s
-        ctx.setLineDash([4 / s, 4 / s])
-        ctx.stroke()
-        ctx.restore()
     }
 
     // --- Undo / Redo ---
@@ -504,6 +560,20 @@ export class Engine {
         ctx.strokeRect(dx2 - sq - off, y - sq - off, sq * 2, sq * 2)
         ctx.strokeRect(dx2 - sq + off, y - sq + off, sq * 2, sq * 2)
 
+        // Handle de suppression (à droite du précédent) — croix ✕ rouge
+        const dx3 = x + gap * 2
+        ctx.fillStyle = '#ef4444'
+        ctx.beginPath()
+        ctx.arc(dx3, y, hr, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = 'white'
+        ctx.lineWidth = 1.5 / scale
+        const cx = 3.5 / scale
+        ctx.beginPath()
+        ctx.moveTo(dx3 - cx, y - cx); ctx.lineTo(dx3 + cx, y + cx)
+        ctx.moveTo(dx3 + cx, y - cx); ctx.lineTo(dx3 - cx, y + cx)
+        ctx.stroke()
+
         ctx.restore()
     }
 
@@ -515,7 +585,12 @@ export class Engine {
         const pad = 8 / scale
         const hx = bounds.minX - pad
         const hy = bounds.minY - pad
-        return { move: { x: hx, y: hy }, duplicate: { x: hx + 20 / scale, y: hy } }
+        const gap = 20 / scale
+        return {
+            move: { x: hx, y: hy },
+            duplicate: { x: hx + gap, y: hy },
+            delete: { x: hx + gap * 2, y: hy },
+        }
     }
 
     // Retourne true si (x,y) monde est sur le handle de déplacement
@@ -538,6 +613,16 @@ export class Engine {
         return Math.hypot(x - pos.duplicate.x, y - pos.duplicate.y) * this._viewTransform.scale <= 14
     }
 
+    // Retourne true si (x,y) monde est sur le handle de suppression
+    isOverDeleteHandle(x: number, y: number): boolean {
+        if (!this._selectedShapeId) return false
+        const shape = this._shapes.find(s => s.id === this._selectedShapeId) as AbstractShape | undefined
+        if (!shape) return false
+        const pos = this._handlePositions(shape.getBounds())
+        if (!pos) return false
+        return Math.hypot(x - pos.delete.x, y - pos.delete.y) * this._viewTransform.scale <= 14
+    }
+
     // --- Duplication ---
     duplicateShape(id: string): string | null {
         const shape = this._shapes.find(s => s.id === id)
@@ -555,6 +640,17 @@ export class Engine {
         this.draw()
         try { this.saveLocal() } catch { /* ignore */ }
         return clone.id
+    }
+
+    // Retourne l'id du shape sous (x,y), du plus récent au plus ancien
+    findShapeAt(x: number, y: number): string | null {
+        const tolerance = 6 / this._viewTransform.scale
+        for (let i = this._shapes.length - 1; i >= 0; i--) {
+            const shape = this._shapes[i]
+            if (shape.hidden) continue
+            if (shape.hitTest(x, y, tolerance)) return shape.id
+        }
+        return null
     }
 
     // --- Visibilité ---
@@ -589,7 +685,63 @@ export class Engine {
         }
     }
 
+    // --- Grid preview ---
+    showGridPreview(duration = 1500) {
+        if (this._currentShape) return  // pas pendant un dessin
+        if (this._gridPreviewTimer) clearTimeout(this._gridPreviewTimer)
+        this._renderGridPreview()
+        this._gridPreviewTimer = setTimeout(() => {
+            this._gridPreviewTimer = null
+            this.overlay.clear()
+            this._drawSelectionOverlay()
+        }, duration)
+    }
+
+    private _renderGridPreview() {
+        this.overlay.clear()
+        const ctx = this.overlay.ctx
+        const w = this.overlay.canvas.width
+        const h = this.overlay.canvas.height
+        const { x: tx, y: ty, scale } = this._viewTransform
+        const size = this._snapGridSize * scale
+        if (size <= 0) return
+        const offsetX = ((tx % size) + size) % size
+        const offsetY = ((ty % size) + size) % size
+
+        ctx.save()
+        ctx.strokeStyle = '#00A8FF'
+        ctx.globalAlpha = 0.35
+        ctx.lineWidth = 1
+        ctx.setLineDash([2, 4])
+
+        for (let x = offsetX; x <= w + size; x += size) {
+            ctx.beginPath()
+            ctx.moveTo(x, 0)
+            ctx.lineTo(x, h)
+            ctx.stroke()
+        }
+        for (let y = offsetY; y <= h + size; y += size) {
+            ctx.beginPath()
+            ctx.moveTo(0, y)
+            ctx.lineTo(w, y)
+            ctx.stroke()
+        }
+
+        ctx.setLineDash([])
+        ctx.restore()
+    }
+
+    async syncRemote(url: string): Promise<void> {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.toJSONData()),
+        })
+        if (!res.ok) throw new Error(`[PiNote] syncRemote: ${res.status} ${res.statusText}`)
+    }
+
     destroy() {
+        if (this._gridPreviewTimer) clearTimeout(this._gridPreviewTimer)
         this._resizeObserver.disconnect()
     }
 }
