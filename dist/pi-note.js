@@ -1,4 +1,4 @@
-import { Fragment as e, Transition as t, computed as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createVNode as s, defineComponent as c, effectScope as l, getCurrentInstance as u, getCurrentScope as d, hasInjectionContext as f, inject as p, isReactive as m, isRef as h, markRaw as g, mergeModels as _, nextTick as v, normalizeClass as y, normalizeStyle as b, onMounted as x, onScopeDispose as S, onUnmounted as C, openBlock as w, reactive as T, ref as E, renderList as D, shallowReactive as O, shallowRef as k, toDisplayString as A, toRaw as j, toRef as M, toRefs as N, unref as P, useModel as F, useTemplateRef as I, vModelText as ee, vShow as L, watch as R, watchEffect as te, withCtx as ne, withDirectives as re, withKeys as ie, withModifiers as z } from "vue";
+import { Fragment as e, Transition as t, computed as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createVNode as s, defineComponent as c, effectScope as l, getCurrentInstance as u, getCurrentScope as d, hasInjectionContext as f, inject as p, isReactive as m, isRef as h, markRaw as g, mergeModels as _, nextTick as v, normalizeClass as y, normalizeStyle as b, onMounted as x, onScopeDispose as S, onUnmounted as C, openBlock as w, reactive as T, ref as E, renderList as D, shallowReactive as O, shallowRef as k, toDisplayString as A, toRaw as j, toRef as M, toRefs as N, unref as P, useModel as ee, useTemplateRef as F, vModelText as I, vShow as L, watch as R, watchEffect as te, withCtx as ne, withDirectives as re, withKeys as ie, withModifiers as z } from "vue";
 //#region src/core/Layer.ts
 var ae = class {
 	name;
@@ -5530,27 +5530,68 @@ function Pa(e, t, n) {
 	return a.$id = e, a;
 }
 //#endregion
+//#region src/config/PiNoteConfig.ts
+var Fa = {
+	backendUrl: "",
+	storageRetentionDays: 30,
+	appTitle: "PiNote",
+	theme: "light",
+	defaults: {
+		tool: "pen",
+		color: "#000000",
+		width: 2,
+		background: { mode: "none" },
+		snapEnabled: !1,
+		snapSize: 80
+	},
+	colorPresets: [
+		{
+			value: "#000000",
+			label: "Noir"
+		},
+		{
+			value: "#e53935",
+			label: "Rouge"
+		},
+		{
+			value: "#1e88e5",
+			label: "Bleu"
+		},
+		{
+			value: "#43a047",
+			label: "Vert"
+		}
+	],
+	maxPages: 0
+}, Ia = {
+	...Fa,
+	defaults: { ...Fa.defaults }
+};
+function La() {
+	return Ia;
+}
+//#endregion
 //#region src/store/useNoteStore.ts
-var Fa = "pi_note_index", Ia = "pi_note_current", La = "pi_note_page_counter", Ra = 30;
-function za() {
-	let e = parseInt(localStorage.getItem(La) ?? "0", 10) + 1;
-	return localStorage.setItem(La, String(e)), e;
+var Ra = "pi_note_index", za = "pi_note_current", Ba = "pi_note_page_counter";
+function Va() {
+	let e = parseInt(localStorage.getItem(Ba) ?? "0", 10) + 1;
+	return localStorage.setItem(Ba, String(e)), e;
 }
 var $ = Pa("note", () => {
 	let e = k(null), t = E(null);
 	function n(e) {
 		t.value = e;
 	}
-	let r = T({
+	let r = La(), i = T({
 		layer: "MAIN",
-		tool: "pen",
-		width: 2,
-		color: "black",
+		tool: r.defaults.tool,
+		width: r.defaults.width,
+		color: r.defaults.color,
 		bezier: !1
-	}), i = T({
+	}), a = T({
 		pen: {
-			color: "black",
-			width: 2
+			color: r.defaults.color,
+			width: r.defaults.width
 		},
 		highlighter: {
 			color: "#eab308",
@@ -5592,42 +5633,42 @@ var $ = Pa("note", () => {
 			color: "",
 			width: 2
 		}
-	}), a = E(0);
-	function o(e) {
-		i[r.tool].color = r.color, i[r.tool].width = r.width, r.tool = e, r.color = i[e].color, r.width = i[e].width, a.value++;
-	}
+	}), o = E(0);
 	function s(e) {
-		r.width = e, i[r.tool].width = e;
+		a[i.tool].color = i.color, a[i.tool].width = i.width, i.tool = e, i.color = a[e].color, i.width = a[e].width, o.value++;
 	}
 	function c(e) {
-		r.color = e, r.tool !== "eraser" && (i[r.tool].color = e);
+		i.width = e, a[i.tool].width = e;
 	}
-	let l = E([]), u = E(null), d = E(!1), f = E(!1), p = E([]);
-	function m() {
-		l.value = e.value?.shapes.slice() ?? [], d.value = e.value?.canUndo ?? !1, f.value = e.value?.canRedo ?? !1;
+	function l(e) {
+		i.color = e, i.tool !== "eraser" && (a[i.tool].color = e);
 	}
+	let u = E([]), d = E(null), f = E(!1), p = E(!1), m = E([]);
 	function h() {
-		e.value?.undo(), m();
+		u.value = e.value?.shapes.slice() ?? [], f.value = e.value?.canUndo ?? !1, p.value = e.value?.canRedo ?? !1;
 	}
 	function g() {
-		e.value?.redo(), m();
+		e.value?.undo(), h();
 	}
-	function _(t) {
-		u.value === t && (u.value = null, e.value?.clearHighlight()), e.value?.destroyById(t), m();
+	function _() {
+		e.value?.redo(), h();
 	}
 	function v(t) {
-		e.value?.toggleVisibility(t), m();
+		d.value === t && (d.value = null, e.value?.clearHighlight()), e.value?.destroyById(t), h();
 	}
 	function y(t) {
-		u.value = t, t ? e.value?.highlightShape(t) : e.value?.clearHighlight();
+		e.value?.toggleVisibility(t), h();
 	}
-	function b(t, n) {
-		e.value?.updateShapeProps(t, n), m();
+	function b(t) {
+		d.value = t, t ? e.value?.highlightShape(t) : e.value?.clearHighlight();
 	}
-	function x(t) {
+	function x(t, n) {
+		e.value?.updateShapeProps(t, n), h();
+	}
+	function S(t) {
 		e.value && e.value.setLayerVisibility(t, !e.value.getLayer(t).visible);
 	}
-	let S = E({
+	let C = E({
 		mode: "none",
 		grid: {
 			size: 80,
@@ -5645,26 +5686,26 @@ var $ = Pa("note", () => {
 			lineWidth: 1,
 			orientation: "pointy"
 		}
-	}), C = E(""), w = T({
-		enabled: !1,
-		size: 80
+	}), w = E(""), D = T({
+		enabled: r.defaults.snapEnabled,
+		size: r.defaults.snapSize
 	});
-	function D(t) {
-		S.value = t, e.value?.setBackground(t), t.mode === "grid" && t.grid?.size && (w.size = t.grid.size);
-	}
 	function O(t) {
-		C.value = t, e.value && (e.value.title = t);
+		C.value = t, e.value?.setBackground(t), t.mode === "grid" && t.grid?.size && (D.size = t.grid.size);
 	}
 	function A(t) {
-		let n = t.size !== w.size;
-		w.enabled = t.enabled, w.size = t.size, e.value && (e.value.snapGridEnabled = t.enabled, e.value.snapGridSize = t.size, n && e.value.showGridPreview());
+		w.value = t, e.value && (e.value.title = t);
 	}
-	function j() {
-		e.value?.resetAll(), u.value = null, m();
+	function j(t) {
+		let n = t.size !== D.size;
+		D.enabled = t.enabled, D.size = t.size, e.value && (e.value.snapGridEnabled = t.enabled, e.value.snapGridSize = t.size, n && e.value.showGridPreview());
 	}
-	async function M() {
+	function M() {
+		e.value?.resetAll(), d.value = null, h();
+	}
+	async function N() {
 		if (!e.value) return;
-		let t = e.value.toJSONData(), n = new Blob([JSON.stringify(t, null, 2)], { type: "application/json" }), r = (C.value || "dessin") + ".pinote.json";
+		let t = e.value.toJSONData(), n = new Blob([JSON.stringify(t, null, 2)], { type: "application/json" }), r = (w.value || "dessin") + ".pinote.json";
 		if ("showSaveFilePicker" in window) try {
 			let e = await (await window.showSaveFilePicker({
 				suggestedName: r,
@@ -5681,7 +5722,7 @@ var $ = Pa("note", () => {
 		let i = URL.createObjectURL(n), a = document.createElement("a");
 		a.href = i, a.download = r, a.click(), URL.revokeObjectURL(i);
 	}
-	async function N(t) {
+	async function P(t) {
 		if (!e.value) return;
 		let n = await t.text(), r;
 		try {
@@ -5690,79 +5731,81 @@ var $ = Pa("note", () => {
 			console.warn("[PiNote] importJSON: fichier JSON invalide");
 			return;
 		}
-		e.value.loadFromJSONData(r), S.value = e.value.backgroundState, C.value = e.value.title, w.enabled = e.value.snapGridEnabled, w.size = e.value.snapGridSize, m();
+		e.value.loadFromJSONData(r), C.value = e.value.backgroundState, w.value = e.value.title, D.enabled = e.value.snapGridEnabled, D.size = e.value.snapGridSize, h();
 	}
-	function P(t) {
+	function ee(t) {
 		if (!e.value) return;
 		let n = t === "screen" ? e.value.exportPNG() : e.value.exportA4(t === "a4-portrait" ? "portrait" : t === "a4-landscape" ? "landscape" : "auto");
 		if (!n) return;
 		let r = t === "screen" ? "" : `-${t}`, i = document.createElement("a");
-		i.href = n, i.download = (C.value || "dessin") + r + ".png", i.click();
+		i.href = n, i.download = (w.value || "dessin") + r + ".png", i.click();
 	}
-	let F = E("default"), I = E([]), ee = E([]);
-	function L() {
-		localStorage.setItem(Fa, JSON.stringify(I.value));
+	let F = E("default"), I = E([]), L = E([]);
+	function R() {
+		localStorage.setItem(Ra, JSON.stringify(I.value));
 	}
-	function R(e) {
+	function te(e) {
 		let t = I.value.find((t) => t.id === e);
-		t && (t.updatedAt = (/* @__PURE__ */ new Date()).toISOString(), L());
-	}
-	function te() {
-		let e = Ra * 24 * 60 * 60 * 1e3, t = Date.now();
-		ee.value = I.value.filter((n) => t - new Date(n.updatedAt).getTime() > e);
+		t && (t.updatedAt = (/* @__PURE__ */ new Date()).toISOString(), R());
 	}
 	function ne() {
-		e.value && (S.value = e.value.backgroundState, C.value = e.value.title, u.value = null, e.value.clearHighlight(), m());
+		let e = La().storageRetentionDays * 24 * 60 * 60 * 1e3, t = Date.now();
+		L.value = I.value.filter((n) => t - new Date(n.updatedAt).getTime() > e);
 	}
-	function re(t) {
-		F.value = t, localStorage.setItem(Ia, t), e.value && (e.value.resetState(), e.value.setPageId(t), e.value.loadLocal(), e.value.onSave = () => R(F.value), ne());
+	function re() {
+		e.value && (C.value = e.value.backgroundState, w.value = e.value.title, d.value = null, e.value.clearHighlight(), h());
 	}
-	function ie() {
+	function ie(t) {
+		F.value = t, localStorage.setItem(za, t), e.value && (e.value.resetState(), e.value.setPageId(t), e.value.loadLocal(), e.value.onSave = () => te(F.value), re());
+	}
+	function z() {
 		let t = [];
 		try {
-			let e = localStorage.getItem(Fa);
+			let e = localStorage.getItem(Ra);
 			e && (t = JSON.parse(e));
 		} catch {}
 		if (t.length === 0) {
 			let e = localStorage.getItem("pi_note_draft");
-			e && localStorage.setItem("pi_note_draft_default", e), localStorage.setItem(La, "1"), t = [{
+			e && localStorage.setItem("pi_note_draft_default", e), localStorage.setItem(Ba, "1"), t = [{
 				id: "default",
 				name: "Page 1",
 				updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-			}], localStorage.setItem(Fa, JSON.stringify(t));
-		} else localStorage.getItem(La) || localStorage.setItem(La, String(t.length));
+			}], localStorage.setItem(Ra, JSON.stringify(t));
+		} else localStorage.getItem(Ba) || localStorage.setItem(Ba, String(t.length));
 		I.value = t;
-		let n = localStorage.getItem(Ia), r = n && t.some((e) => e.id === n) ? n : t[0].id;
-		e.value && (e.value.resetState(), e.value.setPageId(r), e.value.loadLocal(), e.value.onSave = () => R(F.value)), F.value = r, localStorage.setItem(Ia, r), ne(), te();
-	}
-	function z(e) {
-		let t = "page-" + Date.now(), n = {
-			id: t,
-			name: e ?? `Page ${za()}`,
-			updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-		};
-		I.value = [...I.value, n], L(), re(t);
+		let n = localStorage.getItem(za), r = n && t.some((e) => e.id === n) ? n : t[0].id;
+		e.value && (e.value.resetState(), e.value.setPageId(r), e.value.loadLocal(), e.value.onSave = () => te(F.value)), F.value = r, localStorage.setItem(za, r), re(), ne();
 	}
 	function ae(e) {
-		e !== F.value && (R(F.value), re(e));
+		let t = La().maxPages;
+		if (t > 0 && I.value.length >= t) return;
+		let n = "page-" + Date.now(), r = {
+			id: n,
+			name: e ?? `Page ${Va()}`,
+			updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+		};
+		I.value = [...I.value, r], R(), ie(n);
 	}
 	function oe(e) {
-		I.value.length <= 1 || (localStorage.removeItem("pi_note_draft_" + e), I.value = I.value.filter((t) => t.id !== e), ee.value = ee.value.filter((t) => t.id !== e), L(), e === F.value && re(I.value[0].id));
+		e !== F.value && (te(F.value), ie(e));
 	}
-	function se(e, t) {
+	function se(e) {
+		I.value.length <= 1 || (localStorage.removeItem("pi_note_draft_" + e), I.value = I.value.filter((t) => t.id !== e), L.value = L.value.filter((t) => t.id !== e), R(), e === F.value && ie(I.value[0].id));
+	}
+	function ce(e, t) {
 		let n = I.value.find((t) => t.id === e);
-		n && (n.name = t, L());
-	}
-	function ce() {
-		ee.value = [];
+		n && (n.name = t, R());
 	}
 	function le() {
+		L.value = [];
+	}
+	function ue() {
 		for (let e of I.value) localStorage.removeItem("pi_note_draft_" + e.id);
-		localStorage.removeItem(Fa), localStorage.removeItem(Ia), localStorage.setItem(La, "1"), I.value = [{
+		localStorage.removeItem(Ra), localStorage.removeItem(za), localStorage.setItem(Ba, "1"), I.value = [{
 			id: "default",
 			name: "Page 1",
 			updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-		}], ee.value = [], localStorage.setItem(Fa, JSON.stringify(I.value)), F.value = "default", localStorage.setItem(Ia, "default"), e.value && (e.value.resetState(), e.value.setPageId("default"), e.value.onSave = () => R(F.value), e.value.saveLocal()), u.value = null, C.value = "", S.value = {
+		}], L.value = [], localStorage.setItem(Ra, JSON.stringify(I.value)), F.value = "default", localStorage.setItem(za, "default"), e.value && (e.value.resetState(), e.value.setPageId("default"), e.value.onSave = () => te(F.value), e.value.saveLocal()), d.value = null, w.value = "", C.value = {
 			mode: "none",
 			grid: {
 				size: 80,
@@ -5780,124 +5823,124 @@ var $ = Pa("note", () => {
 				lineWidth: 1,
 				orientation: "pointy"
 			}
-		}, m();
+		}, h();
 	}
-	let ue = E(""), B = E("idle"), de = null;
-	async function fe() {
-		if (!(!e.value || !ue.value)) {
-			B.value = "syncing";
+	let B = E(La().backendUrl), de = E("idle"), fe = null;
+	async function pe() {
+		if (!(!e.value || !B.value)) {
+			de.value = "syncing";
 			try {
-				await e.value.syncRemote(ue.value), B.value = "ok";
+				await e.value.syncRemote(B.value), de.value = "ok";
 			} catch {
-				B.value = "error";
+				de.value = "error";
 			}
-			de && clearTimeout(de), de = setTimeout(() => {
-				B.value = "idle";
+			fe && clearTimeout(fe), fe = setTimeout(() => {
+				de.value = "idle";
 			}, 3e3);
 		}
 	}
-	let pe = E(!0);
-	function me() {
+	let me = E(!0);
+	function he() {
 		t.value?.zoomIn();
 	}
-	function he() {
+	function ge() {
 		t.value?.zoomOut();
 	}
-	function ge() {
+	function _e() {
 		t.value?.resetView();
 	}
-	function _e() {
+	function ve() {
 		t.value?.fitView();
 	}
 	return {
 		engine: e,
 		registerZoom: n,
-		tool: r,
-		toolMemory: i,
-		toolSelectCount: a,
-		selectTool: o,
-		setToolWidth: s,
-		setToolColor: c,
-		shapes: l,
-		selectedShapeId: u,
-		canUndo: d,
-		canRedo: f,
-		layers: p,
-		syncFromEngine: m,
-		undo: h,
-		redo: g,
-		destroyShape: _,
-		toggleShapeVisibility: v,
-		highlightShape: y,
-		updateShapeProps: b,
-		toggleLayerVisibility: x,
-		backgroundState: S,
-		title: C,
-		snapGrid: w,
-		setBackground: D,
-		setTitle: O,
-		setSnapGrid: A,
-		clearAll: j,
-		exportPNG: P,
-		exportJSON: M,
-		importJSON: N,
+		tool: i,
+		toolMemory: a,
+		toolSelectCount: o,
+		selectTool: s,
+		setToolWidth: c,
+		setToolColor: l,
+		shapes: u,
+		selectedShapeId: d,
+		canUndo: f,
+		canRedo: p,
+		layers: m,
+		syncFromEngine: h,
+		undo: g,
+		redo: _,
+		destroyShape: v,
+		toggleShapeVisibility: y,
+		highlightShape: b,
+		updateShapeProps: x,
+		toggleLayerVisibility: S,
+		backgroundState: C,
+		title: w,
+		snapGrid: D,
+		setBackground: O,
+		setTitle: A,
+		setSnapGrid: j,
+		clearAll: M,
+		exportPNG: ee,
+		exportJSON: N,
+		importJSON: P,
 		currentPageId: F,
 		pages: I,
-		expiredPages: ee,
-		initSession: ie,
-		createPage: z,
-		switchPage: ae,
-		deletePage: oe,
-		renamePage: se,
-		dismissExpiredPages: ce,
-		newDocument: le,
-		remoteUrl: ue,
-		syncStatus: B,
-		syncRemote: fe,
-		sidebarOpen: pe,
-		zoomIn: me,
-		zoomOut: he,
-		resetView: ge,
-		fitView: _e
+		expiredPages: L,
+		initSession: z,
+		createPage: ae,
+		switchPage: oe,
+		deletePage: se,
+		renamePage: ce,
+		dismissExpiredPages: le,
+		newDocument: ue,
+		remoteUrl: B,
+		syncStatus: de,
+		syncRemote: pe,
+		sidebarOpen: me,
+		zoomIn: he,
+		zoomOut: ge,
+		resetView: _e,
+		fitView: ve
 	};
-}), Ba = { class: "tool-selector" }, Va = ["onClick"], Ha = { class: "icon-wrapper" }, Ua = {
+}), Ha = { class: "tool-selector" }, Ua = ["onClick"], Wa = { class: "icon-wrapper" }, Ga = {
 	key: 0,
 	viewBox: "0 0 24 24",
 	fill: "none"
-}, Wa = {
+}, Ka = {
 	key: 1,
 	viewBox: "0 0 24 24"
-}, Ga = {
+}, qa = {
 	key: 2,
 	viewBox: "0 0 24 24"
-}, Ka = {
+}, Ja = {
 	key: 3,
 	viewBox: "0 0 24 24"
-}, qa = {
+}, Ya = {
 	key: 4,
 	viewBox: "0 0 24 24",
 	fill: "none"
-}, Ja = {
+}, Xa = {
 	key: 5,
 	viewBox: "0 0 24 24"
-}, Ya = {
+}, Za = {
 	key: 6,
 	viewBox: "0 0 24 24"
-}, Xa = {
+}, Qa = {
 	key: 7,
 	viewBox: "0 0 24 24",
 	fill: "none"
-}, Za = {
+}, $a = {
 	key: 8,
 	viewBox: "0 0 24 24"
-}, Qa = {
+}, eo = {
 	key: 9,
 	viewBox: "0 0 24 24"
-}, $a = {
+}, to = {
 	key: 10,
 	viewBox: "0 0 24 24",
 	fill: "none"
-}, eo = /* @__PURE__ */ c({
+}, no = /* @__PURE__ */ c({
 	__name: "ToolSelector",
 	props: { tools: { default: () => [
 		"pen",
@@ -5910,25 +5953,25 @@ var $ = Pa("note", () => {
 	] } },
 	setup(t) {
 		let n = $(), r = t;
-		return (t, s) => (w(), a("div", Ba, [(w(!0), a(e, null, D(r.tools, (e) => (w(), a("button", {
+		return (t, s) => (w(), a("div", Ha, [(w(!0), a(e, null, D(r.tools, (e) => (w(), a("button", {
 			key: e,
 			class: y(["tool-button", { active: P(n).tool.tool === e }]),
 			onClick: (t) => P(n).selectTool(e)
-		}, [o("span", Ha, [e === "select" ? (w(), a("svg", Ua, [...s[0] ||= [o("path", {
+		}, [o("span", Wa, [e === "select" ? (w(), a("svg", Ga, [...s[0] ||= [o("path", {
 			d: "M5 3l14 9-7 1-4 9L5 3z",
 			fill: "currentColor"
-		}, null, -1)]])) : i("", !0), e === "pen" ? (w(), a("svg", Wa, [...s[1] ||= [o("path", { d: "M3 21l3-1 11-11-2-2L4 18l-1 3z" }, null, -1)]])) : e === "highlighter" ? (w(), a("svg", Ga, [...s[2] ||= [o("rect", {
+		}, null, -1)]])) : i("", !0), e === "pen" ? (w(), a("svg", Ka, [...s[1] ||= [o("path", { d: "M3 21l3-1 11-11-2-2L4 18l-1 3z" }, null, -1)]])) : e === "highlighter" ? (w(), a("svg", qa, [...s[2] ||= [o("rect", {
 			x: "3",
 			y: "14",
 			width: "18",
 			height: "6"
-		}, null, -1), o("path", { d: "M7 14L17 4l3 3-10 10" }, null, -1)]])) : e === "eraser" ? (w(), a("svg", Ka, [...s[3] ||= [o("path", { d: "M16 3l5 5-9 9H7L2 12l9-9h5z" }, null, -1)]])) : e === "move" ? (w(), a("svg", qa, [...s[4] ||= [o("path", {
+		}, null, -1), o("path", { d: "M7 14L17 4l3 3-10 10" }, null, -1)]])) : e === "eraser" ? (w(), a("svg", Ja, [...s[3] ||= [o("path", { d: "M16 3l5 5-9 9H7L2 12l9-9h5z" }, null, -1)]])) : e === "move" ? (w(), a("svg", Ya, [...s[4] ||= [o("path", {
 			d: "M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3",
 			stroke: "currentColor",
 			"stroke-width": "1.8",
 			"stroke-linecap": "round",
 			"stroke-linejoin": "round"
-		}, null, -1)]])) : e === "line" ? (w(), a("svg", Ja, [...s[5] ||= [
+		}, null, -1)]])) : e === "line" ? (w(), a("svg", Xa, [...s[5] ||= [
 			o("line", {
 				x1: "2",
 				y1: "22",
@@ -5950,7 +5993,7 @@ var $ = Pa("note", () => {
 				r: "2.5",
 				fill: "currentColor"
 			}, null, -1)
-		]])) : e === "segment" ? (w(), a("svg", Ya, [...s[6] ||= [
+		]])) : e === "segment" ? (w(), a("svg", Za, [...s[6] ||= [
 			o("line", {
 				x1: "4",
 				y1: "20",
@@ -5972,7 +6015,7 @@ var $ = Pa("note", () => {
 				r: "2.5",
 				fill: "currentColor"
 			}, null, -1)
-		]])) : e === "vector" ? (w(), a("svg", Xa, [...s[7] ||= [o("line", {
+		]])) : e === "vector" ? (w(), a("svg", Qa, [...s[7] ||= [o("line", {
 			x1: "4",
 			y1: "20",
 			x2: "18",
@@ -5984,14 +6027,14 @@ var $ = Pa("note", () => {
 			d: "M18 6l-5 1 4 4z",
 			fill: "currentColor",
 			stroke: "none"
-		}, null, -1)]])) : e === "circle" ? (w(), a("svg", Za, [...s[8] ||= [o("circle", {
+		}, null, -1)]])) : e === "circle" ? (w(), a("svg", $a, [...s[8] ||= [o("circle", {
 			cx: "12",
 			cy: "12",
 			r: "7",
 			stroke: "currentColor",
 			"stroke-width": "2",
 			fill: "none"
-		}, null, -1)]])) : e === "rectangle" ? (w(), a("svg", Qa, [...s[9] ||= [o("rect", {
+		}, null, -1)]])) : e === "rectangle" ? (w(), a("svg", eo, [...s[9] ||= [o("rect", {
 			x: "5",
 			y: "7",
 			width: "14",
@@ -6000,14 +6043,14 @@ var $ = Pa("note", () => {
 			stroke: "currentColor",
 			"stroke-width": "2",
 			fill: "none"
-		}, null, -1)]])) : e === "polygon" ? (w(), a("svg", $a, [...s[10] ||= [o("polygon", {
+		}, null, -1)]])) : e === "polygon" ? (w(), a("svg", to, [...s[10] ||= [o("polygon", {
 			points: "12,3 21,9 18,20 6,20 3,9",
 			stroke: "currentColor",
 			"stroke-width": "2",
 			"stroke-linejoin": "round"
-		}, null, -1)]])) : i("", !0)])], 10, Va))), 128))]));
+		}, null, -1)]])) : i("", !0)])], 10, Ua))), 128))]));
 	}
-}), to = { class: "color-selector" }, no = ["onClick"], ro = /* @__PURE__ */ c({
+}), ro = { class: "color-selector" }, io = ["onClick"], ao = /* @__PURE__ */ c({
 	__name: "ColorSelector",
 	props: /* @__PURE__ */ _({ tool: {} }, {
 		modelValue: {},
@@ -6015,7 +6058,7 @@ var $ = Pa("note", () => {
 	}),
 	emits: ["update:modelValue"],
 	setup(t) {
-		let n = F(t, "modelValue"), r = t, i = [
+		let n = ee(t, "modelValue"), r = t, i = [
 			"#000000",
 			"#ef4444",
 			"#3b82f6",
@@ -6028,7 +6071,7 @@ var $ = Pa("note", () => {
 		function c(e) {
 			n.value = e, d.value = e === u.value;
 		}
-		let l = I("picker"), u = E("#34cd34"), d = E(!1);
+		let l = F("picker"), u = E("#34cd34"), d = E(!1);
 		function f() {
 			if (!d.value) {
 				n.value = u.value, d.value = !0;
@@ -6040,7 +6083,7 @@ var $ = Pa("note", () => {
 			let t = e.target.value;
 			u.value = t, n.value = t;
 		}
-		return (t, r) => (w(), a("div", to, [(w(), a(e, null, D(i, (e) => o("button", {
+		return (t, r) => (w(), a("div", ro, [(w(), a(e, null, D(i, (e) => o("button", {
 			key: e,
 			class: y(["color-button", {
 				active: n.value === e,
@@ -6048,7 +6091,7 @@ var $ = Pa("note", () => {
 			}]),
 			style: b({ backgroundColor: e }),
 			onClick: (t) => c(e)
-		}, null, 14, no)), 64)), o("button", {
+		}, null, 14, io)), 64)), o("button", {
 			class: "color-btn",
 			onClick: f
 		}, [o("div", {
@@ -6061,12 +6104,12 @@ var $ = Pa("note", () => {
 			type: "color",
 			onChange: p,
 			onInput: p
-		}, null, 544), [[ee, u.value]])])]));
+		}, null, 544), [[I, u.value]])])]));
 	}
-}), io = { class: "width-selector" }, ao = { class: "presets" }, oo = ["onClick"], so = {
+}), oo = { class: "width-selector" }, so = { class: "presets" }, co = ["onClick"], lo = {
 	key: 0,
 	class: "slider-row"
-}, co = ["max", "value"], lo = ["max", "value"], uo = /* @__PURE__ */ c({
+}, uo = ["max", "value"], fo = ["max", "value"], po = /* @__PURE__ */ c({
 	__name: "WidthSelector",
 	props: /* @__PURE__ */ _({
 		tool: {},
@@ -6078,7 +6121,7 @@ var $ = Pa("note", () => {
 	}),
 	emits: ["update:modelValue"],
 	setup(t) {
-		let r = F(t, "modelValue"), s = t, c = n(() => {
+		let r = ee(t, "modelValue"), s = t, c = n(() => {
 			switch (s.tool) {
 				case "highlighter": return [
 					16,
@@ -6101,7 +6144,7 @@ var $ = Pa("note", () => {
 			let t = Number(e.target.value);
 			t > 0 && (r.value = t);
 		}
-		return (n, f) => (w(), a("div", io, [o("div", ao, [(w(!0), a(e, null, D(c.value, (e) => (w(), a("button", {
+		return (n, f) => (w(), a("div", oo, [o("div", so, [(w(!0), a(e, null, D(c.value, (e) => (w(), a("button", {
 			key: e,
 			class: y(["width-button", { active: r.value === e }]),
 			onClick: (t) => r.value = e
@@ -6119,23 +6162,23 @@ var $ = Pa("note", () => {
 				height: e / 2 + "px",
 				background: s.color || "#333"
 			})
-		}, null, 4))], 10, oo))), 128))]), t.showSlider ? (w(), a("div", so, [o("input", {
+		}, null, 4))], 10, co))), 128))]), t.showSlider ? (w(), a("div", lo, [o("input", {
 			type: "range",
 			class: "slider",
 			min: 1,
 			max: l.value,
 			value: r.value,
 			onInput: d
-		}, null, 40, co), o("input", {
+		}, null, 40, uo), o("input", {
 			type: "number",
 			class: "number-input",
 			min: 1,
 			max: l.value,
 			value: r.value,
 			onChange: d
-		}, null, 40, lo)])) : i("", !0)]));
+		}, null, 40, fo)])) : i("", !0)]));
 	}
-}), fo = { class: "layer-selector" }, po = ["onClick"], mo = /* @__PURE__ */ c({
+}), mo = { class: "layer-selector" }, ho = ["onClick"], go = /* @__PURE__ */ c({
 	__name: "LayerSelector",
 	props: /* @__PURE__ */ _({ showNull: {
 		type: Boolean,
@@ -6146,21 +6189,21 @@ var $ = Pa("note", () => {
 	}),
 	emits: ["update:modelValue"],
 	setup(t) {
-		let n = F(t, "modelValue"), r = ["MAIN", "LAYER"];
+		let n = ee(t, "modelValue"), r = ["MAIN", "LAYER"];
 		function s(e) {
 			n.value = e;
 		}
-		return (c, l) => (w(), a("div", fo, [(w(), a(e, null, D(r, (e) => o("button", {
+		return (c, l) => (w(), a("div", mo, [(w(), a(e, null, D(r, (e) => o("button", {
 			key: e,
 			class: y(["layer-btn", { active: n.value === e }]),
 			onClick: (t) => s(e)
-		}, A(e[0]), 11, po)), 64)), t.showNull ? (w(), a("button", {
+		}, A(e[0]), 11, ho)), 64)), t.showNull ? (w(), a("button", {
 			key: 0,
 			class: y(["layer-btn", { active: n.value === null }]),
 			onClick: l[0] ||= (e) => s(null)
 		}, " T ", 2)) : i("", !0)]));
 	}
-}), ho = { class: "note-tools" }, go = { class: "tabs" }, _o = ["title"], vo = { class: "tools-row" }, yo = /* @__PURE__ */ c({
+}), _o = { class: "note-tools" }, vo = { class: "tabs" }, yo = ["title"], bo = { class: "tools-row" }, xo = /* @__PURE__ */ c({
 	__name: "NoteTools",
 	setup(e) {
 		let t = $(), n = E("drawing"), r = [
@@ -6190,7 +6233,7 @@ var $ = Pa("note", () => {
 				l.value = !1;
 			}, 2500));
 		}
-		return (e, u) => (w(), a("div", ho, [o("div", go, [
+		return (e, u) => (w(), a("div", _o, [o("div", vo, [
 			o("button", {
 				class: y(["btn btn-ghost", { "btn-active": n.value === "drawing" }]),
 				onClick: u[0] ||= (e) => c("drawing")
@@ -6203,30 +6246,30 @@ var $ = Pa("note", () => {
 				class: y(["btn btn-ghost clear-btn", { pending: l.value }]),
 				title: l.value ? "Cliquer à nouveau pour confirmer" : "Tout effacer",
 				onClick: d
-			}, A(l.value ? "Confirmer ?" : "🗑"), 11, _o)
-		]), o("div", vo, [
-			s(eo, { tools: n.value === "drawing" ? r : i }, null, 8, ["tools"]),
+			}, A(l.value ? "Confirmer ?" : "🗑"), 11, yo)
+		]), o("div", bo, [
+			s(no, { tools: n.value === "drawing" ? r : i }, null, 8, ["tools"]),
 			u[5] ||= o("div", { class: "divider" }, null, -1),
-			s(ro, {
+			s(ao, {
 				"model-value": P(t).tool.color,
 				tool: P(t).tool.tool,
 				"onUpdate:modelValue": u[2] ||= (e) => P(t).setToolColor(e)
 			}, null, 8, ["model-value", "tool"]),
-			s(uo, {
+			s(po, {
 				"model-value": P(t).tool.width,
 				tool: P(t).tool.tool,
 				"onUpdate:modelValue": u[3] ||= (e) => P(t).setToolWidth(e)
 			}, null, 8, ["model-value", "tool"]),
-			s(mo, {
+			s(go, {
 				"model-value": P(t).tool.layer,
 				"onUpdate:modelValue": u[4] ||= (e) => P(t).tool.layer = e
 			}, null, 8, ["model-value"])
 		])]));
 	}
-}), bo = { class: "history-body" }, xo = {
+}), So = { class: "history-body" }, Co = {
 	key: 0,
 	class: "msg-empty"
-}, So = ["onClick"], Co = ["title", "onClick"], wo = ["onClick"], To = /* @__PURE__ */ c({
+}, wo = ["onClick"], To = ["title", "onClick"], Eo = ["onClick"], Do = /* @__PURE__ */ c({
 	__name: "SidebarPanelHistory",
 	setup(t) {
 		let n = $(), r = {
@@ -6242,7 +6285,7 @@ var $ = Pa("note", () => {
 			polygon: "Polygone",
 			move: "Dépl."
 		};
-		return (t, s) => (w(), a("div", bo, [P(n).shapes.length === 0 ? (w(), a("div", xo, " Aucune forme ")) : i("", !0), (w(!0), a(e, null, D([...P(n).shapes].reverse(), (e) => (w(), a("div", {
+		return (t, s) => (w(), a("div", So, [P(n).shapes.length === 0 ? (w(), a("div", Co, " Aucune forme ")) : i("", !0), (w(!0), a(e, null, D([...P(n).shapes].reverse(), (e) => (w(), a("div", {
 			key: e.id,
 			class: y(["h-row", { active: P(n).selectedShapeId === e.id }]),
 			onClick: (t) => P(n).highlightShape(e.id)
@@ -6257,37 +6300,37 @@ var $ = Pa("note", () => {
 				class: "btn-icon",
 				title: e.hidden ? "Afficher" : "Cacher",
 				onClick: z((t) => P(n).toggleShapeVisibility(e.id), ["stop"])
-			}, A(e.hidden ? "🙈" : "👁"), 9, Co),
+			}, A(e.hidden ? "🙈" : "👁"), 9, To),
 			o("button", {
 				class: "btn-icon del",
 				title: "Supprimer",
 				onClick: z((t) => P(n).destroyShape(e.id), ["stop"])
-			}, " 🗑 ", 8, wo)
-		], 10, So))), 128))]));
+			}, " 🗑 ", 8, Eo)
+		], 10, wo))), 128))]));
 	}
-}), Eo = { class: "canvas-body" }, Do = { class: "canvas-field pages-header" }, Oo = { style: {
+}), Oo = { class: "canvas-body" }, ko = { class: "canvas-field pages-header" }, Ao = { style: {
 	display: "flex",
 	gap: "4px"
-} }, ko = { class: "pages-list" }, Ao = [
+} }, jo = { class: "pages-list" }, Mo = [
 	"value",
 	"onBlur",
 	"onKeydown"
-], jo = ["onClick", "onDblclick"], Mo = ["disabled", "onClick"], No = {
+], No = ["onClick", "onDblclick"], Po = ["disabled", "onClick"], Fo = {
 	key: 0,
 	class: "expiry-warning"
-}, Po = { class: "expiry-actions" }, Fo = { class: "canvas-field" }, Io = ["value"], Lo = { class: "canvas-field" }, Ro = { class: "bg-grid" }, zo = ["onClick"], Bo = { class: "canvas-field" }, Vo = ["value"], Ho = { class: "opt-val" }, Uo = { class: "canvas-field" }, Wo = ["value"], Go = { class: "opt-val" }, Ko = { class: "canvas-field" }, qo = { class: "color-row" }, Jo = ["title", "onClick"], Yo = ["value"], Xo = { class: "canvas-field" }, Zo = ["value"], Qo = { class: "opt-val" }, $o = { class: "canvas-field" }, es = ["value"], ts = { class: "opt-val" }, ns = { class: "canvas-field" }, rs = { class: "color-row" }, is = ["title", "onClick"], as = ["value"], os = { class: "canvas-field" }, ss = { class: "origin-row" }, cs = { class: "canvas-field" }, ls = ["value"], us = { class: "opt-val" }, ds = { class: "canvas-field" }, fs = ["value"], ps = { class: "opt-val" }, ms = { class: "canvas-field" }, hs = { class: "color-row" }, gs = ["title", "onClick"], _s = ["value"], vs = { class: "canvas-field" }, ys = {
+}, Io = { class: "expiry-actions" }, Lo = { class: "canvas-field" }, Ro = ["value"], zo = { class: "canvas-field" }, Bo = { class: "bg-grid" }, Vo = ["onClick"], Ho = { class: "canvas-field" }, Uo = ["value"], Wo = { class: "opt-val" }, Go = { class: "canvas-field" }, Ko = ["value"], qo = { class: "opt-val" }, Jo = { class: "canvas-field" }, Yo = { class: "color-row" }, Xo = ["title", "onClick"], Zo = ["value"], Qo = { class: "canvas-field" }, $o = ["value"], es = { class: "opt-val" }, ts = { class: "canvas-field" }, ns = ["value"], rs = { class: "opt-val" }, is = { class: "canvas-field" }, as = { class: "color-row" }, os = ["title", "onClick"], ss = ["value"], cs = { class: "canvas-field" }, ls = { class: "origin-row" }, us = { class: "canvas-field" }, ds = ["value"], fs = { class: "opt-val" }, ps = { class: "canvas-field" }, ms = ["value"], hs = { class: "opt-val" }, gs = { class: "canvas-field" }, _s = { class: "color-row" }, vs = ["title", "onClick"], ys = ["value"], bs = { class: "canvas-field" }, xs = {
 	key: 0,
 	class: "opt-val linked-label"
-}, bs = {
+}, Ss = {
 	key: 4,
 	class: "canvas-field"
-}, xs = ["value"], Ss = { class: "opt-val" }, Cs = {
+}, Cs = ["value"], ws = { class: "opt-val" }, Ts = {
 	key: 5,
 	class: "canvas-field"
-}, ws = { class: "opt-val linked-size" }, Ts = { class: "canvas-field export-field" }, Es = { class: "canvas-field export-field" }, Ds = { class: "canvas-field" }, Os = ["value"], ks = {
+}, Es = { class: "opt-val linked-size" }, Ds = { class: "canvas-field export-field" }, Os = { class: "canvas-field export-field" }, ks = { class: "canvas-field" }, As = ["value"], js = {
 	key: 6,
 	class: "canvas-field export-field"
-}, As = ["disabled"], js = /* @__PURE__ */ c({
+}, Ms = ["disabled"], Ns = /* @__PURE__ */ c({
 	__name: "SidebarPanelCanvas",
 	setup(t) {
 		let r = $(), s = E(null);
@@ -6321,13 +6364,7 @@ var $ = Pa("note", () => {
 			ruled: "réglé",
 			grid: "grille",
 			hex: "hex"
-		}, x = [{
-			value: "#777777",
-			label: "Gris"
-		}, {
-			value: "#4a78b5",
-			label: "Bleu encre"
-		}], S = E(r.snapGrid.enabled), C = E(r.snapGrid.size);
+		}, x = La().colorPresets, S = E(r.snapGrid.enabled), C = E(r.snapGrid.size);
 		R(() => r.snapGrid, (e) => {
 			S.value = e.enabled, C.value = e.size;
 		}, { deep: !0 });
@@ -6352,16 +6389,16 @@ var $ = Pa("note", () => {
 				}
 			});
 		}
-		return (t, n) => (w(), a("div", Eo, [
-			o("div", Do, [n[25] ||= o("span", { class: "sec-label" }, "Pages", -1), o("div", Oo, [o("button", {
+		return (t, n) => (w(), a("div", Oo, [
+			o("div", ko, [n[25] ||= o("span", { class: "sec-label" }, "Pages", -1), o("div", Ao, [o("button", {
 				class: "btn btn-sm",
 				onClick: n[0] ||= (e) => P(r).createPage()
-			}, "+ Nouvelle"), o("button", {
+			}, " + Nouvelle "), o("button", {
 				class: "btn btn-sm btn-danger",
 				title: "Nouveau document vierge",
 				onClick: n[1] ||= (e) => h()
-			}, "Nouveau")])]),
-			o("div", ko, [(w(!0), a(e, null, D(P(r).pages, (e) => (w(), a("div", {
+			}, " Nouveau ")])]),
+			o("div", jo, [(w(!0), a(e, null, D(P(r).pages, (e) => (w(), a("div", {
 				key: e.id,
 				class: y(["h-row", { active: e.id === P(r).currentPageId }])
 			}, [l.value === e.id ? (w(), a("input", {
@@ -6372,32 +6409,32 @@ var $ = Pa("note", () => {
 				onInput: n[2] ||= (e) => u.value = e.target.value,
 				onBlur: (t) => f(e.id),
 				onKeydown: [ie((t) => f(e.id), ["enter"]), ie(p, ["escape"])]
-			}, null, 40, Ao)) : (w(), a("span", {
+			}, null, 40, Mo)) : (w(), a("span", {
 				key: 1,
 				class: "h-label",
 				onClick: (t) => P(r).switchPage(e.id),
 				onDblclick: (t) => d(e.id, e.name)
-			}, A(e.name), 41, jo)), o("button", {
+			}, A(e.name), 41, No)), o("button", {
 				class: "btn-icon del",
 				disabled: P(r).pages.length <= 1,
 				title: "Supprimer la page",
 				onClick: (t) => P(r).deletePage(e.id)
-			}, " ✕ ", 8, Mo)], 2))), 128))]),
-			P(r).expiredPages.length ? (w(), a("div", No, [o("span", null, A(P(r).expiredPages.length) + " page(s) non modifiée(s) depuis 30 jours", 1), o("div", Po, [o("button", {
+			}, " ✕ ", 8, Po)], 2))), 128))]),
+			P(r).expiredPages.length ? (w(), a("div", Fo, [o("span", null, A(P(r).expiredPages.length) + " page(s) non modifiée(s) depuis 30 jours", 1), o("div", Io, [o("button", {
 				class: "btn btn-sm btn-danger",
 				onClick: m
 			}, " Supprimer "), o("button", {
 				class: "btn btn-sm",
 				onClick: n[3] ||= (e) => P(r).dismissExpiredPages()
 			}, " Ignorer ")])])) : i("", !0),
-			o("div", Fo, [n[26] ||= o("span", { class: "sec-label" }, "Titre", -1), o("input", {
+			o("div", Lo, [n[26] ||= o("span", { class: "sec-label" }, "Titre", -1), o("input", {
 				class: "title-input",
 				type: "text",
 				placeholder: "Sans titre",
 				value: P(r).title,
 				onInput: n[4] ||= (e) => P(r).setTitle(e.target.value)
-			}, null, 40, Io)]),
-			o("div", Lo, [n[27] ||= o("span", { class: "sec-label" }, "Fond", -1), o("div", Ro, [(w(), a(e, null, D([
+			}, null, 40, Ro)]),
+			o("div", zo, [n[27] ||= o("span", { class: "sec-label" }, "Fond", -1), o("div", Bo, [(w(), a(e, null, D([
 				"none",
 				"ruled",
 				"grid",
@@ -6409,9 +6446,9 @@ var $ = Pa("note", () => {
 					...P(r).backgroundState,
 					mode: e
 				})
-			}, A(v[e]), 11, zo)), 64))])]),
+			}, A(v[e]), 11, Vo)), 64))])]),
 			P(r).backgroundState.mode === "grid" ? (w(), a(e, { key: 1 }, [
-				o("div", Bo, [
+				o("div", Ho, [
 					n[28] ||= o("span", { class: "sec-label" }, "Cellule", -1),
 					o("input", {
 						type: "range",
@@ -6421,10 +6458,10 @@ var $ = Pa("note", () => {
 						class: "opt-slider",
 						value: P(r).backgroundState.grid?.size ?? 80,
 						onInput: n[5] ||= (e) => k({ size: +e.target.value }, "grid")
-					}, null, 40, Vo),
-					o("span", Ho, A(P(r).backgroundState.grid?.size ?? 80) + "px", 1)
+					}, null, 40, Uo),
+					o("span", Wo, A(P(r).backgroundState.grid?.size ?? 80) + "px", 1)
 				]),
-				o("div", Uo, [
+				o("div", Go, [
 					n[29] ||= o("span", { class: "sec-label" }, "Trait", -1),
 					o("input", {
 						type: "range",
@@ -6434,24 +6471,24 @@ var $ = Pa("note", () => {
 						class: "opt-slider",
 						value: P(r).backgroundState.grid?.lineWidth ?? 1,
 						onInput: n[6] ||= (e) => k({ lineWidth: +e.target.value }, "grid")
-					}, null, 40, Wo),
-					o("span", Go, A(P(r).backgroundState.grid?.lineWidth ?? 1), 1)
+					}, null, 40, Ko),
+					o("span", qo, A(P(r).backgroundState.grid?.lineWidth ?? 1), 1)
 				]),
-				o("div", Ko, [n[30] ||= o("span", { class: "sec-label" }, "Couleur", -1), o("div", qo, [(w(), a(e, null, D(x, (e) => o("button", {
+				o("div", Jo, [n[30] ||= o("span", { class: "sec-label" }, "Couleur", -1), o("div", Yo, [(w(!0), a(e, null, D(P(x), (e) => (w(), a("button", {
 					key: e.value,
 					class: y(["color-swatch", { active: (P(r).backgroundState.grid?.color ?? "#777777") === e.value }]),
 					style: b({ background: e.value }),
 					title: e.label,
 					onClick: (t) => k({ color: e.value }, "grid")
-				}, null, 14, Jo)), 64)), o("input", {
+				}, null, 14, Xo))), 128)), o("input", {
 					type: "color",
 					class: "color-pick",
 					value: P(r).backgroundState.grid?.color ?? "#777777",
 					onInput: n[7] ||= (e) => k({ color: e.target.value }, "grid")
-				}, null, 40, Yo)])])
+				}, null, 40, Zo)])])
 			], 64)) : i("", !0),
 			P(r).backgroundState.mode === "ruled" ? (w(), a(e, { key: 2 }, [
-				o("div", Xo, [
+				o("div", Qo, [
 					n[31] ||= o("span", { class: "sec-label" }, "Lignes", -1),
 					o("input", {
 						type: "range",
@@ -6461,10 +6498,10 @@ var $ = Pa("note", () => {
 						class: "opt-slider",
 						value: P(r).backgroundState.ruled?.spacing ?? 40,
 						onInput: n[8] ||= (e) => k({ spacing: +e.target.value }, "ruled")
-					}, null, 40, Zo),
-					o("span", Qo, A(P(r).backgroundState.ruled?.spacing ?? 40) + "px", 1)
+					}, null, 40, $o),
+					o("span", es, A(P(r).backgroundState.ruled?.spacing ?? 40) + "px", 1)
 				]),
-				o("div", $o, [
+				o("div", ts, [
 					n[32] ||= o("span", { class: "sec-label" }, "Trait", -1),
 					o("input", {
 						type: "range",
@@ -6474,31 +6511,31 @@ var $ = Pa("note", () => {
 						class: "opt-slider",
 						value: P(r).backgroundState.ruled?.lineWidth ?? 1,
 						onInput: n[9] ||= (e) => k({ lineWidth: +e.target.value }, "ruled")
-					}, null, 40, es),
-					o("span", ts, A(P(r).backgroundState.ruled?.lineWidth ?? 1), 1)
+					}, null, 40, ns),
+					o("span", rs, A(P(r).backgroundState.ruled?.lineWidth ?? 1), 1)
 				]),
-				o("div", ns, [n[33] ||= o("span", { class: "sec-label" }, "Couleur", -1), o("div", rs, [(w(), a(e, null, D(x, (e) => o("button", {
+				o("div", is, [n[33] ||= o("span", { class: "sec-label" }, "Couleur", -1), o("div", as, [(w(!0), a(e, null, D(P(x), (e) => (w(), a("button", {
 					key: e.value,
 					class: y(["color-swatch", { active: (P(r).backgroundState.ruled?.color ?? "#777777") === e.value }]),
 					style: b({ background: e.value }),
 					title: e.label,
 					onClick: (t) => k({ color: e.value }, "ruled")
-				}, null, 14, is)), 64)), o("input", {
+				}, null, 14, os))), 128)), o("input", {
 					type: "color",
 					class: "color-pick",
 					value: P(r).backgroundState.ruled?.color ?? "#777777",
 					onInput: n[10] ||= (e) => k({ color: e.target.value }, "ruled")
-				}, null, 40, as)])])
+				}, null, 40, ss)])])
 			], 64)) : i("", !0),
 			P(r).backgroundState.mode === "hex" ? (w(), a(e, { key: 3 }, [
-				o("div", os, [n[34] ||= o("span", { class: "sec-label" }, "Orient.", -1), o("div", ss, [o("button", {
+				o("div", cs, [n[34] ||= o("span", { class: "sec-label" }, "Orient.", -1), o("div", ls, [o("button", {
 					class: y(["btn btn-sm btn-opt", { "btn-active": (P(r).backgroundState.hex?.orientation ?? "pointy") === "pointy" }]),
 					onClick: n[11] ||= (e) => k({ orientation: "pointy" }, "hex")
 				}, " sommet ", 2), o("button", {
 					class: y(["btn btn-sm btn-opt", { "btn-active": (P(r).backgroundState.hex?.orientation ?? "pointy") === "flat" }]),
 					onClick: n[12] ||= (e) => k({ orientation: "flat" }, "hex")
 				}, " arête ", 2)])]),
-				o("div", cs, [
+				o("div", us, [
 					n[35] ||= o("span", { class: "sec-label" }, "Côté", -1),
 					o("input", {
 						type: "range",
@@ -6508,10 +6545,10 @@ var $ = Pa("note", () => {
 						class: "opt-slider",
 						value: P(r).backgroundState.hex?.size ?? 40,
 						onInput: n[13] ||= (e) => k({ size: +e.target.value }, "hex")
-					}, null, 40, ls),
-					o("span", us, A(P(r).backgroundState.hex?.size ?? 40) + "px", 1)
+					}, null, 40, ds),
+					o("span", fs, A(P(r).backgroundState.hex?.size ?? 40) + "px", 1)
 				]),
-				o("div", ds, [
+				o("div", ps, [
 					n[36] ||= o("span", { class: "sec-label" }, "Trait", -1),
 					o("input", {
 						type: "range",
@@ -6521,31 +6558,31 @@ var $ = Pa("note", () => {
 						class: "opt-slider",
 						value: P(r).backgroundState.hex?.lineWidth ?? 1,
 						onInput: n[14] ||= (e) => k({ lineWidth: +e.target.value }, "hex")
-					}, null, 40, fs),
-					o("span", ps, A(P(r).backgroundState.hex?.lineWidth ?? 1), 1)
+					}, null, 40, ms),
+					o("span", hs, A(P(r).backgroundState.hex?.lineWidth ?? 1), 1)
 				]),
-				o("div", ms, [n[37] ||= o("span", { class: "sec-label" }, "Couleur", -1), o("div", hs, [(w(), a(e, null, D(x, (e) => o("button", {
+				o("div", gs, [n[37] ||= o("span", { class: "sec-label" }, "Couleur", -1), o("div", _s, [(w(!0), a(e, null, D(P(x), (e) => (w(), a("button", {
 					key: e.value,
 					class: y(["color-swatch", { active: (P(r).backgroundState.hex?.color ?? "#777777") === e.value }]),
 					style: b({ background: e.value }),
 					title: e.label,
 					onClick: (t) => k({ color: e.value }, "hex")
-				}, null, 14, gs)), 64)), o("input", {
+				}, null, 14, vs))), 128)), o("input", {
 					type: "color",
 					class: "color-pick",
 					value: P(r).backgroundState.hex?.color ?? "#777777",
 					onInput: n[15] ||= (e) => k({ color: e.target.value }, "hex")
-				}, null, 40, _s)])])
+				}, null, 40, ys)])])
 			], 64)) : i("", !0),
-			o("div", vs, [
+			o("div", bs, [
 				n[38] ||= o("span", { class: "sec-label" }, "Snap", -1),
 				o("button", {
 					class: y(["btn btn-sm btn-opt snap-toggle", { "btn-active": S.value }]),
 					onClick: T
 				}, " Grille ", 2),
-				P(r).backgroundState.mode === "grid" ? (w(), a("span", ys, "lié")) : i("", !0)
+				P(r).backgroundState.mode === "grid" ? (w(), a("span", xs, "lié")) : i("", !0)
 			]),
-			S.value && P(r).backgroundState.mode !== "grid" ? (w(), a("div", bs, [
+			S.value && P(r).backgroundState.mode !== "grid" ? (w(), a("div", Ss, [
 				n[39] ||= o("span", { class: "sec-label" }, "Pas", -1),
 				o("input", {
 					type: "range",
@@ -6555,11 +6592,11 @@ var $ = Pa("note", () => {
 					class: "opt-slider",
 					value: C.value,
 					onInput: n[16] ||= (e) => O(+e.target.value)
-				}, null, 40, xs),
-				o("span", Ss, A(C.value) + "px", 1)
+				}, null, 40, Cs),
+				o("span", ws, A(C.value) + "px", 1)
 			])) : i("", !0),
-			S.value && P(r).backgroundState.mode === "grid" ? (w(), a("div", Cs, [n[40] ||= o("span", { class: "sec-label" }, "Pas", -1), o("span", ws, A(C.value) + "px (fond)", 1)])) : i("", !0),
-			o("div", Ts, [
+			S.value && P(r).backgroundState.mode === "grid" ? (w(), a("div", Ts, [n[40] ||= o("span", { class: "sec-label" }, "Pas", -1), o("span", Es, A(C.value) + "px (fond)", 1)])) : i("", !0),
+			o("div", Ds, [
 				o("button", {
 					class: "btn btn-sm",
 					title: "Enregistrer en JSON",
@@ -6579,7 +6616,7 @@ var $ = Pa("note", () => {
 					onChange: c
 				}, null, 544)
 			]),
-			o("div", Es, [
+			o("div", Os, [
 				o("button", {
 					class: "btn btn-sm",
 					title: "Export résolution écran",
@@ -6601,24 +6638,24 @@ var $ = Pa("note", () => {
 					onClick: n[22] ||= (e) => P(r).exportPNG("a4-landscape")
 				}, " A4 ↔ ")
 			]),
-			o("div", Ds, [n[41] ||= o("span", { class: "sec-label" }, "Sync", -1), o("input", {
+			o("div", ks, [n[41] ||= o("span", { class: "sec-label" }, "Sync", -1), o("input", {
 				class: "title-input",
 				type: "url",
 				placeholder: "https://…",
 				value: g.value,
 				onInput: n[23] ||= (e) => g.value = e.target.value
-			}, null, 40, Os)]),
-			g.value ? (w(), a("div", ks, [o("button", {
+			}, null, 40, As)]),
+			g.value ? (w(), a("div", js, [o("button", {
 				class: y(["btn btn-sm", { "btn-active": P(r).syncStatus === "ok" }]),
 				disabled: P(r).syncStatus === "syncing",
 				onClick: n[24] ||= (e) => P(r).syncRemote()
-			}, A(_.value), 11, As)])) : i("", !0)
+			}, A(_.value), 11, Ms)])) : i("", !0)
 		]));
 	}
-}), Ms = { class: "sp-root" }, Ns = { class: "sp-body" }, Ps = { key: 0 }, Fs = {
+}), Ps = { class: "sp-root" }, Fs = { class: "sp-body" }, Is = { key: 0 }, Ls = {
 	key: 1,
 	class: "sp-divider"
-}, Is = { key: 2 }, Ls = { class: "sp-row-gap" }, Rs = { class: "sp-row-gap" }, zs = { class: "sp-row-gap" }, Bs = { class: "sp-row" }, Vs = { class: "sp-row" }, Hs = { class: "sp-row" }, Us = { key: 0 }, Ws = { class: "sp-opacity-row" }, Gs = ["value"], Ks = { class: "sp-opacity-val" }, qs = /* @__PURE__ */ c({
+}, Rs = { key: 2 }, zs = { class: "sp-row-gap" }, Bs = { class: "sp-row-gap" }, Vs = { class: "sp-row-gap" }, Hs = { class: "sp-row" }, Us = { class: "sp-row" }, Ws = { class: "sp-row" }, Gs = { key: 0 }, Ks = { class: "sp-opacity-row" }, qs = ["value"], Js = { class: "sp-opacity-val" }, Ys = /* @__PURE__ */ c({
 	__name: "ShapeProperties",
 	props: { shape: {} },
 	emits: ["update"],
@@ -6629,15 +6666,15 @@ var $ = Pa("note", () => {
 			"move",
 			"select",
 			"eraser"
-		].includes(C), k = n(() => c.shape.canHaveArrows), j = n(() => c.shape.canBeFilled), M = C === "pen", N = C === "polygon", F = n(() => h.value || g.value);
-		return (t, n) => (w(), a("div", Ms, [o("div", Ns, [
-			T ? (w(), a("section", Ps, [n[14] ||= o("div", { class: "sp-label" }, " Couleur ", -1), s(ro, {
+		].includes(C), k = n(() => c.shape.canHaveArrows), j = n(() => c.shape.canBeFilled), M = C === "pen", N = C === "polygon", ee = n(() => h.value || g.value);
+		return (t, n) => (w(), a("div", Ps, [o("div", Fs, [
+			T ? (w(), a("section", Is, [n[14] ||= o("div", { class: "sp-label" }, " Couleur ", -1), s(ao, {
 				modelValue: d.value,
 				"onUpdate:modelValue": n[0] ||= (e) => d.value = e,
 				tool: P(C)
 			}, null, 8, ["modelValue", "tool"])])) : i("", !0),
-			T && D ? (w(), a("div", Fs)) : i("", !0),
-			D ? (w(), a("section", Is, [n[15] ||= o("div", { class: "sp-label" }, " Épaisseur ", -1), s(uo, {
+			T && D ? (w(), a("div", Ls)) : i("", !0),
+			D ? (w(), a("section", Rs, [n[15] ||= o("div", { class: "sp-label" }, " Épaisseur ", -1), s(po, {
 				modelValue: f.value,
 				"onUpdate:modelValue": n[1] ||= (e) => f.value = e,
 				tool: P(C),
@@ -6649,12 +6686,12 @@ var $ = Pa("note", () => {
 				"color"
 			])])) : i("", !0),
 			n[30] ||= o("div", { class: "sp-divider" }, null, -1),
-			o("section", null, [n[16] ||= o("div", { class: "sp-label" }, " Calque ", -1), s(mo, {
+			o("section", null, [n[16] ||= o("div", { class: "sp-label" }, " Calque ", -1), s(go, {
 				modelValue: p.value,
 				"onUpdate:modelValue": n[2] ||= (e) => p.value = e,
 				"show-null": !1
 			}, null, 8, ["modelValue"])]),
-			O ? (w(), a(e, { key: 3 }, [n[18] ||= o("div", { class: "sp-divider" }, null, -1), o("section", null, [n[17] ||= o("div", { class: "sp-label" }, " Trait ", -1), o("div", Ls, [
+			O ? (w(), a(e, { key: 3 }, [n[18] ||= o("div", { class: "sp-divider" }, null, -1), o("section", null, [n[17] ||= o("div", { class: "sp-label" }, " Trait ", -1), o("div", zs, [
 				o("button", {
 					class: y(["btn btn-sm btn-toggle", { "btn-active": m.value === "solid" }]),
 					onClick: n[3] ||= (e) => m.value = "solid"
@@ -6670,14 +6707,14 @@ var $ = Pa("note", () => {
 			])])], 64)) : i("", !0),
 			k.value ? (w(), a(e, { key: 4 }, [
 				n[22] ||= o("div", { class: "sp-divider" }, null, -1),
-				o("section", null, [n[19] ||= o("div", { class: "sp-label" }, " Flèche ", -1), o("div", Rs, [o("button", {
+				o("section", null, [n[19] ||= o("div", { class: "sp-label" }, " Flèche ", -1), o("div", Bs, [o("button", {
 					class: y(["btn btn-sm btn-toggle", { "btn-active": h.value }]),
 					onClick: n[6] ||= (e) => h.value = !h.value
 				}, " ← départ ", 2), o("button", {
 					class: y(["btn btn-sm btn-toggle", { "btn-active": g.value }]),
 					onClick: n[7] ||= (e) => g.value = !g.value
 				}, " arrivée → ", 2)])]),
-				F.value ? (w(), a(e, { key: 0 }, [n[21] ||= o("div", { class: "sp-divider" }, null, -1), o("section", null, [n[20] ||= o("div", { class: "sp-label" }, " Style ", -1), o("div", zs, [o("button", {
+				ee.value ? (w(), a(e, { key: 0 }, [n[21] ||= o("div", { class: "sp-divider" }, null, -1), o("section", null, [n[20] ||= o("div", { class: "sp-label" }, " Style ", -1), o("div", Vs, [o("button", {
 					class: y(["sp-toggle", { active: _.value === "filled" }]),
 					onClick: n[8] ||= (e) => _.value = "filled"
 				}, " ▶ plein ", 2), o("button", {
@@ -6685,21 +6722,21 @@ var $ = Pa("note", () => {
 					onClick: n[9] ||= (e) => _.value = "open"
 				}, " ➤ ouvert ", 2)])])], 64)) : i("", !0)
 			], 64)) : i("", !0),
-			M ? (w(), a(e, { key: 5 }, [n[24] ||= o("div", { class: "sp-divider" }, null, -1), o("section", Bs, [n[23] ||= o("span", { class: "sp-label" }, "Lissage", -1), o("button", {
+			M ? (w(), a(e, { key: 5 }, [n[24] ||= o("div", { class: "sp-divider" }, null, -1), o("section", Hs, [n[23] ||= o("span", { class: "sp-label" }, "Lissage", -1), o("button", {
 				class: y(["sp-toggle", { active: v.value }]),
 				onClick: n[10] ||= (e) => v.value = !v.value
 			}, A(v.value ? "oui" : "non"), 3)])], 64)) : i("", !0),
-			N ? (w(), a(e, { key: 6 }, [n[26] ||= o("div", { class: "sp-divider" }, null, -1), o("section", Vs, [n[25] ||= o("span", { class: "sp-label" }, "Fermé", -1), o("button", {
+			N ? (w(), a(e, { key: 6 }, [n[26] ||= o("div", { class: "sp-divider" }, null, -1), o("section", Us, [n[25] ||= o("span", { class: "sp-label" }, "Fermé", -1), o("button", {
 				class: y(["sp-toggle", { active: b.value }]),
 				onClick: n[11] ||= (e) => b.value = !b.value
 			}, A(b.value ? "oui" : "non"), 3)])], 64)) : i("", !0),
 			j.value ? (w(), a(e, { key: 7 }, [
 				n[29] ||= o("div", { class: "sp-divider" }, null, -1),
-				o("section", Hs, [n[27] ||= o("span", { class: "sp-label" }, "Remplissage", -1), o("button", {
+				o("section", Ws, [n[27] ||= o("span", { class: "sp-label" }, "Remplissage", -1), o("button", {
 					class: y(["sp-toggle", { active: x.value }]),
 					onClick: n[12] ||= (e) => x.value = !x.value
 				}, A(x.value ? "oui" : "non"), 3)]),
-				x.value ? (w(), a("section", Us, [n[28] ||= o("div", { class: "sp-label" }, " Opacité ", -1), o("div", Ws, [o("input", {
+				x.value ? (w(), a("section", Gs, [n[28] ||= o("div", { class: "sp-label" }, " Opacité ", -1), o("div", Ks, [o("input", {
 					type: "range",
 					min: "0.05",
 					max: "1",
@@ -6707,28 +6744,28 @@ var $ = Pa("note", () => {
 					value: S.value,
 					class: "sp-slider",
 					onInput: n[13] ||= (e) => S.value = parseFloat(e.target.value)
-				}, null, 40, Gs), o("span", Ks, A(Math.round(S.value * 100)) + "%", 1)])])) : i("", !0)
+				}, null, 40, qs), o("span", Js, A(Math.round(S.value * 100)) + "%", 1)])])) : i("", !0)
 			], 64)) : i("", !0)
 		])]));
 	}
-}), Js = { class: "props-body" }, Ys = {
+}), Xs = { class: "props-body" }, Zs = {
 	key: 0,
 	class: "msg-empty"
-}, Xs = /* @__PURE__ */ c({
+}, Qs = /* @__PURE__ */ c({
 	__name: "SidebarPanelProperties",
 	setup(e) {
 		let t = $(), i = n(() => t.tool.tool === "select" && t.selectedShapeId ? t.engine?.getShapeById(t.selectedShapeId) ?? null : null);
-		return (e, n) => (w(), a("div", Js, [i.value ? (w(), r(qs, {
+		return (e, n) => (w(), a("div", Xs, [i.value ? (w(), r(Ys, {
 			key: P(t).selectedShapeId ?? "",
 			shape: i.value,
 			onUpdate: n[0] ||= (e, n) => P(t).updateShapeProps(e, n)
-		}, null, 8, ["shape"])) : (w(), a("div", Ys, " Aucune forme sélectionnée "))]));
+		}, null, 8, ["shape"])) : (w(), a("div", Zs, " Aucune forme sélectionnée "))]));
 	}
-}), Zs = { class: "zoom-row" }, Qs = /* @__PURE__ */ c({
+}), $s = { class: "zoom-row" }, ec = /* @__PURE__ */ c({
 	__name: "SidebarPanelZoom",
 	setup(e) {
 		let t = $();
-		return (e, n) => (w(), a("div", Zs, [
+		return (e, n) => (w(), a("div", $s, [
 			o("button", {
 				class: "btn",
 				title: "Zoom +",
@@ -6751,7 +6788,7 @@ var $ = Pa("note", () => {
 			}, " ⊙ ")
 		]));
 	}
-}), $s = { class: "history-body" }, ec = ["onClick"], tc = ["title", "onClick"], nc = ["onClick"], rc = /* @__PURE__ */ c({
+}), tc = { class: "history-body" }, nc = ["onClick"], rc = ["title", "onClick"], ic = ["onClick"], ac = /* @__PURE__ */ c({
 	__name: "SidebarPanelLayers",
 	setup(t) {
 		let n = $(), r = {
@@ -6780,7 +6817,7 @@ var $ = Pa("note", () => {
 		function d(e) {
 			n.tool.layer = e;
 		}
-		return (t, f) => (w(), a("div", $s, [(w(), a(e, null, D(s, (e) => o("div", {
+		return (t, f) => (w(), a("div", tc, [(w(), a(e, null, D(s, (e) => o("div", {
 			key: e,
 			class: y(["h-row", { active: P(n).tool.layer === e }]),
 			style: b(i.includes(e) ? { cursor: "pointer" } : {}),
@@ -6791,57 +6828,57 @@ var $ = Pa("note", () => {
 				class: "btn-icon",
 				title: c[e] ? "Cacher" : "Afficher",
 				onClick: z((t) => l(e), ["stop"])
-			}, A(c[e] ? "👁" : "🙈"), 9, tc),
+			}, A(c[e] ? "👁" : "🙈"), 9, rc),
 			o("button", {
 				class: "btn-icon del",
 				title: "Effacer le calque",
 				style: b(e === "BACKGROUND" ? { visibility: "hidden" } : {}),
 				onClick: z((t) => u(e), ["stop"])
-			}, " 🗑 ", 12, nc)
-		], 14, ec)), 64))]));
+			}, " 🗑 ", 12, ic)
+		], 14, nc)), 64))]));
 	}
-}), ic = { class: "sidebar" }, ac = { class: "sidebar-topbar" }, oc = { class: "sec sec-history" }, sc = { class: "sec-header-row" }, cc = { class: "undo-redo" }, lc = ["disabled"], uc = ["disabled"], dc = { class: "sec" }, fc = { class: "sec" }, pc = { class: "sec sec-props" }, mc = { class: "sec-zoom" }, hc = { class: "sec-row" }, gc = /* @__PURE__ */ c({
+}), oc = { class: "sidebar" }, sc = { class: "sidebar-topbar" }, cc = { class: "sidebar-topbar-panel" }, lc = { class: "undo-redo" }, uc = ["disabled"], dc = ["disabled"], fc = { class: "sec sec-history" }, pc = { class: "sec-header-row" }, mc = { class: "sec" }, hc = { class: "sec" }, gc = { class: "sec sec-props" }, _c = { class: "sec-zoom" }, vc = { class: "sec-row" }, yc = /* @__PURE__ */ c({
 	__name: "NoteSidebar",
 	setup(e) {
 		let t = $(), n = E(!0), r = E(!1), i = E(!0), c = E(!0);
 		return R(() => t.selectedShapeId, (e) => {
 			e && (i.value = !0);
-		}), (e, l) => (w(), a("div", ic, [
-			o("div", ac, [l[7] ||= o("span", { class: "sidebar-title" }, "PiNote", -1), o("button", {
-				class: "close-btn",
-				title: "Fermer le panneau",
-				onClick: l[0] ||= (e) => P(t).sidebarOpen = !1
-			}, " ‹ ")]),
-			o("div", oc, [o("div", sc, [o("button", {
-				class: "sec-header-btn",
-				onClick: l[1] ||= (e) => n.value = !n.value
-			}, [l[8] ||= o("span", { class: "sec-title" }, "Historique", -1), o("span", { class: y(["chevron", { open: n.value }]) }, "›", 2)]), o("div", cc, [o("button", {
+		}), (e, l) => (w(), a("div", oc, [
+			o("div", sc, [l[7] ||= o("span", { class: "sidebar-title" }, "PiNote", -1), o("div", cc, [o("div", lc, [o("button", {
 				class: "btn",
 				disabled: !P(t).canUndo,
 				title: "Annuler",
-				onClick: l[2] ||= (e) => P(t).undo()
-			}, " ↩ ", 8, lc), o("button", {
+				onClick: l[0] ||= (e) => P(t).undo()
+			}, " ↩ ", 8, uc), o("button", {
 				class: "btn",
 				disabled: !P(t).canRedo,
 				title: "Rétablir",
-				onClick: l[3] ||= (e) => P(t).redo()
-			}, " ↪ ", 8, uc)])]), re(s(To, null, null, 512), [[L, n.value]])]),
-			o("div", dc, [o("button", {
+				onClick: l[1] ||= (e) => P(t).redo()
+			}, " ↪ ", 8, dc)]), o("button", {
+				class: "close-btn",
+				title: "Fermer le panneau",
+				onClick: l[2] ||= (e) => P(t).sidebarOpen = !1
+			}, " ‹ ")])]),
+			o("div", fc, [o("div", pc, [o("button", {
+				class: "sec-header-btn",
+				onClick: l[3] ||= (e) => n.value = !n.value
+			}, [l[8] ||= o("span", { class: "sec-title" }, "Historique", -1), o("span", { class: y(["chevron", { open: n.value }]) }, "›", 2)])]), re(s(Do, null, null, 512), [[L, n.value]])]),
+			o("div", mc, [o("button", {
 				class: "sec-header",
 				onClick: l[4] ||= (e) => r.value = !r.value
-			}, [l[9] ||= o("span", { class: "sec-title" }, "Canvas", -1), o("span", { class: y(["chevron", { open: r.value }]) }, "›", 2)]), re(s(js, null, null, 512), [[L, r.value]])]),
-			o("div", fc, [o("button", {
+			}, [l[9] ||= o("span", { class: "sec-title" }, "Canvas", -1), o("span", { class: y(["chevron", { open: r.value }]) }, "›", 2)]), re(s(Ns, null, null, 512), [[L, r.value]])]),
+			o("div", hc, [o("button", {
 				class: "sec-header",
 				onClick: l[5] ||= (e) => c.value = !c.value
-			}, [l[10] ||= o("span", { class: "sec-title" }, "Calques", -1), o("span", { class: y(["chevron", { open: c.value }]) }, "›", 2)]), re(s(rc, null, null, 512), [[L, c.value]])]),
-			o("div", pc, [o("button", {
+			}, [l[10] ||= o("span", { class: "sec-title" }, "Calques", -1), o("span", { class: y(["chevron", { open: c.value }]) }, "›", 2)]), re(s(ac, null, null, 512), [[L, c.value]])]),
+			o("div", gc, [o("button", {
 				class: "sec-header",
 				onClick: l[6] ||= (e) => i.value = !i.value
-			}, [l[11] ||= o("span", { class: "sec-title" }, "Propriétés", -1), o("span", { class: y(["chevron", { open: i.value }]) }, "›", 2)]), re(s(Xs, null, null, 512), [[L, i.value]])]),
-			o("div", mc, [o("div", hc, [l[12] ||= o("span", { class: "sec-label" }, "Zoom", -1), s(Qs)])])
+			}, [l[11] ||= o("span", { class: "sec-title" }, "Propriétés", -1), o("span", { class: y(["chevron", { open: i.value }]) }, "›", 2)]), re(s(Qs, null, null, 512), [[L, i.value]])]),
+			o("div", _c, [o("div", vc, [l[12] ||= o("span", { class: "sec-label" }, "Zoom", -1), s(ec)])])
 		]));
 	}
-}), _c = {
+}), bc = {
 	pen: "Tracé libre à main levée.",
 	highlighter: "Surlignage à main levée avec opacité réduite.",
 	eraser: "Effacez les traits en les survolant avec le bouton enfoncé.",
@@ -6853,84 +6890,84 @@ var $ = Pa("note", () => {
 	circle: "Cliquez pour définir le centre, glissez pour fixer le rayon.",
 	rectangle: "1er clic : posez la première arête. 2e clic : fixez la largeur du rectangle.",
 	polygon: "Cliquez pour ajouter des sommets un par un. Double-clic pour fermer et terminer."
-}, vc = {
+}, xc = {
 	key: 0,
 	class: "tool-hint"
-}, yc = /* @__PURE__ */ c({
+}, Sc = /* @__PURE__ */ c({
 	__name: "ToolHint",
 	setup(e) {
 		let t = $(), n = E(!1), r = E(""), o = null;
 		return R(() => t.toolSelectCount, () => {
-			r.value = _c[t.tool.tool] ?? "", r.value && (n.value = !0, o && clearTimeout(o), o = setTimeout(() => {
+			r.value = bc[t.tool.tool] ?? "", r.value && (n.value = !0, o && clearTimeout(o), o = setTimeout(() => {
 				n.value = !1;
 			}, 3e3));
-		}), (e, t) => n.value ? (w(), a("div", vc, A(r.value), 1)) : i("", !0);
+		}), (e, t) => n.value ? (w(), a("div", xc, A(r.value), 1)) : i("", !0);
 	}
 });
 //#endregion
 //#region src/composables/useCanvasTransform.ts
-function bc(e, t = {}) {
-	let { panButton: r = 0, onTransformChange: i } = t, a = .1, o = .15, s = O({
+function Cc(e, t = {}) {
+	let { panButton: r = 0, onTransformChange: i, canPan: a } = t, o = .1, s = .15, c = O({
 		x: 0,
 		y: 0,
 		scale: 1
-	}), c = n(() => `translate(${s.x}px, ${s.y}px) scale(${s.scale})`);
-	function l() {
+	}), l = n(() => `translate(${c.x}px, ${c.y}px) scale(${c.scale})`);
+	function u() {
 		i?.();
 	}
-	function u(e, t, n) {
+	function d(e, t, n) {
 		return Math.max(t, Math.min(n, e));
 	}
-	function d(e, t, n) {
-		let r = u(s.scale * n, a, 10), i = r / s.scale;
-		s.x = e - (e - s.x) * i, s.y = t - (t - s.y) * i, s.scale = r, l();
-	}
-	function f() {
-		let t = e.value;
-		t && d(t.offsetWidth / 2, t.offsetHeight / 2, 1 + o);
+	function f(e, t, n) {
+		let r = d(c.scale * n, o, 10), i = r / c.scale;
+		c.x = e - (e - c.x) * i, c.y = t - (t - c.y) * i, c.scale = r, u();
 	}
 	function p() {
 		let t = e.value;
-		t && d(t.offsetWidth / 2, t.offsetHeight / 2, 1 - o);
+		t && f(t.offsetWidth / 2, t.offsetHeight / 2, 1 + s);
 	}
 	function m() {
-		s.x = 0, s.y = 0, s.scale = 1, l();
+		let t = e.value;
+		t && f(t.offsetWidth / 2, t.offsetHeight / 2, 1 - s);
 	}
-	function h(t) {
+	function h() {
+		c.x = 0, c.y = 0, c.scale = 1, u();
+	}
+	function g(t) {
 		let n = e.value;
 		if (!n || !t.length) return;
-		let r = Infinity, i = Infinity, o = -Infinity, c = -Infinity;
+		let r = Infinity, i = Infinity, a = -Infinity, s = -Infinity;
 		for (let e of t) {
 			let t = e.getBounds();
-			t && (t.minX < r && (r = t.minX), t.minY < i && (i = t.minY), t.maxX > o && (o = t.maxX), t.maxY > c && (c = t.maxY));
+			t && (t.minX < r && (r = t.minX), t.minY < i && (i = t.minY), t.maxX > a && (a = t.maxX), t.maxY > s && (s = t.maxY));
 		}
 		if (!isFinite(r)) return;
-		let d = o - r || 1, f = c - i || 1;
-		s.scale = u(Math.min((n.offsetWidth - 48) / d, (n.offsetHeight - 48) / f), a, 10), s.x = (n.offsetWidth - d * s.scale) / 2 - r * s.scale, s.y = (n.offsetHeight - f * s.scale) / 2 - i * s.scale, l();
+		let l = a - r || 1, f = s - i || 1;
+		c.scale = d(Math.min((n.offsetWidth - 48) / l, (n.offsetHeight - 48) / f), o, 10), c.x = (n.offsetWidth - l * c.scale) / 2 - r * c.scale, c.y = (n.offsetHeight - f * c.scale) / 2 - i * c.scale, u();
 	}
-	let g = !1, _ = {
+	let _ = !1, v = {
 		x: 0,
 		y: 0
 	};
-	function v(e) {
-		e.button === r && (g = !0, _ = {
-			x: e.clientX - s.x,
-			y: e.clientY - s.y
+	function y(e) {
+		e.button === r && (_ = !0, v = {
+			x: e.clientX - c.x,
+			y: e.clientY - c.y
 		});
 	}
-	function y(e) {
-		g && (s.x = e.clientX - _.x, s.y = e.clientY - _.y, l());
+	function b(e) {
+		_ && (c.x = e.clientX - v.x, c.y = e.clientY - v.y, u());
 	}
-	function b() {
-		g = !1;
+	function S() {
+		_ = !1;
 	}
-	function S(t) {
+	function w(t) {
 		t.preventDefault();
-		let n = e.value.getBoundingClientRect(), r = t.deltaY < 0 ? 1 + o : 1 - o;
-		d(t.clientX - n.left, t.clientY - n.top, r);
+		let n = e.value.getBoundingClientRect(), r = t.deltaY < 0 ? 1 + s : 1 - s;
+		f(t.clientX - n.left, t.clientY - n.top, r);
 	}
-	let w = [], T = 0;
-	function E(e) {
+	let T = [], E = 0;
+	function D(e) {
 		let t = [];
 		for (let n of Array.from(e)) t.push({
 			x: n.clientX,
@@ -6938,50 +6975,50 @@ function bc(e, t = {}) {
 		});
 		return t;
 	}
-	function D(e, t) {
+	function k(e, t) {
 		return Math.sqrt((e.x - t.x) ** 2 + (e.y - t.y) ** 2);
 	}
-	function k(e) {
-		e.preventDefault(), w = E(e.touches), e.touches.length === 2 && (T = D(w[0], w[1]));
+	function A(e) {
+		e.preventDefault(), T = D(e.touches), e.touches.length === 2 && (E = k(T[0], T[1]));
 	}
-	function A(t) {
+	function j(t) {
 		t.preventDefault();
-		let n = E(t.touches), r = e.value.getBoundingClientRect();
-		if (n.length === 1 && w.length >= 1) s.x += n[0].x - w[0].x, s.y += n[0].y - w[0].y, l();
-		else if (n.length === 2 && w.length === 2) {
-			let e = D(n[0], n[1]), t = e / T, i = (n[0].x + n[1].x) / 2 - r.left, o = (n[0].y + n[1].y) / 2 - r.top, c = (w[0].x + w[1].x) / 2 - r.left, d = (w[0].y + w[1].y) / 2 - r.top, f = u(s.scale * t, a, 10), p = f / s.scale;
-			s.x = i - (i - s.x) * p + (i - c), s.y = o - (o - s.y) * p + (o - d), s.scale = f, T = e, l();
+		let n = D(t.touches), r = e.value.getBoundingClientRect();
+		if (n.length === 1 && T.length >= 1 && (!a || a())) c.x += n[0].x - T[0].x, c.y += n[0].y - T[0].y, u();
+		else if (n.length === 2 && T.length === 2) {
+			let e = k(n[0], n[1]), t = e / E, i = (n[0].x + n[1].x) / 2 - r.left, a = (n[0].y + n[1].y) / 2 - r.top, s = (T[0].x + T[1].x) / 2 - r.left, l = (T[0].y + T[1].y) / 2 - r.top, f = d(c.scale * t, o, 10), p = f / c.scale;
+			c.x = i - (i - c.x) * p + (i - s), c.y = a - (a - c.y) * p + (a - l), c.scale = f, E = e, u();
 		}
-		w = n;
+		T = n;
 	}
-	function j(e) {
-		w = E(e.touches), T = w.length === 2 ? D(w[0], w[1]) : 0;
+	function M(e) {
+		T = D(e.touches), E = T.length === 2 ? k(T[0], T[1]) : 0;
 	}
 	return x(() => {
 		let t = e.value;
-		t.addEventListener("mousedown", v), t.addEventListener("mousemove", y), t.addEventListener("mouseup", b), t.addEventListener("mouseleave", b), t.addEventListener("touchstart", k, { passive: !1 }), t.addEventListener("touchmove", A, { passive: !1 }), t.addEventListener("touchend", j), t.addEventListener("wheel", S, { passive: !1 });
+		t.addEventListener("mousedown", y), t.addEventListener("mousemove", b), t.addEventListener("mouseup", S), t.addEventListener("mouseleave", S), t.addEventListener("touchstart", A, { passive: !1 }), t.addEventListener("touchmove", j, { passive: !1 }), t.addEventListener("touchend", M), t.addEventListener("wheel", w, { passive: !1 });
 	}), C(() => {
 		let t = e.value;
-		t && (t.removeEventListener("mousedown", v), t.removeEventListener("mousemove", y), t.removeEventListener("mouseup", b), t.removeEventListener("mouseleave", b), t.removeEventListener("touchstart", k), t.removeEventListener("touchmove", A), t.removeEventListener("touchend", j), t.removeEventListener("wheel", S));
+		t && (t.removeEventListener("mousedown", y), t.removeEventListener("mousemove", b), t.removeEventListener("mouseup", S), t.removeEventListener("mouseleave", S), t.removeEventListener("touchstart", A), t.removeEventListener("touchmove", j), t.removeEventListener("touchend", M), t.removeEventListener("wheel", w));
 	}), {
-		transform: s,
-		cssTransform: c,
-		zoomIn: f,
-		zoomOut: p,
-		resetView: m,
-		zoomAt: d,
-		fitView: h
+		transform: c,
+		cssTransform: l,
+		zoomIn: p,
+		zoomOut: m,
+		resetView: h,
+		zoomAt: f,
+		fitView: g
 	};
 }
 //#endregion
 //#region src/vue/NoteCanvas.vue?vue&type=script&setup=true&lang.ts
-var xc = { class: "note-canvas-wrapper" }, Sc = {
+var wc = { class: "note-canvas-wrapper" }, Tc = {
 	key: 0,
 	class: "mini-panel"
-}, Cc = ["disabled"], wc = ["disabled"], Tc = {
+}, Ec = ["disabled"], Dc = ["disabled"], Oc = {
 	key: 0,
 	class: "mini-panel mini-panel-zoom"
-}, Ec = /* @__PURE__ */ c({
+}, kc = /* @__PURE__ */ c({
 	__name: "NoteCanvas",
 	props: {
 		background: { default: () => ({
@@ -7006,19 +7043,20 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 	emits: ["tool-change"],
 	setup(e, { expose: n, emit: r }) {
 		Mi() || ji(ba());
-		let c = $(), l = r, u = e, d = E(null), { transform: f, zoomIn: p, zoomOut: m, resetView: h, fitView: g } = bc(d, {
+		let c = $(), l = r, u = e, d = E(null), { transform: f, zoomIn: p, zoomOut: m, resetView: h, fitView: g } = Cc(d, {
 			panButton: 2,
 			onTransformChange: () => {
 				c.engine?.setViewTransform(f.x, f.y, f.scale), c.engine?.draw();
-			}
+			},
+			canPan: () => c.tool.tool === "move"
 		}), _ = k(void 0), v = null, b = !1, S = 0, T = !1, D = 0, O = !1, A = !1, j = !1, M = {
 			x: 0,
 			y: 0
-		}, N = !1, F = {
+		}, N = !1, ee = {
 			x: 0,
 			y: 0
 		};
-		function I(e) {
+		function F(e) {
 			if (!d.value) return {
 				x: 0,
 				y: 0
@@ -7029,16 +7067,16 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 				y: (e.clientY - t.top - f.y) / f.scale
 			};
 		}
-		function ee(e) {
+		function I(e) {
 			if (!e.isPrimary || e.button !== 0 || !d.value || !_.value) return;
 			if (c.tool.tool === "move") {
-				N = !0, F = {
+				N = !0, ee = {
 					x: e.clientX - f.x,
 					y: e.clientY - f.y
 				};
 				return;
 			}
-			let t = I(e);
+			let t = F(e);
 			if (c.selectedShapeId) {
 				if (_.value.isOverDeleteHandle(t.x, t.y)) {
 					c.destroyShape(c.selectedShapeId);
@@ -7082,24 +7120,24 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 		function L(e) {
 			if (!e.isPrimary) return;
 			if (N) {
-				f.x = e.clientX - F.x, f.y = e.clientY - F.y, _.value?.setViewTransform(f.x, f.y, f.scale), _.value?.draw();
+				f.x = e.clientX - ee.x, f.y = e.clientY - ee.y, _.value?.setViewTransform(f.x, f.y, f.scale), _.value?.draw();
 				return;
 			}
 			if (A && c.selectedShapeId) {
-				let t = I(e);
+				let t = F(e);
 				_.value?.moveShape(c.selectedShapeId, t.x - M.x, t.y - M.y), M = t;
 				return;
 			}
 			if (d.value) {
-				let t = I(e);
+				let t = F(e);
 				c.selectedShapeId && _.value?.isOverMoveHandle(t.x, t.y) ? d.value.style.cursor = "grab" : c.selectedShapeId && _.value?.isOverDeleteHandle(t.x, t.y) ? d.value.style.cursor = "not-allowed" : c.selectedShapeId && _.value?.isOverDuplicateHandle(t.x, t.y) ? d.value.style.cursor = "copy" : c.tool.tool === "select" ? d.value.style.cursor = _.value?.findShapeAt(t.x, t.y) ? "pointer" : "" : d.value.style.cursor = "";
 			}
 			if (O || T) {
-				_.value?.updateShape(I(e).x, I(e).y);
+				_.value?.updateShape(F(e).x, F(e).y);
 				return;
 			}
 			if (!b || !v) return;
-			let t = I(e);
+			let t = F(e);
 			v.onDrawPoint?.(t.x, t.y, Date.now() - S), _.value?.updateShape(t.x, t.y);
 		}
 		function te(e) {
@@ -7142,7 +7180,7 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 			}));
 		}), C(() => {
 			_.value?.destroy();
-		}), n({ engine: _ }), (e, n) => (w(), a("div", xc, [
+		}), n({ engine: _ }), (e, n) => (w(), a("div", wc, [
 			o("div", {
 				ref_key: "canvasEl",
 				ref: d,
@@ -7150,29 +7188,29 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 					"cursor-grab": P(c).tool.tool === "move" && !P(N),
 					"cursor-grabbing": P(c).tool.tool === "move" && P(N)
 				}]),
-				onPointerdown: z(ee, ["prevent"]),
+				onPointerdown: z(I, ["prevent"]),
 				onPointermove: z(L, ["prevent"]),
 				onPointerup: z(te, ["prevent"]),
 				onPointerleave: z(te, ["prevent"]),
 				onPointercancel: te,
 				onContextmenu: n[0] ||= z(() => {}, ["prevent"])
 			}, null, 34),
-			s(yc),
-			s(yo),
+			s(Sc),
+			s(xo),
 			s(t, { name: "mini" }, {
-				default: ne(() => [P(c).sidebarOpen ? i("", !0) : (w(), a("div", Sc, [
+				default: ne(() => [P(c).sidebarOpen ? i("", !0) : (w(), a("div", Tc, [
 					o("button", {
 						class: "btn",
 						disabled: !P(c).canUndo,
 						title: "Annuler",
 						onClick: n[1] ||= (e) => P(c).undo()
-					}, " ↩ ", 8, Cc),
+					}, " ↩ ", 8, Ec),
 					o("button", {
 						class: "btn",
 						disabled: !P(c).canRedo,
 						title: "Rétablir",
 						onClick: n[2] ||= (e) => P(c).redo()
-					}, " ↪ ", 8, wc),
+					}, " ↪ ", 8, Dc),
 					o("button", {
 						class: "btn mini-open",
 						title: "Ouvrir le panneau",
@@ -7182,7 +7220,7 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 				_: 1
 			}),
 			s(t, { name: "mini-zoom" }, {
-				default: ne(() => [P(c).sidebarOpen ? i("", !0) : (w(), a("div", Tc, [
+				default: ne(() => [P(c).sidebarOpen ? i("", !0) : (w(), a("div", Oc, [
 					o("button", {
 						class: "btn",
 						title: "Zoom +",
@@ -7206,9 +7244,9 @@ var xc = { class: "note-canvas-wrapper" }, Sc = {
 				]))]),
 				_: 1
 			}),
-			o("div", { class: y(["sidebar-wrapper", { closed: !P(c).sidebarOpen }]) }, [s(gc)], 2)
+			o("div", { class: y(["sidebar-wrapper", { closed: !P(c).sidebarOpen }]) }, [s(yc)], 2)
 		]));
 	}
 });
 //#endregion
-export { Ce as Engine, ae as Layer, Ec as NoteCanvas };
+export { Ce as Engine, ae as Layer, kc as NoteCanvas };

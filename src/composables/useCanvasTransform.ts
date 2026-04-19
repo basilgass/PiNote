@@ -11,13 +11,14 @@ export interface CanvasTransform {
 export interface UseCanvasTransformOptions {
     panButton?: 0 | 1 | 2     // bouton souris pour le pan (défaut: 0 = clic gauche)
     onTransformChange?: () => void
+    canPan?: () => boolean     // si fourni, le pan 1 doigt n'est actif que si retourne true
 }
 
 export function useCanvasTransform<T extends HTMLElement>(
     targetRef: Ref<T | null>,
     options: UseCanvasTransformOptions = {}
 ) {
-    const {panButton = 0, onTransformChange} = options
+    const {panButton = 0, onTransformChange, canPan} = options
 
     const MIN_SCALE = 0.1
     const MAX_SCALE = 10
@@ -151,7 +152,7 @@ export function useCanvasTransform<T extends HTMLElement>(
         const current = snapTouches(e.touches)
         const rect = targetRef.value!.getBoundingClientRect()
 
-        if (current.length === 1 && lastTouches.length >= 1) {
+        if (current.length === 1 && lastTouches.length >= 1 && (!canPan || canPan())) {
             transform.x += current[0].x - lastTouches[0].x
             transform.y += current[0].y - lastTouches[0].y
             notify()

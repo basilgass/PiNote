@@ -43,6 +43,7 @@ const { transform, zoomIn, zoomOut, resetView, fitView } = useCanvasTransform(ca
     store.engine?.setViewTransform(transform.x, transform.y, transform.scale)
     store.engine?.draw()
   },
+  canPan: () => store.tool.tool === 'move',
 })
 
 // ── État de dessin (local — ne concerne pas l'UI des panels) ─────────────────
