@@ -43,8 +43,14 @@ export class Layer {
   // resize
   // ----------------
   resize(container: HTMLDivElement) {
-    this.canvas.width = container.offsetWidth
-    this.canvas.height = container.offsetHeight
+    const dpr = window.devicePixelRatio || 1
+    const w = container.offsetWidth
+    const h = container.offsetHeight
+    this.canvas.width = w * dpr
+    this.canvas.height = h * dpr
+    this.canvas.style.width = w + 'px'
+    this.canvas.style.height = h + 'px'
+    this.ctx.scale(dpr, dpr)
   }
 
   // ----------------

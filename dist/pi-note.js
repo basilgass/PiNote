@@ -14,7 +14,8 @@ var ae = class {
 		n.dataset.layer = this.name, n.width = e.clientWidth, n.height = e.clientHeight, n.style.position = "absolute", n.style.top = "0", n.style.left = "0", n.style.zIndex = t.zIndex.toString(), n.style.pointerEvents = "none", n.style.backgroundColor = this.name === "BACKGROUND" ? "white" : "transparent", e.appendChild(n), this.canvas = n, this.ctx = n.getContext("2d"), this.resize(e);
 	}
 	resize(e) {
-		this.canvas.width = e.offsetWidth, this.canvas.height = e.offsetHeight;
+		let t = window.devicePixelRatio || 1, n = e.offsetWidth, r = e.offsetHeight;
+		this.canvas.width = n * t, this.canvas.height = r * t, this.canvas.style.width = n + "px", this.canvas.style.height = r + "px", this.ctx.scale(t, t);
 	}
 	set visible(e) {
 		this._visible = e, this.canvas.style.display = e ? "block" : "none";
