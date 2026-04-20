@@ -43,6 +43,13 @@ export class Circle extends AbstractShape {
         AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
         ctx.stroke()
         ctx.setLineDash([])
+
+        const dotRadius = Math.max(2, this.width * 1.5) / scale
+        ctx.beginPath()
+        ctx.arc(this.cx, this.cy, dotRadius, 0, Math.PI * 2)
+        ctx.fillStyle = this.color
+        ctx.fill()
+
         ctx.restore()
     }
 

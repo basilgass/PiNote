@@ -9,7 +9,8 @@
     "width": 2,
     "background": { "mode": "none" },
     "snapEnabled": false,
-    "snapSize": 80
+    "snapSize": 80,
+    "bezier": true
   },
   "colorPresets": [
     { "value": "#000000", "label": "Noir" },

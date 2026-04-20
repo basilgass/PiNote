@@ -662,7 +662,9 @@ var ae = class {
 	}
 	draw(e) {
 		let t = Math.abs(e.getTransform().a) || 1;
-		e.save(), e.beginPath(), e.arc(this.cx, this.cy, this.radius, 0, Math.PI * 2), this.fill && (e.globalAlpha = this.fillOpacity, e.fillStyle = this.color, e.fill(), e.globalAlpha = 1), e.strokeStyle = this.color, e.lineWidth = this.width, B.applyLineStyle(e, this.lineStyle, this.width, t), e.stroke(), e.setLineDash([]), e.restore();
+		e.save(), e.beginPath(), e.arc(this.cx, this.cy, this.radius, 0, Math.PI * 2), this.fill && (e.globalAlpha = this.fillOpacity, e.fillStyle = this.color, e.fill(), e.globalAlpha = 1), e.strokeStyle = this.color, e.lineWidth = this.width, B.applyLineStyle(e, this.lineStyle, this.width, t), e.stroke(), e.setLineDash([]);
+		let n = Math.max(2, this.width * 1.5) / t;
+		e.beginPath(), e.arc(this.cx, this.cy, n, 0, Math.PI * 2), e.fillStyle = this.color, e.fill(), e.restore();
 	}
 	update(e, t) {
 		let n = e - this.cx, r = t - this.cy;
@@ -5543,7 +5545,8 @@ var Fa = {
 		width: 2,
 		background: { mode: "none" },
 		snapEnabled: !1,
-		snapSize: 80
+		snapSize: 80,
+		bezier: !0
 	},
 	colorPresets: [
 		{
@@ -5588,7 +5591,7 @@ var $ = Pa("note", () => {
 		tool: r.defaults.tool,
 		width: r.defaults.width,
 		color: r.defaults.color,
-		bezier: !1
+		bezier: r.defaults.bezier
 	}), a = T({
 		pen: {
 			color: r.defaults.color,

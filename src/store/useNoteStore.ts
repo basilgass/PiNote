@@ -50,7 +50,7 @@ export const useNoteStore = defineStore('note', () => {
     tool: _cfg.defaults.tool,
     width: _cfg.defaults.width,
     color: _cfg.defaults.color,
-    bezier: false,
+    bezier: _cfg.defaults.bezier,
   })
 
   /** Mémoire couleur/largeur par outil, pour restaurer la config au changement d'outil */
