@@ -10,6 +10,6 @@ export const TOOL_HINTS: Record<ToolType, string> = {
     segment:     'Cliquez et glissez entre deux points pour tracer un segment borné.',
     vector:      'Cliquez et glissez pour tracer un vecteur orienté avec une flèche.',
     circle:      'Cliquez pour définir le centre, glissez pour fixer le rayon.',
-    rectangle:   '1er clic : posez la première arête. 2e clic : fixez la largeur du rectangle.',
+    rectangle:   '2pts : glissez pour tracer le rectangle. 3pts : glissez pour l\'arête, relâchez, puis glissez pour la largeur.',
     polygon:     'Cliquez pour ajouter des sommets un par un. Double-clic pour fermer et terminer.',
 }

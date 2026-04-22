@@ -1,14 +1,14 @@
 <script lang="ts" setup>
-import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { createPinia, getActivePinia, setActivePinia } from 'pinia'
-import { Engine } from '@core/Engine'
-import type { Adaptable } from '../shapes/Adaptable'
-import type { BackgroundState, ToolConfig } from '../types'
+import {onMounted, onUnmounted, ref, shallowRef, watch} from 'vue'
+import {createPinia, getActivePinia, setActivePinia} from 'pinia'
+import {Engine} from '@core/Engine'
+import type {Adaptable} from '../shapes/Adaptable'
+import type {BackgroundState, ToolConfig} from '../types'
 import NoteTools from '@pi-vue/NoteTools.vue'
 import NoteSidebar from '@pi-vue/components/NoteSidebar.vue'
 import ToolHint from '@pi-vue/components/ToolHint.vue'
-import { useCanvasTransform } from '../composables/useCanvasTransform'
-import { useNoteStore } from '../store/useNoteStore'
+import {useCanvasTransform} from '../composables/useCanvasTransform'
+import {useNoteStore} from '../store/useNoteStore'
 
 // ── Initialisation Pinia (library-safe) ─────────────────────────────────────
 if (!getActivePinia()) setActivePinia(createPinia())
@@ -27,8 +27,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   background: (): BackgroundState => ({
     mode: 'none',
-    grid: { size: 80, color: '#777777', lineWidth: 1 },
-    ruled: { spacing: 40, color: '#777777', lineWidth: 1 },
+    grid: {size: 80, color: '#777777', lineWidth: 1},
+    ruled: {spacing: 40, color: '#777777', lineWidth: 1},
   }),
   snapGridSize: 80,
   snapGridEnabled: false,
@@ -37,7 +37,7 @@ const props = withDefaults(defineProps<{
 // ── Canvas & transform ───────────────────────────────────────────────────────
 
 const canvasEl = ref<HTMLDivElement | null>(null)
-const { transform, zoomIn, zoomOut, resetView, fitView } = useCanvasTransform(canvasEl, {
+const {transform, zoomIn, zoomOut, resetView, fitView} = useCanvasTransform(canvasEl, {
   panButton: 2,
   onTransformChange: () => {
     store.engine?.setViewTransform(transform.x, transform.y, transform.scale)
@@ -57,23 +57,24 @@ let startTime = 0
 let isMultiClickDrawing = false
 let lastClickTime = 0
 
-// Mode two-phase (ex: rectangle) : 1er clic = phase 1 (arête), 2e clic = phase 2 (largeur)
-let isPhase1Active = false
+// Mode two-phase (ex: rectangle 3pts) : deux drags successifs
+let isPhase1Dragging = false   // premier drag en cours (on trace l'arête)
+let isPhase2Ready = false       // entre les deux drags (en attente du 2e pointerdown)
 
 // Déplacement / duplication de shape sélectionnée
 let isMovingShape = false
 let isDuplicatingShape = false
-let movePrevPos = { x: 0, y: 0 }
+let movePrevPos = {x: 0, y: 0}
 
 // Pan manuel (outil 'move')
 let isPanning = false
-let panStart = { x: 0, y: 0 }
+let panStart = {x: 0, y: 0}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Convertit les coordonnées client d'un PointerEvent en coordonnées canvas (avec transform) */
 function toCanvasCoords(event: PointerEvent): { x: number; y: number } {
-  if (!canvasEl.value) return { x: 0, y: 0 }
+  if (!canvasEl.value) return {x: 0, y: 0}
   const rect = canvasEl.value.getBoundingClientRect()
   return {
     x: (event.clientX - rect.left - transform.x) / transform.scale,
@@ -89,7 +90,7 @@ function onPointerDown(event: PointerEvent) {
 
   if (store.tool.tool === 'move') {
     isPanning = true
-    panStart = { x: event.clientX - transform.x, y: event.clientY - transform.y }
+    panStart = {x: event.clientX - transform.x, y: event.clientY - transform.y}
     return
   }
 
@@ -126,12 +127,11 @@ function onPointerDown(event: PointerEvent) {
     return
   }
 
-  // Transition phase 1 → phase 2 (ex: rectangle 2e clic)
-  if (isPhase1Active && currentShape) {
-    isPhase1Active = false
+  // Phase 2 : deuxième drag (rectangle 3pts)
+  if (isPhase2Ready && currentShape) {
+    isPhase2Ready = false
     isDrawing = true
     startTime = Date.now()
-    engine.value.phaseTransition(pos.x, pos.y)
     return
   }
 
@@ -139,7 +139,7 @@ function onPointerDown(event: PointerEvent) {
   if (isMultiClickDrawing && currentShape) {
     const now = Date.now()
     const isDoubleClick = (currentShape.doubleClickTimeout !== undefined)
-      && (now - lastClickTime < currentShape.doubleClickTimeout)
+        && (now - lastClickTime < currentShape.doubleClickTimeout)
     lastClickTime = now
 
     if (isDoubleClick) {
@@ -171,11 +171,12 @@ function onPointerDown(event: PointerEvent) {
     createdAt: startTime,
     x: pos.x,
     y: pos.y,
+    rectMode: store.tool.rectMode,
   })
 
   const mode = currentShape.drawingMode ?? 'drag'
   if (mode === 'two-phase') {
-    isPhase1Active = true
+    isPhase1Dragging = true
   } else if (mode === 'multi-click') {
     isMultiClickDrawing = true
     lastClickTime = Date.now()
@@ -220,12 +221,16 @@ function onPointerMove(event: PointerEvent) {
     }
   }
 
-  if (isPhase1Active || isMultiClickDrawing) {
+  if (isPhase1Dragging || isPhase2Ready || isMultiClickDrawing) {
     engine.value?.updateShape(toCanvasCoords(event).x, toCanvasCoords(event).y)
     return
   }
 
-  if (!isDrawing || !currentShape) return
+  if (!isDrawing || !currentShape) {
+    const pos = toCanvasCoords(event)
+    engine.value?.hoverSnap(pos.x, pos.y, store.tool.tool)
+    return
+  }
 
   const pos = toCanvasCoords(event)
   currentShape.onDrawPoint?.(pos.x, pos.y, Date.now() - startTime)
@@ -258,7 +263,19 @@ function onPointerUp(event: PointerEvent) {
     return
   }
 
-  if (!isDrawing) return
+  // Fin du premier drag (two-phase) : verrouille l'arête, attend le 2e drag
+  if (isPhase1Dragging && currentShape) {
+    const pos = toCanvasCoords(event)
+    isPhase1Dragging = false
+    engine.value?.phaseTransition(pos.x, pos.y)
+    isPhase2Ready = true
+    return
+  }
+
+  if (!isDrawing) {
+    engine.value?.clearHoverSnap()
+    return
+  }
   isDrawing = false
   if (currentShape) {
     engine.value?.endShape()
@@ -274,12 +291,23 @@ watch(() => store.tool.bezier, (val) => {
   if (engine.value) engine.value.bezier = val
 })
 
-// Annule un dessin en cours si l'utilisateur change d'outil
+// Annule un dessin en cours si l'utilisateur change d'outil ou de mode rectangle
+watch(() => store.tool.rectMode, () => {
+  if (isPhase1Dragging || isPhase2Ready) {
+    engine.value?.cancelShape()
+    isPhase1Dragging = false
+    isPhase2Ready = false
+    isDrawing = false
+    currentShape = null
+  }
+})
+
 watch(() => store.tool.tool, (newTool) => {
-  if (isMultiClickDrawing || isPhase1Active) {
+  if (isMultiClickDrawing || isPhase1Dragging || isPhase2Ready) {
     engine.value?.cancelShape()
     isMultiClickDrawing = false
-    isPhase1Active = false
+    isPhase1Dragging = false
+    isPhase2Ready = false
     currentShape = null
   }
   if (newTool !== 'select' && store.selectedShapeId) {
@@ -288,15 +316,15 @@ watch(() => store.tool.tool, (newTool) => {
 })
 
 // Remonte le changement d'outil au parent (prop publique de la lib)
-watch(() => ({ ...store.tool }), (val) => {
+watch(() => ({...store.tool}), (val) => {
   emit('tool-change', val)
-}, { deep: true })
+}, {deep: true})
 
 // Synchronise les props externes vers le store
 watch(() => props.background, (bg) => {
   store.setBackground(bg)
   engine.value?.setBackground(bg)
-}, { deep: true })
+}, {deep: true})
 
 watch(() => props.snapGridSize, (size) => {
   store.snapGrid.size = size
@@ -316,15 +344,16 @@ onMounted(() => {
   // Annule tout dessin en cours si un 2e doigt arrive (pinch → zoom)
   canvasEl.value.addEventListener('touchstart', (e) => {
     if (e.touches.length >= 2) {
-      if (isDrawing || isMultiClickDrawing || isPhase1Active) {
+      if (isDrawing || isMultiClickDrawing || isPhase1Dragging || isPhase2Ready) {
         engine.value?.cancelShape()
         isDrawing = false
         isMultiClickDrawing = false
-        isPhase1Active = false
+        isPhase1Dragging = false
+        isPhase2Ready = false
         currentShape = null
       }
     }
-  }, { passive: true })
+  }, {passive: true})
 
   // Initialise l'engine avec les props
   engine.value = new Engine(canvasEl.value, props.background)
@@ -357,7 +386,7 @@ onUnmounted(() => {
 })
 
 // Expose Engine au parent si nécessaire
-defineExpose({ engine })
+defineExpose({engine})
 </script>
 
 <template>
@@ -390,22 +419,24 @@ defineExpose({ engine })
 				v-if="!store.sidebarOpen"
 				class="mini-panel"
 			>
-				<button
-					class="btn"
-					:disabled="!store.canUndo"
-					title="Annuler"
-					@click="store.undo()"
-				>
-					↩
-				</button>
-				<button
-					class="btn"
-					:disabled="!store.canRedo"
-					title="Rétablir"
-					@click="store.redo()"
-				>
-					↪
-				</button>
+				<div class="mini-panel-row">
+					<button
+						class="btn"
+						:disabled="!store.canUndo"
+						title="Annuler"
+						@click="store.undo()"
+					>
+						↩
+					</button>
+					<button
+						class="btn"
+						:disabled="!store.canRedo"
+						title="Rétablir"
+						@click="store.redo()"
+					>
+						↪
+					</button>
+				</div>
 				<button
 					class="btn mini-open"
 					title="Ouvrir le panneau"
@@ -416,45 +447,8 @@ defineExpose({ engine })
 			</div>
 		</transition>
 
-		<!-- Mini panel zoom quand sidebar fermé -->
-			<transition name="mini-zoom">
-				<div
-					v-if="!store.sidebarOpen"
-					class="mini-panel mini-panel-zoom"
-				>
-					<button
-						class="btn"
-						title="Zoom +"
-						@click="store.zoomIn()"
-					>
-						+
-					</button>
-					<button
-						class="btn"
-						title="Zoom −"
-						@click="store.zoomOut()"
-					>
-						−
-					</button>
-					<button
-						class="btn"
-						title="Tout afficher"
-						@click="store.fitView()"
-					>
-						⤢
-					</button>
-					<button
-						class="btn"
-						title="Réinitialiser"
-						@click="store.resetView()"
-					>
-						⊙
-					</button>
-				</div>
-			</transition>
-
-			<!-- Sidebar -->
-			<div
+		<!-- Sidebar -->
+		<div
 			class="sidebar-wrapper"
 			:class="{ closed: !store.sidebarOpen }"
 		>

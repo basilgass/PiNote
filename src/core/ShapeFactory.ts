@@ -24,6 +24,7 @@ export interface ShapeStartConfig {
     lineStyle?: LineStyle
     fill?: boolean
     fillOpacity?: number
+    rectMode?: '2pts' | '3pts'
 }
 
 // factory industrialisable
@@ -75,7 +76,7 @@ export class ShapeFactory {
                 return new Circle((values as CircleConfig) ?? {cx: x, cy: y, radius: 0}, options)
 
             case "rectangle":
-                return new Rectangle((values as RectangleConfig) ?? {p1: {x, y}, p2: {x, y}, w: 0}, options)
+                return new Rectangle((values as RectangleConfig) ?? {p1: {x, y}, p2: {x, y}, w: 0}, options, config.rectMode ?? '2pts')
 
             case "polygon":
                 return new Polygon((values as PolygonConfig) ?? {points: []}, options)

@@ -31,6 +31,7 @@ export interface ToolConfig {
     width: number
     layer: LayerName
     bezier: boolean
+    rectMode?: '2pts' | '3pts'
 }
 
 interface ToolState {

@@ -1,5 +1,5 @@
 import {AbstractShape} from "./AbstractShape"
-import {ShapeOptions} from "./Adaptable"
+import {DrawingMode, ShapeOptions} from "./Adaptable"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
 import type {IDrawingContext} from "../core/DrawingContext"
 
@@ -16,15 +16,18 @@ export class Rectangle extends AbstractShape {
     p2: Pt
     w: number
     cursorPos: Pt | null = null
+    readonly mode: '2pts' | '3pts'
 
     override readonly canBeFilled = true
-    readonly drawingMode = 'two-phase' as const
+    readonly drawingMode: DrawingMode
 
-    constructor(config: RectangleConfig, options: Partial<ShapeOptions> = {}) {
+    constructor(config: RectangleConfig, options: Partial<ShapeOptions> = {}, mode: '2pts' | '3pts' = '2pts') {
         super(options)
         this.p1 = config.p1
         this.p2 = config.p2
         this.w = config.w
+        this.mode = mode
+        this.drawingMode = mode === '3pts' ? 'two-phase' : 'drag'
     }
 
     // Phase courante : 1 si P2 pas encore placé (arête de longueur nulle), 2 sinon
@@ -50,7 +53,11 @@ export class Rectangle extends AbstractShape {
     }
 
     update(x: number, y: number) {
-        if (this.phase === 1) {
+        if (this.mode === '2pts') {
+            this.p2 = { x: Math.round(x * 10) / 10, y: Math.round(this.p1.y * 10) / 10 }
+            const sign = x >= this.p1.x ? 1 : -1
+            this.w = Math.round((y - this.p1.y) * sign * 10) / 10
+        } else if (this.phase === 1) {
             this.cursorPos = { x, y }
         } else {
             const dx = this.p2.x - this.p1.x
@@ -112,15 +119,12 @@ export class Rectangle extends AbstractShape {
         ctx.lineJoin = 'round'
 
         if (this.phase === 1) {
-            // Preview de l'arête (pointillés)
+            // Premier drag : on trace le segment (rectangle de largeur nulle)
             if (!this.cursorPos) { ctx.restore(); return }
-            const dash = Math.max(this.width * 2, 5) / scale
-            ctx.setLineDash([dash, dash])
             ctx.beginPath()
             ctx.moveTo(this.p1.x, this.p1.y)
             ctx.lineTo(this.cursorPos.x, this.cursorPos.y)
             ctx.stroke()
-            ctx.setLineDash([])
         } else {
             const corners = this.getCorners()
             if (!corners) { ctx.restore(); return }

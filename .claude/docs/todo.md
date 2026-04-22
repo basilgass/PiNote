@@ -30,7 +30,7 @@
 ## Performance / scalabilité
 
 - [ ] **M. Rendu incrémental (dirty-flag)** — Ne redessiner que le layer modifié au lieu du `draw()` complet (`excludeLayer` existe mais non systématisé)
-- [ ] **N. Web Worker pour le snap** — Déplacer `SnapManager.snap()` dans un Worker pour ne pas bloquer le thread UI sur canvas très chargé
+- [x] **N. Web Worker pour le snap** — Déplacer `SnapManager.snap()` dans un Worker pour ne pas bloquer le thread UI sur canvas très chargé
 - [ ] **O. Virtualisation historique** — NoteHistory lent avec beaucoup de shapes → virtualiser la liste (sliding window ou `@tanstack/virtual`)
 
 ---

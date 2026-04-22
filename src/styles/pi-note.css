@@ -170,7 +170,7 @@
   right: 12px;
   z-index: 100;
   display: flex;
-  gap: 4px;
+  gap: 20px;
   background: var(--pn-bg);
   border: 1px solid var(--pn-border);
   border-radius: 8px;
@@ -178,9 +178,9 @@
   box-shadow: var(--pn-shadow-md);
 }
 
-.mini-panel-zoom {
-  top: auto;
-  bottom: 12px;
+.mini-panel-row {
+  display: flex;
+  gap: 4px;
 }
 
 .mini-open { font-size: 17px !important; line-height: 1; padding: 2px 7px !important; }
@@ -216,11 +216,17 @@
   align-items: center;
 }
 
+.tabs-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 /* Modificateur du bouton "Tout effacer" */
-.clear-btn                        { margin-left: auto; }
-.clear-btn:not(.pending)          { color: var(--pn-text-faint); }
-.clear-btn:hover:not(:disabled)   { color: var(--pn-danger); background: var(--pn-danger-light); }
-.clear-btn.pending                { color: var(--pn-danger); background: var(--pn-danger-light); font-size: 11px; }
+.clear                            { margin-left: auto; }
+.clear>.btn:not(.pending)          { color: var(--pn-text-faint); }
+.clear>.btn:hover:not(:disabled)   { color: var(--pn-danger); background: var(--pn-danger-light); }
+.clear>.btn.pending                { color: var(--pn-danger); background: var(--pn-danger-light); font-size: 11px; }
 
 .tools-row {
   display: flex;

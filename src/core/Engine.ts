@@ -3,6 +3,7 @@ import {BackgroundMode, BackgroundState, LayerName, ToolType} from "../types"
 import {Adaptable, ShapePatch} from "../shapes/Adaptable"
 import {AbstractShape} from "../shapes/AbstractShape"
 import {SnapManager} from "../snap/SnapManager"
+import {SnapWorkerClient, type SnapGeometry} from "../snap/SnapWorkerClient"
 import {ShapeFactory, ShapeStartConfig} from "@core/ShapeFactory"
 import {drawGrid, drawHex, drawRuled} from "@core/helper"
 import {SnapRenderer} from "../snap/visual/SnapRenderer"
@@ -23,6 +24,9 @@ export class Engine {
     private _pageId = 'default'
     private _onSaveCallback?: () => void
     private _snapManager: SnapManager = new SnapManager({snapRadius: 10})
+    private _snapWorkerClient: SnapWorkerClient
+    private _geometryDirty = true
+    private _cachedGeometry: SnapGeometry = { points: [], segments: [], circles: [] }
     private snapRenderer: SnapRenderer
     private _resizeObserver: ResizeObserver
     private _viewTransform = { x: 0, y: 0, scale: 1 }
@@ -45,6 +49,7 @@ export class Engine {
         this.overlay = new Layer(this.container, { name: 'overlay', zIndex: 99 })
 
         this.snapRenderer = new SnapRenderer(this.overlay.ctx)
+        this._snapWorkerClient = new SnapWorkerClient()
 
         if (defaultBackground) this._applyBackground(defaultBackground)
 
@@ -175,6 +180,7 @@ export class Engine {
 
         this._shapes.push(shape)
         this._undoStack = []
+        this._markGeometryDirty()
 
         if (shape.layer !== null) {
             const layer = this.getLayer(shape.layer)
@@ -328,6 +334,7 @@ export class Engine {
         this._undoStack = []
         this._selectedShapeId = null
         this._title = ''
+        this._markGeometryDirty()
         this.overlay.clear()
         this.clearAll()
         this._applyBackground({ mode: 'none' })
@@ -368,6 +375,7 @@ export class Engine {
 
         this._undoStack = []
         this._selectedShapeId = null
+        this._markGeometryDirty()
         this.draw()
         try { this.saveLocal() } catch { /* ignore */ }
     }
@@ -484,6 +492,7 @@ export class Engine {
         if (!this.canUndo) return
         const removed = this._shapes.pop()!
         this._undoStack.push(removed)
+        this._markGeometryDirty()
         if (this._selectedShapeId === removed.id) this._selectedShapeId = null
         this.draw()
         try { this.saveLocal() } catch { /* ignore */ }
@@ -492,6 +501,7 @@ export class Engine {
     redo() {
         if (!this.canRedo) return
         this._shapes.push(this._undoStack.pop()!)
+        this._markGeometryDirty()
         this.draw()
         try { this.saveLocal() } catch { /* ignore */ }
     }
@@ -636,6 +646,7 @@ export class Engine {
         clone.translate(15, 15)
         this._shapes.push(clone)
         this._undoStack = []
+        this._markGeometryDirty()
         this._selectedShapeId = clone.id
         this.draw()
         try { this.saveLocal() } catch { /* ignore */ }
@@ -667,6 +678,7 @@ export class Engine {
         const shape = this._shapes.find(s => s.id === id)
         if (!shape) return
         shape.translate(dx, dy)
+        this._markGeometryDirty()
         this.draw()
     }
 
@@ -675,12 +687,13 @@ export class Engine {
         const idx = this._shapes.findIndex(s => s.id === id)
         if (idx === -1) return
         const [removed] = this._shapes.splice(idx, 1)
+        this._markGeometryDirty()
         this.draw()
-        // P5: rollback si saveLocal échoue
         try {
             this.saveLocal()
         } catch {
             this._shapes.splice(idx, 0, removed)
+            this._markGeometryDirty()
             this.draw()
         }
     }
@@ -740,8 +753,55 @@ export class Engine {
         if (!res.ok) throw new Error(`[PiNote] syncRemote: ${res.status} ${res.statusText}`)
     }
 
+    // --- Hover snap ---
+
+    private _getGeometry(): SnapGeometry {
+        if (this._geometryDirty) {
+            this._cachedGeometry = SnapWorkerClient.buildGeometry(this._shapes)
+            this._geometryDirty = false
+        }
+        return this._cachedGeometry
+    }
+
+    private _markGeometryDirty() {
+        this._geometryDirty = true
+    }
+
+    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'move', 'select'])
+
+    hoverSnap(x: number, y: number, tool: ToolType): void {
+        if (Engine.HOVER_SNAP_EXCLUDED.has(tool)) return
+        if (this._currentShape) return
+
+        const geometry = this._getGeometry()
+        this._snapWorkerClient.request(x, y, geometry, {
+            snapRadius: this._snapManager.snapRadius,
+            gridEnabled: this._snapGridEnabled,
+            gridSize: this._snapGridSize,
+            activeLayer: null,
+        }, (result) => {
+            if (this._currentShape) return
+            this.overlay.clear()
+            if (!result) return
+            const { x: tx, y: ty, scale } = this._viewTransform
+            const ctx = this.overlay.ctx
+            ctx.save()
+            ctx.translate(tx, ty)
+            ctx.scale(scale, scale)
+            this.snapRenderer.draw(result)
+            ctx.restore()
+        })
+    }
+
+    clearHoverSnap(): void {
+        if (this._currentShape) return
+        this.overlay.clear()
+        this._drawSelectionOverlay()
+    }
+
     destroy() {
         if (this._gridPreviewTimer) clearTimeout(this._gridPreviewTimer)
         this._resizeObserver.disconnect()
+        this._snapWorkerClient.destroy()
     }
 }

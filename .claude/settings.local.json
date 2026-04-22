@@ -7,7 +7,9 @@
       "Bash(rm \"C:/Users/basil/.claude/skills/create-tool/SKILL.md\")",
       "Bash(rmdir \"C:/Users/basil/.claude/skills/create-tool\")",
       "Bash(npm install *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Read(//mnt/c/websites/PiNote/**)",
+      "Read(//mnt/c/websites/**)"
     ]
   }
 }

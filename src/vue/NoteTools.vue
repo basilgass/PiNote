@@ -61,14 +61,48 @@ function requestClear() {
 			>
 				Formes
 			</button>
-			<button
-				class="btn btn-ghost clear-btn"
-				:class="{ pending: clearPending }"
-				:title="clearPending ? 'Cliquer à nouveau pour confirmer' : 'Tout effacer'"
-				@click="requestClear"
-			>
-				{{ clearPending ? 'Confirmer ?' : '🗑' }}
-			</button>
+
+			<div class="clear tabs-row">
+				<div class="mini-panel-row">
+					<button
+						class="btn"
+						title="Zoom +"
+						@click="store.zoomIn()"
+					>
+						+
+					</button>
+					<button
+						class="btn"
+						title="Zoom −"
+						@click="store.zoomOut()"
+					>
+						−
+					</button>
+					<button
+						class="btn"
+						title="Tout afficher"
+						@click="store.fitView()"
+					>
+						⤢
+					</button>
+					<button
+						class="btn"
+						title="Réinitialiser"
+						@click="store.resetView()"
+					>
+						⊙
+					</button>
+				</div>
+
+				<button
+					class="btn btn-ghost"
+					:class="{ pending: clearPending }"
+					:title="clearPending ? 'Cliquer à nouveau pour confirmer' : 'Tout effacer'"
+					@click="requestClear"
+				>
+					{{ clearPending ? 'Confirmer ?' : '🗑' }}
+				</button>
+			</div>
 		</div>
 
 		<div class="tools-row">

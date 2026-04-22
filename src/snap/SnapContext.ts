@@ -6,8 +6,8 @@ export interface SnapContext {
     x: number
     y: number
 
-    // toutes les shapes visibles pour snap
-    shapes: Adaptable[]
+    // toutes les shapes visibles pour snap (optionnel — les stratégies utilisent index)
+    shapes?: Adaptable[]
 
     // index spatial pour accélérer la recherche
     index: SpatialIndex

@@ -151,21 +151,20 @@ const props = withDefaults(defineProps<{ tools?: ToolType[] }>(), {
 					/>
 				</svg>
 
-				<!-- RECTANGLE -->
+				<!-- RECTANGLE 2pts : horizontal -->
+				<svg
+					v-else-if="tool === 'rectangle' && !(store.tool.tool === 'rectangle' && store.tool.rectMode === '3pts')"
+					viewBox="0 0 24 24"
+				>
+					<rect x="5" y="7" width="14" height="10" rx="2" stroke="currentColor" stroke-width="2" fill="none" />
+				</svg>
+
+				<!-- RECTANGLE 3pts : incliné -->
 				<svg
 					v-else-if="tool === 'rectangle'"
 					viewBox="0 0 24 24"
 				>
-					<rect
-						x="5"
-						y="7"
-						width="14"
-						height="10"
-						rx="2"
-						stroke="currentColor"
-						stroke-width="2"
-						fill="none"
-					/>
+					<rect x="5" y="7" width="14" height="10" rx="2" stroke="currentColor" stroke-width="2" fill="none" transform="rotate(-18, 12, 12)" />
 				</svg>
 
 				<!-- POLYGON -->

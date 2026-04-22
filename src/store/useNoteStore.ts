@@ -51,6 +51,7 @@ export const useNoteStore = defineStore('note', () => {
     width: _cfg.defaults.width,
     color: _cfg.defaults.color,
     bezier: _cfg.defaults.bezier,
+    rectMode: '2pts',
   })
 
   /** Mémoire couleur/largeur par outil, pour restaurer la config au changement d'outil */
@@ -72,6 +73,12 @@ export const useNoteStore = defineStore('note', () => {
 
   /** Change l'outil actif et restaure sa mémoire couleur/largeur */
   function selectTool(newTool: ToolType) {
+    if (newTool === 'rectangle' && tool.tool === 'rectangle') {
+      tool.rectMode = tool.rectMode === '3pts' ? '2pts' : '3pts'
+      toolSelectCount.value++
+      return
+    }
+
     toolMemory[tool.tool].color = tool.color
     toolMemory[tool.tool].width = tool.width
 
