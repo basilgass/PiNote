@@ -17,10 +17,16 @@ export class Engine {
 
     private container: HTMLDivElement
     private overlay!: Layer
+    private _tempLayer!: Layer
     private _layers: Record<LayerName, Layer>
     private _shapes: Adaptable[] = []
     private _currentShape: Adaptable | null = null
-    private _background: BackgroundState = { mode: 'none' }
+    private _background: BackgroundState = {
+        mode: 'none',
+        grid:  { size: 80,  color: '#777777', lineWidth: 1 },
+        ruled: { spacing: 40, color: '#777777', lineWidth: 1 },
+        hex:   { size: 40,  color: '#777777', lineWidth: 1, orientation: 'pointy' },
+    }
     private _pageId = 'default'
     private _onSaveCallback?: () => void
     private _snapManager: SnapManager = new SnapManager({snapRadius: 10})
@@ -30,6 +36,7 @@ export class Engine {
     private snapRenderer: SnapRenderer
     private _resizeObserver: ResizeObserver
     private _viewTransform = { x: 0, y: 0, scale: 1 }
+    private _referenceBitmap: ImageBitmap | null = null
     private _undoStack: Adaptable[] = []
     private _selectedShapeId: string | null = null
     private _snapGridEnabled = false
@@ -42,11 +49,14 @@ export class Engine {
 
         this._layers = {
             BACKGROUND: new Layer(this.container, { name: 'BACKGROUND', zIndex: 1 }),
-            MAIN: new Layer(this.container, { name: 'MAIN', zIndex: 2 }),
-            LAYER: new Layer(this.container, { name: 'LAYER', zIndex: 3 }),
+            REFERENCE:  new Layer(this.container, { name: 'REFERENCE',  zIndex: 2 }),
+            OVERLAY:    new Layer(this.container, { name: 'OVERLAY',    zIndex: 3 }),
+            MAIN:       new Layer(this.container, { name: 'MAIN',       zIndex: 4 }),
+            LAYER:      new Layer(this.container, { name: 'LAYER',      zIndex: 5 }),
         }
 
-        this.overlay = new Layer(this.container, { name: 'overlay', zIndex: 99 })
+        this._tempLayer = new Layer(this.container, { name: 'TEMP', zIndex: 6 })
+        this.overlay    = new Layer(this.container, { name: 'overlay', zIndex: 99 })
 
         this.snapRenderer = new SnapRenderer(this.overlay.ctx)
         this._snapWorkerClient = new SnapWorkerClient()
@@ -138,11 +148,12 @@ export class Engine {
         if (!this._currentShape) return
 
         this.overlay.clear()
+        this._tempLayer.clear()
 
         const handled = this._currentShape.onDrawMove?.(x, y, this._buildDrawingContext())
         if (handled) return
 
-        // Comportement générique : snap + draw sur overlay
+        // Comportement générique : snap sur overlay, forme sur _tempLayer
         let newX = x
         let newY = y
         const isSnapTool = !Engine.NO_SNAP_TOOLS.has(this._currentShape.tool)
@@ -158,11 +169,20 @@ export class Engine {
         this._currentShape.update?.(newX, newY)
 
         const { x: tx, y: ty, scale } = this._viewTransform
-        const ctx = this.overlay.ctx
+
+        if (isSnapTool) {
+            const octx = this.overlay.ctx
+            octx.save()
+            octx.translate(tx, ty)
+            octx.scale(scale, scale)
+            this.snapRenderer.draw(snapResult)
+            octx.restore()
+        }
+
+        const ctx = this._tempLayer.ctx
         ctx.save()
         ctx.translate(tx, ty)
         ctx.scale(scale, scale)
-        if (isSnapTool) this.snapRenderer.draw(snapResult)
         this._currentShape.draw(ctx)
         ctx.restore()
     }
@@ -173,6 +193,7 @@ export class Engine {
         const shape = this._currentShape
         this._currentShape = null
         this.overlay.clear()
+        this._tempLayer.clear()
 
         if ((shape as AbstractShape).isEmpty()) return
 
@@ -239,13 +260,41 @@ export class Engine {
     clearLayer(name: LayerName) { this.getLayer(name)?.clear() }
     clearAll() {
         for (const layer of Object.values(this._layers)) {
-            if (layer.visible && !layer.locked && layer.name !== 'BACKGROUND') layer.clear()
+            if (layer.visible && !layer.locked
+                && layer.name !== 'BACKGROUND'
+                && layer.name !== 'REFERENCE'
+                && layer.name !== 'OVERLAY') layer.clear()
         }
+        this._tempLayer.clear()
+    }
+
+    get referenceBitmap(): ImageBitmap | null { return this._referenceBitmap }
+
+    setReferenceBitmap(bitmap: ImageBitmap | null) {
+        this._referenceBitmap = bitmap
+        this._drawReference()
+    }
+
+    private _drawReference() {
+        const layer = this._layers['REFERENCE']
+        layer.clear()
+        if (!this._referenceBitmap) return
+        const { x: tx, y: ty, scale } = this._viewTransform
+        const ctx = layer.ctx
+        ctx.save()
+        ctx.translate(tx, ty)
+        ctx.scale(scale, scale)
+        ctx.drawImage(this._referenceBitmap, 0, 0)
+        ctx.strokeStyle = '#aaaaaa'
+        ctx.lineWidth = 1
+        ctx.strokeRect(0, 0, this._referenceBitmap.width, this._referenceBitmap.height)
+        ctx.restore()
     }
 
     // --- Drawing ---
     // excludeLayer: si fourni, les shapes appartenant à ce layer sont ignorées
     draw(excludeLayer?: LayerName) {
+        this._drawReference()
         this.clearAll()
         const byLayer = new Map<LayerName, Adaptable[]>()
         for (const shape of this._shapes) {
@@ -274,7 +323,7 @@ export class Engine {
     }
 
     resize() {
-        for (const layer of [...Object.values(this._layers), this.overlay]) {
+        for (const layer of [...Object.values(this._layers), this._tempLayer, this.overlay]) {
             layer.resize(this.container)
         }
         // A4: ctx overlay mis à jour après resize (défensif)
@@ -296,12 +345,17 @@ export class Engine {
     }
 
     private _applyBackground(state: BackgroundState) {
-        this._background = state
-        this.renderBackground(state)
+        this._background = {
+            mode:  state.mode,
+            grid:  state.grid  ?? this._background.grid,
+            ruled: state.ruled ?? this._background.ruled,
+            hex:   state.hex   ?? this._background.hex,
+        }
+        this.renderBackground(this._background)
     }
 
     private renderBackground(state: BackgroundState) {
-        const layer = this.getLayer('BACKGROUND')
+        const layer = this.getLayer('OVERLAY')
         const ctx = layer.ctx
         const w = layer.canvas.width
         const h = layer.canvas.height
@@ -312,7 +366,6 @@ export class Engine {
             case 'ruled': drawRuled(ctx, w, h, state.ruled!); break
             case 'hex': drawHex(ctx, w, h, state.hex!); break
         }
-        // P3/P4: this.draw() supprimé — l'appelant en est responsable
     }
 
     // --- LocalStorage ---
@@ -338,6 +391,7 @@ export class Engine {
         this.overlay.clear()
         this.clearAll()
         this._applyBackground({ mode: 'none' })
+        this.setReferenceBitmap(null)
     }
 
     resetAll() {
@@ -403,7 +457,7 @@ export class Engine {
         const ctx = offscreen.getContext('2d')!
         ctx.fillStyle = 'white'
         ctx.fillRect(0, 0, offscreen.width, offscreen.height)
-        for (const name of ['BACKGROUND', 'MAIN', 'LAYER'] as LayerName[]) {
+        for (const name of ['REFERENCE', 'OVERLAY', 'MAIN', 'LAYER'] as LayerName[]) {
             if (this._layers[name].visible) ctx.drawImage(this._layers[name].canvas, 0, 0)
         }
         return offscreen.toDataURL('image/png')
@@ -482,6 +536,7 @@ export class Engine {
         if (!this._currentShape) return
         this._currentShape = null
         this.overlay.clear()
+        this._tempLayer.clear()
     }
 
     // --- Undo / Redo ---

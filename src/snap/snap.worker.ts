@@ -1,3 +1,4 @@
+/// <reference lib="webworker" />
 import { SpatialIndex } from '../core/SpatialIndex'
 import { GridSnap } from './strategies/GridSnap'
 import { MidpointSnap } from './strategies/MidpointSnap'

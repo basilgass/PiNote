@@ -18,10 +18,11 @@ export default defineConfig({
 			fileName: 'pi-note'
 		},
 		rollupOptions: {
-			external: ['vue'],
+			external: ['vue', 'pdfjs-dist'],
 			output: {
 				globals: {
-					vue: 'Vue'
+					vue: 'Vue',
+					'pdfjs-dist': 'pdfjsLib'
 				}
 			}
 		}

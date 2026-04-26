@@ -6,6 +6,7 @@ import SidebarPanelCanvas from './SidebarPanelCanvas.vue'
 import SidebarPanelProperties from './SidebarPanelProperties.vue'
 import SidebarPanelZoom from './SidebarPanelZoom.vue'
 import SidebarPanelLayers from './SidebarPanelLayers.vue'
+import PiIcon from './PiIcon.vue'
 
 const store = useNoteStore()
 
@@ -34,7 +35,7 @@ watch(() => store.selectedShapeId, (id) => {
 						title="Annuler"
 						@click="store.undo()"
 					>
-						↩
+						<PiIcon icon="rotate-left" />
 					</button>
 					<button
 						class="btn"
@@ -42,7 +43,7 @@ watch(() => store.selectedShapeId, (id) => {
 						title="Rétablir"
 						@click="store.redo()"
 					>
-						↪
+						<PiIcon icon="rotate-right" />
 					</button>
 				</div>
 
@@ -51,7 +52,7 @@ watch(() => store.selectedShapeId, (id) => {
 					title="Fermer le panneau"
 					@click="store.sidebarOpen = false"
 				>
-					‹
+					<PiIcon icon="chevron-right" />
 				</button>
 			</div>
 		</div>
@@ -67,7 +68,7 @@ watch(() => store.selectedShapeId, (id) => {
 					<span
 						class="chevron"
 						:class="{ open: openHistory }"
-					>›</span>
+					><PiIcon icon="chevron-right" /></span>
 				</button>
 			</div>
 			<sidebar-panel-history v-show="openHistory" />
@@ -83,7 +84,7 @@ watch(() => store.selectedShapeId, (id) => {
 				<span
 					class="chevron"
 					:class="{ open: openCanvas }"
-				>›</span>
+				><PiIcon icon="chevron-right" /></span>
 			</button>
 			<sidebar-panel-canvas v-show="openCanvas" />
 		</div>
@@ -98,7 +99,7 @@ watch(() => store.selectedShapeId, (id) => {
 				<span
 					class="chevron"
 					:class="{ open: openLayers }"
-				>›</span>
+				><PiIcon icon="chevron-right" /></span>
 			</button>
 			<sidebar-panel-layers v-show="openLayers" />
 		</div>
@@ -113,7 +114,7 @@ watch(() => store.selectedShapeId, (id) => {
 				<span
 					class="chevron"
 					:class="{ open: openProps }"
-				>›</span>
+				><PiIcon icon="chevron-right" /></span>
 			</button>
 			<sidebar-panel-properties v-show="openProps" />
 		</div>

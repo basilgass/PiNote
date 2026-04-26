@@ -9,6 +9,7 @@ import NoteSidebar from '@pi-vue/components/NoteSidebar.vue'
 import ToolHint from '@pi-vue/components/ToolHint.vue'
 import {useCanvasTransform} from '../composables/useCanvasTransform'
 import {useNoteStore} from '../store/useNoteStore'
+import PiIcon from '@pi-vue/components/PiIcon.vue'
 
 // ── Initialisation Pinia (library-safe) ─────────────────────────────────────
 if (!getActivePinia()) setActivePinia(createPinia())
@@ -377,7 +378,16 @@ onMounted(() => {
     zoomIn,
     zoomOut,
     resetView,
-    fitView: () => fitView(engine.value?.shapes ?? []),
+    fitView: () => {
+      const shapes = engine.value?.shapes ?? []
+      const bitmap = engine.value?.referenceBitmap
+      if (bitmap) {
+        const pdfShape = { getBounds: () => ({ minX: 0, minY: 0, maxX: bitmap.width, maxY: bitmap.height }) }
+        fitView([...shapes, pdfShape])
+      } else {
+        fitView(shapes)
+      }
+    },
   })
 })
 
@@ -426,7 +436,7 @@ defineExpose({engine})
 						title="Annuler"
 						@click="store.undo()"
 					>
-						↩
+						<PiIcon icon="rotate-left" />
 					</button>
 					<button
 						class="btn"
@@ -434,7 +444,7 @@ defineExpose({engine})
 						title="Rétablir"
 						@click="store.redo()"
 					>
-						↪
+						<PiIcon icon="rotate-right" />
 					</button>
 				</div>
 				<button
@@ -442,7 +452,7 @@ defineExpose({engine})
 					title="Ouvrir le panneau"
 					@click="store.sidebarOpen = true"
 				>
-					›
+					<PiIcon icon="chevron-left" />
 				</button>
 			</div>
 		</transition>

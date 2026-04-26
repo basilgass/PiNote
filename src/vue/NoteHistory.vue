@@ -2,6 +2,7 @@
 import {ref, watch} from "vue"
 import {LayerName} from "../types"
 import {Adaptable} from "../shapes/Adaptable"
+import PiIcon from "./components/PiIcon.vue"
 
 const props = defineProps<{
   shapes: Adaptable[]
@@ -75,7 +76,7 @@ const TOOL_LABEL: Record<string, string> = {
 					title="Annuler"
 					@click="emit('undo')"
 				>
-					↩
+					<PiIcon icon="rotate-left" />
 				</button>
 				<button
 					class="btn"
@@ -83,13 +84,13 @@ const TOOL_LABEL: Record<string, string> = {
 					title="Rétablir"
 					@click="emit('redo')"
 				>
-					↪
+					<PiIcon icon="rotate-right" />
 				</button>
 				<button
 					class="btn btn-sm"
 					@click="isOpen = !isOpen"
 				>
-					{{ isOpen ? '▲' : '▼' }}
+					<PiIcon :icon="isOpen ? 'chevron-up' : 'chevron-down'" />
 				</button>
 			</div>
 		</div>
@@ -129,14 +130,14 @@ const TOOL_LABEL: Record<string, string> = {
 						:title="shape.hidden ? 'Afficher' : 'Cacher'"
 						@click.stop="emit('toggleVisibility', shape.id)"
 					>
-						{{ shape.hidden ? '🙈' : '👁' }}
+						<PiIcon :icon="shape.hidden ? 'eye-slash' : 'eye'" />
 					</button>
 					<button
 						class="nh-delete"
 						title="Supprimer"
 						@click="deleteShape($event, shape.id)"
 					>
-						🗑
+						<PiIcon icon="trash-can" />
 					</button>
 				</div>
 			</div>

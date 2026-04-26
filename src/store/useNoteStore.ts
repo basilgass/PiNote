@@ -1,14 +1,19 @@
-import { defineStore } from 'pinia'
-import { ref, reactive, shallowRef } from 'vue'
-import type { Engine } from '@core/Engine'
-import type { Adaptable, ShapePatch } from '../shapes/Adaptable'
-import type { BackgroundState, LayerName, ToolConfig, ToolMemory, ToolType } from '../types'
-import { getConfig } from '../config/PiNoteConfig'
+import {defineStore} from 'pinia'
+import {reactive, ref, shallowRef} from 'vue'
+import type {Engine} from '@core/Engine'
+import type {Adaptable, ShapePatch} from '../shapes/Adaptable'
+import type {BackgroundState, LayerName, ToolConfig, ToolMemory, ToolType} from '../types'
+import {getConfig} from '../config/PiNoteConfig'
+import {usePdfStore} from './usePdfStore'
+import {clearPdfCache, clearPdfThumbnails} from '../services/PdfRenderer'
+import {pdfStorageRemove} from '../services/PdfStorage'
 
 export interface PageEntry {
   id: string
   name: string
   updatedAt: string
+  pdfId?: string
+  pdfPageIndex?: number
 }
 
 const INDEX_KEY = 'pi_note_index'
@@ -315,6 +320,7 @@ export const useNoteStore = defineStore('note', () => {
     engine.value.loadLocal()
     engine.value.onSave = () => _touchPage(currentPageId.value)
     _syncEngineState()
+    void usePdfStore().renderPageForCurrentPage()
   }
 
   /**
@@ -360,6 +366,7 @@ export const useNoteStore = defineStore('note', () => {
     localStorage.setItem(CURRENT_KEY, targetId)
     _syncEngineState()
     _checkExpiry()
+    void usePdfStore().renderPageForCurrentPage()
   }
 
   function createPage(name?: string) {
@@ -382,12 +389,58 @@ export const useNoteStore = defineStore('note', () => {
     _applyPage(id)
   }
 
+  function setPdfReference(pageId: string, pdfId: string | undefined, pdfPageIndex: number | undefined) {
+    const entry = pages.value.find(p => p.id === pageId)
+    if (!entry) return
+    entry.pdfId = pdfId
+    entry.pdfPageIndex = pdfPageIndex
+    _savePageIndex()
+  }
+
+  /**
+   * Ajoute N pages liées à un PDF sans changer de page courante pendant la création.
+   * Retourne l'id de la première page créée.
+   */
+  function appendPdfPages(pdfId: string, pageCount: number, baseName: string): string {
+    const max = getConfig().maxPages
+    const now = Date.now()
+    const newEntries: PageEntry[] = []
+    for (let i = 0; i < pageCount; i++) {
+      if (max > 0 && pages.value.length + newEntries.length >= max) break
+      const entry: PageEntry = {
+        id: `page-${now}-${i}`,
+        name: `${baseName} ${i + 1}`,
+        updatedAt: new Date().toISOString(),
+        pdfId,
+        pdfPageIndex: i,
+      }
+      newEntries.push(entry)
+    }
+    if (newEntries.length === 0) return currentPageId.value
+    pages.value = [...pages.value, ...newEntries]
+    _savePageIndex()
+    _applyPage(newEntries[0].id)
+    return newEntries[0].id
+  }
+
+  function _cleanOrphanPdf(deletedPdfId: string | undefined) {
+    if (!deletedPdfId) return
+    const stillUsed = pages.value.some(p => p.pdfId === deletedPdfId)
+    if (!stillUsed) {
+      void pdfStorageRemove(deletedPdfId)
+      clearPdfCache(deletedPdfId)
+      clearPdfThumbnails(deletedPdfId)
+    }
+  }
+
   function deletePage(id: string) {
     if (pages.value.length <= 1) return
+    const removed = pages.value.find(p => p.id === id)
     localStorage.removeItem('pi_note_draft_' + id)
     pages.value = pages.value.filter(p => p.id !== id)
     expiredPages.value = expiredPages.value.filter(p => p.id !== id)
     _savePageIndex()
+    _cleanOrphanPdf(removed?.pdfId)
     if (id === currentPageId.value) {
       _applyPage(pages.value[0].id)
     }
@@ -407,6 +460,12 @@ export const useNoteStore = defineStore('note', () => {
 
   /** Repart d'un document vierge : supprime toutes les pages et réinitialise le stockage. */
   function newDocument() {
+    const pdfIds = new Set(pages.value.map(p => p.pdfId).filter(Boolean) as string[])
+    for (const id of pdfIds) {
+      void pdfStorageRemove(id)
+      clearPdfCache(id)
+    }
+    clearPdfThumbnails()
     for (const p of pages.value) localStorage.removeItem('pi_note_draft_' + p.id)
     localStorage.removeItem(INDEX_KEY)
     localStorage.removeItem(CURRENT_KEY)
@@ -480,6 +539,7 @@ export const useNoteStore = defineStore('note', () => {
     // Pages
     currentPageId, pages, expiredPages,
     initSession, createPage, switchPage, deletePage, renamePage, dismissExpiredPages, newDocument,
+    setPdfReference, appendPdfPages,
     // Sync distante
     remoteUrl, syncStatus, syncRemote,
     // UI

@@ -3,6 +3,10 @@ import App from './App.vue'
 import '../src/styles/pi-note.css'
 import { setConfig, getConfig } from '../src/config/PiNoteConfig'
 import type { PiNoteConfig } from '../src/config/PiNoteConfig'
+import { initPdfWorker } from '../src/services/PdfRenderer'
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+initPdfWorker(workerUrl)
 
 async function bootstrap() {
   try {

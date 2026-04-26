@@ -1,10 +1,42 @@
 <script setup lang="ts">
-import {computed, ref, watch} from 'vue'
+import {computed, ref, watch, watchEffect} from 'vue'
 import type {BackgroundMode} from '../../types'
 import {useNoteStore} from '../../store/useNoteStore'
+import {usePdfStore} from '../../store/usePdfStore'
 import {getConfig} from '../../config/PiNoteConfig'
+import PiIcon from './PiIcon.vue'
+import PagesDialog from './PagesDialog.vue'
 
 const store = useNoteStore()
+const pdfStore = usePdfStore()
+
+// ── Référence PDF ─────────────────────────────────────────────────────────────
+const pdfFileInput = ref<HTMLInputElement | null>(null)
+
+const currentPage = ref(store.pages.find(p => p.id === store.currentPageId))
+watchEffect(() => {
+  currentPage.value = store.pages.find(p => p.id === store.currentPageId)
+})
+
+// Noms de fichiers PDF mémorisés côté client (non persistés, reconstruits à l'import)
+const pdfNames = ref<Record<string, string>>({})
+
+async function onPdfImport(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+
+  const { pdfId, pageCount } = await pdfStore.importPdf(file)
+  pdfNames.value[pdfId] = file.name
+  store.appendPdfPages(pdfId, pageCount, 'Page')
+}
+
+function detachPdf() {
+  if (!currentPage.value) return
+  store.setPdfReference(currentPage.value.id, undefined, undefined)
+  pdfStore.clearReference()
+}
 const fileInput = ref<HTMLInputElement | null>(null)
 
 async function onFileLoad(event: Event) {
@@ -16,27 +48,7 @@ async function onFileLoad(event: Event) {
 }
 
 // ── Pages ────────────────────────────────────────────────────────────────────
-const editingPageId = ref<string | null>(null)
-const editingName = ref('')
-
-function startRename(id: string, name: string) {
-  editingPageId.value = id
-  editingName.value = name
-}
-
-function commitRename(id: string) {
-  if (editingName.value.trim()) store.renamePage(id, editingName.value.trim())
-  editingPageId.value = null
-}
-
-function cancelRename() {
-  editingPageId.value = null
-}
-
-function deleteAllExpired() {
-  for (const p of [...store.expiredPages]) store.deletePage(p.id)
-  store.dismissExpiredPages()
-}
+const showPagesDialog = ref(false)
 
 function confirmNewDocument() {
   if (confirm('Nouveau document : toutes les pages seront supprimées. Continuer ?')) {
@@ -89,78 +101,32 @@ function patchBackground(patch: Record<string, unknown>, section: 'grid' | 'rule
 	<div class="canvas-body">
 		<!-- Pages -->
 		<div class="canvas-field pages-header">
-			<span class="sec-label">Pages</span>
-			<div style="display:flex;gap:4px">
-				<button
-					class="btn btn-sm"
-					@click="store.createPage()"
-				>
-					+ Nouvelle
-				</button>
-				<button
-					class="btn btn-sm btn-danger"
-					title="Nouveau document vierge"
-					@click="confirmNewDocument()"
-				>
-					Nouveau
-				</button>
-			</div>
-		</div>
-		<div class="pages-list">
-			<div
-				v-for="page in store.pages"
-				:key="page.id"
-				class="h-row"
-				:class="{ active: page.id === store.currentPageId }"
+			<button
+				class="btn btn-sm"
+				@click="store.createPage()"
 			>
-				<input
-					v-if="editingPageId === page.id"
-					class="page-name-input"
-					:value="editingName"
-					autofocus
-					@input="editingName = ($event.target as HTMLInputElement).value"
-					@blur="commitRename(page.id)"
-					@keydown.enter="commitRename(page.id)"
-					@keydown.escape="cancelRename"
-				>
-				<span
-					v-else
-					class="h-label"
-					@click="store.switchPage(page.id)"
-					@dblclick="startRename(page.id, page.name)"
-				>{{ page.name }}</span>
-				<button
-					class="btn-icon del"
-					:disabled="store.pages.length <= 1"
-					title="Supprimer la page"
-					@click="store.deletePage(page.id)"
-				>
-					✕
-				</button>
-			</div>
+				+ Nouvelle
+			</button>
+			<button
+				class="btn btn-sm btn-danger"
+				title="Nouveau document vierge"
+				@click="confirmNewDocument()"
+			>
+				Nouveau
+			</button>
+			<button
+				class="btn btn-sm"
+				title="Gérer toutes les pages"
+				@click="showPagesDialog = true"
+			>
+				Pages…
+			</button>
 		</div>
 
-		<!-- Alerte pages expirées -->
-		<div
-			v-if="store.expiredPages.length"
-			class="expiry-warning"
-		>
-			<span>{{ store.expiredPages.length }} page(s) non modifiée(s) depuis 30 jours</span>
-			<div class="expiry-actions">
-				<button
-					class="btn btn-sm btn-danger"
-					@click="deleteAllExpired"
-				>
-					Supprimer
-				</button>
-				<button
-					class="btn btn-sm"
-					@click="store.dismissExpiredPages()"
-				>
-					Ignorer
-				</button>
-			</div>
-		</div>
+		<PagesDialog
+			:open="showPagesDialog"
+			@close="showPagesDialog = false"
+		/>
 
 		<!-- Titre du canvas -->
 		<div class="canvas-field">
@@ -358,6 +324,48 @@ function patchBackground(patch: Record<string, unknown>, section: 'grid' | 'rule
 				</div>
 			</div>
 		</template>
+
+		<!-- Référence PDF -->
+		<div class="canvas-field pages-header">
+			<span class="sec-label">PDF</span>
+			<div style="display:flex;gap:4px;flex-wrap:wrap">
+				<button
+					class="btn btn-sm"
+					:disabled="pdfStore.isRendering"
+					title="Importer un PDF et créer une page par feuille"
+					@click="pdfFileInput?.click()"
+				>
+					{{ pdfStore.isRendering ? 'Chargement…' : 'Importer' }}
+				</button>
+				<button
+					v-if="currentPage?.pdfId"
+					class="btn btn-sm btn-danger"
+					title="Détacher le PDF de cette page"
+					@click="detachPdf"
+				>
+					Détacher
+				</button>
+			</div>
+			<input
+				ref="pdfFileInput"
+				type="file"
+				accept="application/pdf"
+				style="display:none"
+				@change="onPdfImport"
+			>
+		</div>
+		<div
+			v-if="currentPage?.pdfId"
+			class="canvas-field"
+		>
+			<span class="sec-label">Fichier</span>
+			<span class="opt-val" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+				{{ pdfNames[currentPage.pdfId] ?? currentPage.pdfId }}
+				<template v-if="currentPage.pdfPageIndex !== undefined">
+					(p.&nbsp;{{ currentPage.pdfPageIndex + 1 }})
+				</template>
+			</span>
+		</div>
 
 		<!-- Snap grille -->
 		<div class="canvas-field">

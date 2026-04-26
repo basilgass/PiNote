@@ -3,6 +3,7 @@ import {computed, ref, watch} from 'vue'
 import type {Adaptable, ShapePatch} from '../../shapes/Adaptable'
 import type {ArrowStyle, LayerName, LineStyle} from '../../types'
 import ColorSelector from './ColorSelector.vue'
+import PiIcon from './PiIcon.vue'
 import WidthSelector from './WidthSelector.vue'
 import LayerSelector from './LayerSelector.vue'
 
@@ -135,14 +136,14 @@ const showArrowStyle = computed(() => arrowStart.value || arrowEnd.value)
 							:class="{ 'btn-active': arrowStart }"
 							@click="arrowStart = !arrowStart"
 						>
-							← départ
+							<PiIcon icon="arrow-left" /> départ
 						</button>
 						<button
 							class="btn btn-sm btn-toggle"
 							:class="{ 'btn-active': arrowEnd }"
 							@click="arrowEnd = !arrowEnd"
 						>
-							arrivée →
+							arrivée <PiIcon icon="arrow-right" />
 						</button>
 					</div>
 				</section>
@@ -159,14 +160,14 @@ const showArrowStyle = computed(() => arrowStart.value || arrowEnd.value)
 								:class="{ active: arrowStyle === 'filled' }"
 								@click="arrowStyle = 'filled'"
 							>
-								▶ plein
+								<PiIcon icon="play" /> plein
 							</button>
 							<button
 								class="sp-toggle"
 								:class="{ active: arrowStyle === 'open' }"
 								@click="arrowStyle = 'open'"
 							>
-								➤ ouvert
+								<PiIcon icon="angle-right" /> ouvert
 							</button>
 						</div>
 					</section>

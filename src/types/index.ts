@@ -29,7 +29,7 @@ export interface ToolConfig {
     tool: ToolType
     color: string
     width: number
-    layer: LayerName
+    layer: LayerName | null
     bezier: boolean
     rectMode?: '2pts' | '3pts'
 }
@@ -41,7 +41,7 @@ interface ToolState {
 
 export type ToolMemory = Record<ToolType, ToolState>
 
-export type LayerName = 'BACKGROUND' | 'MAIN' | 'LAYER'
+export type LayerName = 'BACKGROUND' | 'REFERENCE' | 'OVERLAY' | 'MAIN' | 'LAYER'
 
 export interface LayerInfo {
     name: string

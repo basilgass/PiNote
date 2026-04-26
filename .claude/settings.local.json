@@ -9,7 +9,11 @@
       "Bash(npm install *)",
       "Bash(npx eslint *)",
       "Read(//mnt/c/websites/PiNote/**)",
-      "Read(//mnt/c/websites/**)"
+      "Read(//mnt/c/websites/**)",
+      "Bash(npm audit *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(npx vitest *)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

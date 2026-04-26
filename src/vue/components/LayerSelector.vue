@@ -2,13 +2,13 @@
 
 import {LayerName} from "../../types"
 
-const selectedLayer = defineModel<LayerName>()
+const selectedLayer = defineModel<LayerName | null>()
 
 withDefaults(defineProps<{ showNull?: boolean }>(), { showNull: true })
 
 const layers: LayerName[] = ['MAIN', 'LAYER']
 
-function selectLayer(layer: LayerName) {
+function selectLayer(layer: LayerName | null) {
   selectedLayer.value = layer
 }
 </script>

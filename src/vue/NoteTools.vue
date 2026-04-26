@@ -6,6 +6,7 @@ import WidthSelector from '@pi-vue/components/WidthSelector.vue'
 import LayerSelector from '@pi-vue/components/LayerSelector.vue'
 import {useNoteStore} from '../store/useNoteStore'
 import type {ToolType} from '../types'
+import PiIcon from '@pi-vue/components/PiIcon.vue'
 
 const store = useNoteStore()
 
@@ -69,28 +70,28 @@ function requestClear() {
 						title="Zoom +"
 						@click="store.zoomIn()"
 					>
-						+
+						<PiIcon icon="magnifying-glass-plus" />
 					</button>
 					<button
 						class="btn"
 						title="Zoom −"
 						@click="store.zoomOut()"
 					>
-						−
+						<PiIcon icon="magnifying-glass-minus" />
 					</button>
 					<button
 						class="btn"
 						title="Tout afficher"
 						@click="store.fitView()"
 					>
-						⤢
+						<PiIcon icon="expand" />
 					</button>
 					<button
 						class="btn"
 						title="Réinitialiser"
 						@click="store.resetView()"
 					>
-						⊙
+						<PiIcon icon="compress" />
 					</button>
 				</div>
 
@@ -100,7 +101,13 @@ function requestClear() {
 					:title="clearPending ? 'Cliquer à nouveau pour confirmer' : 'Tout effacer'"
 					@click="requestClear"
 				>
-					{{ clearPending ? 'Confirmer ?' : '🗑' }}
+					<template v-if="clearPending">
+						Confirmer ?
+					</template>
+					<PiIcon
+						v-else
+						icon="trash-can"
+					/>
 				</button>
 			</div>
 		</div>
@@ -115,18 +122,18 @@ function requestClear() {
 			<color-selector
 				:model-value="store.tool.color"
 				:tool="store.tool.tool"
-				@update:model-value="store.setToolColor($event)"
+				@update:model-value="(v) => v !== undefined && store.setToolColor(v)"
 			/>
 
 			<width-selector
 				:model-value="store.tool.width"
 				:tool="store.tool.tool"
-				@update:model-value="store.setToolWidth($event)"
+				@update:model-value="(v) => v !== undefined && store.setToolWidth(v)"
 			/>
 
 			<layer-selector
 				:model-value="store.tool.layer"
-				@update:model-value="store.tool.layer = $event"
+				@update:model-value="(v) => { store.tool.layer = v ?? null }"
 			/>
 		</div>
 	</div>

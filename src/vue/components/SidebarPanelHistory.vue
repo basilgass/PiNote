@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useNoteStore } from '../../store/useNoteStore'
+import PiIcon from './PiIcon.vue'
 
 const store = useNoteStore()
 
@@ -41,14 +42,14 @@ const TOOL_LABEL: Record<string, string> = {
 				:title="shape.hidden ? 'Afficher' : 'Cacher'"
 				@click.stop="store.toggleShapeVisibility(shape.id)"
 			>
-				{{ shape.hidden ? '🙈' : '👁' }}
+				<PiIcon :icon="shape.hidden ? 'eye-slash' : 'eye'" />
 			</button>
 			<button
 				class="btn-icon del"
 				title="Supprimer"
 				@click.stop="store.destroyShape(shape.id)"
 			>
-				🗑
+				<PiIcon icon="trash-can" />
 			</button>
 		</div>
 	</div>
