@@ -12,4 +12,7 @@ export const TOOL_HINTS: Record<ToolType, string> = {
     circle:      'Cliquez pour définir le centre, glissez pour fixer le rayon.',
     rectangle:   '2pts : glissez pour tracer le rectangle. 3pts : glissez pour l\'arête, relâchez, puis glissez pour la largeur.',
     polygon:     'Cliquez pour ajouter des sommets un par un. Double-clic pour fermer et terminer.',
+    arc:         'Cliquez pour poser le sommet, cliquez pour fixer le premier côté, cliquez pour tracer l\'arc dans le sens trigonométrique.',
+    text:        'Glissez pour définir la boîte de texte, puis saisissez votre contenu LaTeX.',
+    graph:       'Glissez pour définir la zone du graphe, puis configurez les axes et les fonctions.',
 }

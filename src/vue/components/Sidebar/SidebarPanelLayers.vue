@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { reactive, ref, watchEffect } from 'vue'
-import { useNoteStore } from '../../store/useNoteStore'
-import { usePdfStore } from '../../store/usePdfStore'
-import PiIcon from './PiIcon.vue'
-import type { LayerName } from '../../types'
+import {reactive, ref, watchEffect} from 'vue'
+import PiIcon from '../PiIcon.vue'
+import {useNoteStore} from "../../../store/useNoteStore"
+import {usePdfStore} from "../../../store/usePdfStore"
+import type {LayerName} from "../../../types"
 
 const store = useNoteStore()
 const pdfStore = usePdfStore()
@@ -107,8 +107,11 @@ watchEffect(() => {
 					title="Opacité"
 					@input="setOpacity(name, +($event.target as HTMLInputElement).value)"
 					@click.stop
+				>
+				<span
+					v-else
+					style="flex:1"
 				/>
-				<span v-else style="flex:1" />
 			</template>
 
 			<button

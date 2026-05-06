@@ -1,27 +1,29 @@
 <script setup lang="ts">
 import {ref} from 'vue'
-import ToolSelector from '@pi-vue/components/ToolSelector.vue'
-import ColorSelector from '@pi-vue/components/ColorSelector.vue'
-import WidthSelector from '@pi-vue/components/WidthSelector.vue'
-import LayerSelector from '@pi-vue/components/LayerSelector.vue'
+import ToolSelector from '@pi-vue/components/controls/ToolSelector.vue'
+import ColorSelector from '@pi-vue/components/controls/ColorSelector.vue'
+import WidthSelector from '@pi-vue/components/controls/WidthSelector.vue'
+import LayerSelector from '@pi-vue/components/controls/LayerSelector.vue'
 import {useNoteStore} from '../store/useNoteStore'
 import type {ToolType} from '../types'
 import PiIcon from '@pi-vue/components/PiIcon.vue'
+import ZoomControls from '@pi-vue/components/ZoomControls.vue'
 
 const store = useNoteStore()
 
 // ── Onglets ──────────────────────────────────────────────────────────────────
 
-type Tab = 'drawing' | 'shapes'
+type Tab = 'drawing' | 'shapes' | 'widgets'
 const activeTab = ref<Tab>('drawing')
 
-const drawingTools: ToolType[] = ['select', 'move', 'pen', 'highlighter', 'eraser']
-const shapeTools: ToolType[]   = ['select', 'move', 'line', 'segment', 'vector', 'circle', 'rectangle', 'polygon']
+const drawingTools: ToolType[] = ['select', 'move', 'pen', 'highlighter', 'eraser', 'text']
+const shapeTools: ToolType[]   = ['select', 'move', 'line', 'segment', 'vector', 'circle', 'rectangle', 'polygon', 'arc']
+const widgetTools: ToolType[]  = ['select', 'move', 'text', 'graph']
 
 /** Change d'onglet et bascule sur le premier outil de l'onglet si nécessaire */
 function selectTab(tab: Tab) {
   activeTab.value = tab
-  const tools = tab === 'drawing' ? drawingTools : shapeTools
+  const tools = tab === 'drawing' ? drawingTools : tab === 'shapes' ? shapeTools : widgetTools
   if (!tools.includes(store.tool.tool)) {
     store.selectTool(tools[0])
   }
@@ -62,38 +64,16 @@ function requestClear() {
 			>
 				Formes
 			</button>
+			<button
+				class="btn btn-ghost"
+				:class="{ 'btn-active': activeTab === 'widgets' }"
+				@click="selectTab('widgets')"
+			>
+				Widgets
+			</button>
 
 			<div class="clear tabs-row">
-				<div class="mini-panel-row">
-					<button
-						class="btn"
-						title="Zoom +"
-						@click="store.zoomIn()"
-					>
-						<PiIcon icon="magnifying-glass-plus" />
-					</button>
-					<button
-						class="btn"
-						title="Zoom −"
-						@click="store.zoomOut()"
-					>
-						<PiIcon icon="magnifying-glass-minus" />
-					</button>
-					<button
-						class="btn"
-						title="Tout afficher"
-						@click="store.fitView()"
-					>
-						<PiIcon icon="expand" />
-					</button>
-					<button
-						class="btn"
-						title="Réinitialiser"
-						@click="store.resetView()"
-					>
-						<PiIcon icon="compress" />
-					</button>
-				</div>
+				<zoom-controls class="mini-panel-row" />
 
 				<button
 					class="btn btn-ghost"
@@ -114,7 +94,7 @@ function requestClear() {
 
 		<div class="tools-row">
 			<tool-selector
-				:tools="activeTab === 'drawing' ? drawingTools : shapeTools"
+				:tools="activeTab === 'drawing' ? drawingTools : activeTab === 'shapes' ? shapeTools : widgetTools"
 			/>
 
 			<div class="divider" />

@@ -13,7 +13,22 @@
       "Bash(npm audit *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
       "Bash(npx vitest *)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(xargs wc *)",
+      "Bash(npx vue-tsc *)",
+      "WebFetch(domain:docs.mathjax.org)",
+      "Bash(npm show *)",
+      "Bash(node -e \"const v=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const arr=JSON.parse\\(v\\); console.log\\(arr.slice\\(-5\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(npm pack *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('exports',{}\\), indent=2\\)\\)\")",
+      "Bash(grep \"\\\\.js$\")",
+      "Bash(xargs grep *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); imports=d.get\\('imports',{}\\); [print\\(k,':',v\\) for k,v in imports.items\\(\\)]\")",
+      "Bash(mkdir -p 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\controls')",
+      "Bash(mkdir -p 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\Sidebar')",
+      "Bash(mkdir -p 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\Widget')",
+      "Bash(mv 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\ColorSelector.vue' 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\controls\\\\')",
+      "Bash(mv 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\LayerSelector.vue' 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\controls\\\\')"
     ]
   }
 }

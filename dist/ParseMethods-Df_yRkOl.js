@@ -1,0 +1,1228 @@
+import { r as e } from "./Options-xGJmd5BJ.js";
+import { t } from "./Entities-IELpojcS.js";
+import { n } from "./Styles-NrSKVl_0.js";
+import { h as r, i, t as a } from "./mo-CHa-ZBtr.js";
+import { C as o, S as s, _ as c, g as l, m as u, r as d, v as f, x as p, y as m } from "./Configuration-D9a4xjiL.js";
+import { t as h } from "./ParseUtil-DNGKyXxF.js";
+import { r as g } from "./lengths-BtEx5qB5.js";
+//#region node_modules/@mathjax/src/mjs/input/tex/base/BaseItems.js
+var _ = class extends c {
+	constructor(e, t) {
+		super(e), this.global = t;
+	}
+	get kind() {
+		return "start";
+	}
+	get isOpen() {
+		return !0;
+	}
+	checkItem(e) {
+		if (e.isKind("stop")) {
+			let e = this.toMml();
+			return this.global.isInner || (e = this.factory.configuration.tags.finalize(e, this.env)), [[this.factory.create("mml", e)], !0];
+		}
+		return super.checkItem(e);
+	}
+}, v = class extends c {
+	get kind() {
+		return "stop";
+	}
+	get isClose() {
+		return !0;
+	}
+}, y = class extends c {
+	get kind() {
+		return "open";
+	}
+	get isOpen() {
+		return !0;
+	}
+	checkItem(e) {
+		if (e.isKind("close")) {
+			let t = this.toMml(), n = this.create("node", "TeXAtom", [t]);
+			return e.addLatexItem(n), [[this.factory.create("mml", n)], !0];
+		}
+		return super.checkItem(e);
+	}
+};
+y.errors = Object.assign(Object.create(c.errors), { stop: ["ExtraOpenMissingClose", "Extra open brace or missing close brace"] });
+var b = class extends c {
+	get kind() {
+		return "close";
+	}
+	get isClose() {
+		return !0;
+	}
+}, x = class extends c {
+	get kind() {
+		return "null";
+	}
+}, S = class extends c {
+	get kind() {
+		return "prime";
+	}
+	checkItem(e) {
+		let [t, n] = this.Peek(2), r = (o.isType(t, "msubsup") || o.isType(t, "msup")) && !o.getChildAt(t, t.sup), i = (o.isType(t, "munderover") || o.isType(t, "mover")) && !o.getChildAt(t, t.over) && !o.getProperty(t, "subsupOK");
+		if (!r && !i) return [[this.create("node", t.getProperty("movesupsub") ? "mover" : "msup", [t, n]), e], !0];
+		let a = r ? t.sup : t.over;
+		return o.setChild(t, a, n), [[t, e], !0];
+	}
+}, C = class extends c {
+	get kind() {
+		return "subsup";
+	}
+	checkItem(e) {
+		if (e.isKind("open") || e.isKind("left")) return c.success;
+		let t = this.First, n = this.getProperty("position");
+		if (e.isKind("mml")) return this.getProperty("primes") && (n === 2 ? (o.setProperty(this.getProperty("primes"), "variantForm", !0), e.First = this.create("node", "mrow", [this.getProperty("primes"), e.First])) : o.setChild(t, 2, this.getProperty("primes"))), o.setChild(t, n, e.First), this.getProperty("movesupsub") != null && o.setProperty(t, "movesupsub", this.getProperty("movesupsub")), [[this.factory.create("mml", t)], !0];
+		super.checkItem(e);
+		let r = this.getErrors([
+			"",
+			"sub",
+			"sup"
+		][n]);
+		throw new f(r[0], r[1], ...r.splice(2));
+	}
+};
+C.errors = Object.assign(Object.create(c.errors), {
+	stop: ["MissingScript", "Missing superscript or subscript argument"],
+	sup: ["MissingOpenForSup", "Missing open brace for superscript"],
+	sub: ["MissingOpenForSub", "Missing open brace for subscript"]
+});
+var w = class extends c {
+	constructor(e) {
+		super(e), this.setProperty("name", "\\over");
+	}
+	get kind() {
+		return "over";
+	}
+	get isClose() {
+		return !0;
+	}
+	checkItem(e) {
+		if (e.isKind("over")) throw new f("AmbiguousUseOf", "Ambiguous use of %1", e.getName());
+		if (e.isClose) {
+			let t = this.create("node", "mfrac", [this.getProperty("num"), this.toMml(!1)]);
+			return this.getProperty("thickness") != null && o.setAttribute(t, "linethickness", this.getProperty("thickness")), (this.getProperty("ldelim") || this.getProperty("rdelim")) && (o.setProperty(t, "withDelims", !0), t = h.fixedFence(this.factory.configuration, this.getProperty("ldelim"), t, this.getProperty("rdelim"))), t.attributes.set(s.Attr.LATEXITEM, this.getProperty("name")), [[this.factory.create("mml", t), e], !0];
+		}
+		return super.checkItem(e);
+	}
+	toString() {
+		return "over[" + this.getProperty("num") + " / " + this.nodes.join("; ") + "]";
+	}
+}, T = class extends c {
+	constructor(e, t) {
+		super(e), this.setProperty("delim", t);
+	}
+	get kind() {
+		return "left";
+	}
+	get isOpen() {
+		return !0;
+	}
+	checkItem(e) {
+		if (e.isKind("right")) {
+			let t = h.fenced(this.factory.configuration, this.getProperty("delim"), this.toMml(), e.getProperty("delim"), "", e.getProperty("color")), n = t.childNodes[0], r = t.childNodes[t.childNodes.length - 1], i = this.factory.create("mml", t);
+			return this.addLatexItem(n, "\\left"), e.addLatexItem(r, "\\right"), i.Peek()[0].attributes.set(s.Attr.LATEXITEM, "\\left" + e.startStr.slice(this.startI, e.stopI)), [[i], !0];
+		}
+		if (e.isKind("middle")) {
+			let t = { stretchy: !0 };
+			e.getProperty("color") && (t.mathcolor = e.getProperty("color"));
+			let n = this.create("token", "mo", t, e.getProperty("delim"));
+			return e.addLatexItem(n, "\\middle"), this.Push(this.create("node", "TeXAtom", [], { texClass: r.CLOSE }), n, this.create("node", "TeXAtom", [], { texClass: r.OPEN })), this.env = {}, [[this], !0];
+		}
+		return super.checkItem(e);
+	}
+};
+T.errors = Object.assign(Object.create(c.errors), { stop: ["ExtraLeftMissingRight", "Extra \\left or missing \\right"] });
+var E = class extends c {
+	constructor(e, t, n) {
+		super(e), this.setProperty("delim", t), n && this.setProperty("color", n);
+	}
+	get kind() {
+		return "middle";
+	}
+	get isClose() {
+		return !0;
+	}
+}, D = class extends c {
+	constructor(e, t, n) {
+		super(e), this.setProperty("delim", t), n && this.setProperty("color", n);
+	}
+	get kind() {
+		return "right";
+	}
+	get isClose() {
+		return !0;
+	}
+}, O = class extends c {
+	get kind() {
+		return "break";
+	}
+	constructor(e, t, n) {
+		super(e), this.setProperty("linebreak", t), this.setProperty("insert", n);
+	}
+	checkItem(e) {
+		let t = this.getProperty("linebreak");
+		if (e.isKind("mml")) {
+			let n = e.First;
+			if (n.isKind("mo")) {
+				if ((o.getOp(n)?.[3]?.linebreakstyle || o.getAttribute(n, "linebreakstyle")) !== "after") return o.setAttribute(n, "linebreak", t), [[e], !0];
+				if (!this.getProperty("insert")) return [[e], !0];
+			}
+		}
+		let n = this.create("token", "mspace", { linebreak: t });
+		return [[this.factory.create("mml", n), e], !0];
+	}
+}, k = class extends c {
+	get kind() {
+		return "begin";
+	}
+	get isOpen() {
+		return !0;
+	}
+	checkItem(e) {
+		if (e.isKind("end")) {
+			if (e.getName() !== this.getName()) throw new f("EnvBadEnd", "\\begin{%1} ended with \\end{%2}", this.getName(), e.getName());
+			let t = this.toMml();
+			return e.addLatexItem(t), [[this.factory.create("mml", t)], !0];
+		}
+		if (e.isKind("stop")) throw new f("EnvMissingEnd", "Missing \\end{%1}", this.getName());
+		return super.checkItem(e);
+	}
+}, A = class extends c {
+	get kind() {
+		return "end";
+	}
+	get isClose() {
+		return !0;
+	}
+}, j = class extends c {
+	get kind() {
+		return "style";
+	}
+	checkItem(e) {
+		if (!e.isClose) return super.checkItem(e);
+		let t = this.create("node", "mstyle", this.nodes, this.getProperty("styles"));
+		return [[this.factory.create("mml", t), e], !0];
+	}
+}, M = class extends c {
+	get kind() {
+		return "position";
+	}
+	checkItem(e) {
+		if (e.isClose) throw new f("MissingBoxFor", "Missing box for %1", this.getName());
+		if (e.isFinal) {
+			let t = e.toMml();
+			switch (this.getProperty("move")) {
+				case "vertical": return t = this.create("node", "mpadded", [t], {
+					height: this.getProperty("dh"),
+					depth: this.getProperty("dd"),
+					voffset: this.getProperty("dh")
+				}), [[this.factory.create("mml", t)], !0];
+				case "horizontal": return [[
+					this.factory.create("mml", this.getProperty("left")),
+					e,
+					this.factory.create("mml", this.getProperty("right"))
+				], !0];
+			}
+		}
+		return super.checkItem(e);
+	}
+}, N = class extends c {
+	get kind() {
+		return "cell";
+	}
+	get isClose() {
+		return !0;
+	}
+}, P = class extends c {
+	get isFinal() {
+		return !0;
+	}
+	get kind() {
+		return "mml";
+	}
+}, F = class extends c {
+	get kind() {
+		return "fn";
+	}
+	checkItem(e) {
+		let n = this.First;
+		if (n) {
+			if (e.isOpen) return c.success;
+			if (!e.isKind("fn")) {
+				let t = e.First;
+				if (!e.isKind("mml") || !t || o.isType(t, "mstyle") && t.childNodes.length && o.isType(t.childNodes[0].childNodes[0], "mspace") || o.isType(t, "mspace")) return [[n, e], !0];
+				o.isEmbellished(t) && (t = o.getCoreMO(t));
+				let r = o.getForm(t);
+				if (r != null && [
+					0,
+					0,
+					1,
+					1,
+					0,
+					1,
+					1,
+					0,
+					0,
+					0
+				][r[2]]) return [[n, e], !0];
+			}
+			return n.isKind("TeXAtom") && n.isEmpty ? [[n, e], !0] : [[
+				n,
+				this.create("token", "mo", { texClass: r.NONE }, t.ApplyFunction),
+				e
+			], !0];
+		}
+		return super.checkItem(e);
+	}
+}, I = class extends c {
+	constructor() {
+		super(...arguments), this.remap = d.getMap("not_remap");
+	}
+	get kind() {
+		return "not";
+	}
+	checkItem(e) {
+		let t, n, i;
+		if (e.isKind("open") || e.isKind("left")) return c.success;
+		if (e.isKind("mml") && (o.isType(e.First, "mo") || o.isType(e.First, "mi") || o.isType(e.First, "mtext")) && (t = e.First, n = o.getText(t), n.length === 1 && !o.getProperty(t, "movesupsub") && o.getChildren(t).length === 1)) return this.remap.contains(n) ? (i = this.create("text", this.remap.lookup(n).char), o.setChild(t, 0, i)) : (i = this.create("text", "̸"), o.appendChildren(t, [i])), [[e], !0];
+		i = this.create("text", "⧸");
+		let a = this.create("node", "mtext", [], {}, i), s = this.create("node", "mpadded", [a], { width: 0 });
+		return t = this.create("node", "TeXAtom", [s], { texClass: r.REL }), [[t, e], !0];
+	}
+}, L = class extends c {
+	get kind() {
+		return "nonscript";
+	}
+	checkItem(e) {
+		if (e.isKind("mml") && e.Size() === 1) {
+			let t = e.First;
+			if (t.isKind("mstyle") && t.notParent && (t = o.getChildren(o.getChildren(t)[0])[0]), t.isKind("mspace")) {
+				if (t !== e.First) {
+					let t = this.create("node", "mrow", [e.Pop()]);
+					e.Push(t);
+				}
+				this.factory.configuration.addNode("nonscript", e.First);
+			}
+		}
+		return [[e], !0];
+	}
+}, R = class extends c {
+	get kind() {
+		return "dots";
+	}
+	checkItem(e) {
+		if (e.isKind("open") || e.isKind("left")) return c.success;
+		let t = this.getProperty("ldots"), n = e.First;
+		if (e.isKind("mml") && o.isEmbellished(n)) {
+			let e = o.getTexClass(o.getCoreMO(n));
+			(e === r.BIN || e === r.REL) && (t = this.getProperty("cdots"));
+		}
+		return [[t, e], !0];
+	}
+}, z = class extends c {
+	constructor() {
+		super(...arguments), this.table = [], this.row = [], this.frame = [], this.hfill = [], this.arraydef = {}, this.cstart = [], this.cend = [], this.cextra = [], this.atEnd = !1, this.ralign = [], this.breakAlign = {
+			cell: "",
+			row: "",
+			table: ""
+		}, this.templateSubs = 0;
+	}
+	get kind() {
+		return "array";
+	}
+	get isOpen() {
+		return !0;
+	}
+	get copyEnv() {
+		return !1;
+	}
+	checkItem(e) {
+		if (e.isClose && !e.isKind("over")) {
+			if (e.getProperty("isEntry")) return this.EndEntry(), this.clearEnv(), this.StartEntry(), c.fail;
+			if (e.getProperty("isCR")) return this.EndEntry(), this.EndRow(), this.clearEnv(), this.StartEntry(), c.fail;
+			this.EndTable(), this.clearEnv();
+			let t = this.factory.create("mml", this.createMml());
+			if (this.getProperty("requireClose")) {
+				if (e.isKind("close")) return [[t], !0];
+				throw new f("MissingCloseBrace", "Missing close brace");
+			}
+			return [[t, e], !0];
+		}
+		return super.checkItem(e);
+	}
+	createMml() {
+		let e = this.arraydef.scriptlevel;
+		delete this.arraydef.scriptlevel;
+		let t = this.create("node", "mtable", this.table, this.arraydef);
+		return e && t.setProperty("smallmatrix", !0), this.breakAlign.table && o.setAttribute(t, "data-break-align", this.breakAlign.table), this.getProperty("arrayPadding") && (o.setAttribute(t, "data-frame-styles", ""), o.setAttribute(t, "framespacing", this.getProperty("arrayPadding"))), t = this.handleFrame(t), e !== void 0 && (t = this.create("node", "mstyle", [t], { scriptlevel: e })), (this.getProperty("open") || this.getProperty("close")) && (t = h.fenced(this.factory.configuration, this.getProperty("open"), t, this.getProperty("close"))), t;
+	}
+	handleFrame(e) {
+		if (!this.frame.length) return e;
+		let t = new Map(this.frame), r = this.frame.reduce((e, [, t]) => t === e ? t : "", this.frame[0][1]);
+		if (r) {
+			if (this.frame.length === 4) return o.setAttribute(e, "frame", r), o.removeAttribute(e, "data-frame-styles"), e;
+			if (r === "solid") return o.setAttribute(e, "data-frame-styles", ""), e = this.create("node", "menclose", [e], {
+				notation: Array.from(t.keys()).join(" "),
+				"data-padding": 0
+			}), e;
+		}
+		let i = n.map((e) => t.get(e) || "none").join(" ");
+		return o.setAttribute(e, "data-frame-styles", i), e;
+	}
+	StartEntry() {
+		let e = this.row.length, t = this.cstart[e], n = this.cend[e], r = this.ralign[e], i = this.cextra;
+		if (!t && !n && !r && !i[e] && !i[e + 1]) return;
+		let [a, o, s, c] = this.getEntry();
+		if (i[e] && (!this.atEnd || i[e + 1]) && (t += "&"), s !== "&" && (c = !!o.trim() || !!(e || s && s.substring(0, 4) !== "\\end"), i[e + 1] && !i[e] && (n = (n || "") + "&", this.atEnd = !0)), !c && !a) return;
+		let l = this.parser;
+		if (c && (t && (o = h.addArgs(l, t, o)), n && (o = h.addArgs(l, o, n)), r && (o = "\\text{" + o.trim() + "}"), (t || n || r) && ++this.templateSubs > l.configuration.options.maxTemplateSubtitutions)) throw new f("MaxTemplateSubs", "Maximum template substitutions exceeded; is there an invalid use of \\\\ in the template?");
+		a && (o = h.addArgs(l, a, o)), l.string = h.addArgs(l, o, l.string), l.i = 0;
+	}
+	getEntry() {
+		let e = this.parser, t = /^([^]*?)([&{}]|\\\\|\\(?:begin|end)\s*\{array\}|\\cr|\\)/, n = 0, r = 0, i = e.i, a, o = [
+			"",
+			"",
+			"",
+			!1
+		];
+		for (; (a = e.string.slice(i).match(t)) !== null;) switch (i += a[0].length, a[2]) {
+			case "\\":
+				i++;
+				break;
+			case "{":
+				n++;
+				break;
+			case "}":
+				if (!n) return o;
+				n--;
+				break;
+			case "\\begin{array}":
+				n || r++;
+				break;
+			case "\\end{array}": if (!n && r) {
+				r--;
+				break;
+			}
+			default: {
+				if (n || r) continue;
+				i -= a[2].length;
+				let t = e.string.slice(e.i, i).trim(), o = t.match(/^(?:\s*\\(?:h(?:dash)?line|hfil{1,3}|rowcolor\s*\{.*?\}))+/);
+				return o && (t = t.slice(o[0].length)), e.string = e.string.slice(i), e.i = 0, [
+					o?.[0] || "",
+					t,
+					a[2],
+					!0
+				];
+			}
+		}
+		return o;
+	}
+	EndEntry() {
+		let e = this.create("node", "mtd", this.nodes);
+		this.hfill.length && (this.hfill[0] === 0 && o.setAttribute(e, "columnalign", "right"), this.hfill[this.hfill.length - 1] === this.Size() && o.setAttribute(e, "columnalign", o.getAttribute(e, "columnalign") ? "center" : "left"));
+		let t = this.ralign[this.row.length];
+		if (t) {
+			let [n, r, i] = t, a = this.create("node", "mpadded", e.childNodes[0].childNodes, {
+				width: r,
+				"data-overflow": "auto",
+				"data-align": i,
+				"data-vertical-align": n
+			});
+			a.setProperty("vbox", n), e.childNodes[0].childNodes = [], e.appendChild(a);
+		} else this.breakAlign.cell && o.setAttribute(e, "data-vertical-align", this.breakAlign.cell);
+		this.breakAlign.cell = "", this.row.push(e), this.Clear(), this.hfill = [];
+	}
+	EndRow() {
+		let e = "mtr";
+		this.getProperty("isNumbered") && this.row.length === 3 ? (this.row.unshift(this.row.pop()), e = "mlabeledtr") : this.getProperty("isLabeled") && (e = "mlabeledtr", this.setProperty("isLabeled", !1));
+		let t = this.create("node", e, this.row);
+		this.breakAlign.row && (o.setAttribute(t, "data-break-align", this.breakAlign.row), this.breakAlign.row = ""), this.addLatexItem(t), this.table.push(t), this.row = [], this.atEnd = !1;
+	}
+	EndTable() {
+		(this.Size() || this.row.length) && (this.EndEntry(), this.EndRow()), this.checkLines();
+	}
+	checkLines() {
+		if (this.arraydef.rowlines) {
+			let e = this.arraydef.rowlines.split(/ /);
+			e.length === this.table.length ? (this.frame.push(["bottom", e.pop()]), e.length ? this.arraydef.rowlines = e.join(" ") : delete this.arraydef.rowlines) : e.length < this.table.length - 1 && (this.arraydef.rowlines += " none");
+		}
+		if (this.getProperty("rowspacing")) {
+			let e = this.arraydef.rowspacing.split(/ /);
+			for (; e.length < this.table.length;) e.push(this.getProperty("rowspacing") + "em");
+			this.arraydef.rowspacing = e.join(" ");
+		}
+	}
+	addRowSpacing(e) {
+		if (this.arraydef.rowspacing) {
+			let t = this.arraydef.rowspacing.split(/ /);
+			if (!this.getProperty("rowspacing")) {
+				let e = m.dimen2em(t[0]);
+				this.setProperty("rowspacing", e);
+			}
+			let n = this.getProperty("rowspacing");
+			for (; t.length < this.table.length;) t.push(m.em(n));
+			t[this.table.length - 1] = m.em(Math.max(0, n + m.dimen2em(e))), this.arraydef.rowspacing = t.join(" ");
+		}
+	}
+}, B = class extends z {
+	constructor(e, ...t) {
+		super(e), this.maxrow = 0, this.factory.configuration.tags.start(t[0], t[2], t[1]);
+	}
+	get kind() {
+		return "eqnarray";
+	}
+	EndEntry() {
+		let e = this.arraydef.columnalign.split(/ /);
+		(this.row.length && e.length ? e[this.row.length % e.length] : "right") !== "right" && h.fixInitialMO(this.factory.configuration, this.nodes), super.EndEntry();
+	}
+	EndRow() {
+		this.row.length > this.maxrow && (this.maxrow = this.row.length);
+		let e = this.factory.configuration.tags.getTag();
+		e && (this.row = [e].concat(this.row), this.setProperty("isLabeled", !0)), this.factory.configuration.tags.clearTag(), super.EndRow();
+	}
+	EndTable() {
+		super.EndTable(), this.factory.configuration.tags.end(), this.extendArray("columnalign", this.maxrow), this.extendArray("columnwidth", this.maxrow), this.extendArray("columnspacing", this.maxrow - 1), this.extendArray("data-break-align", this.maxrow), this.addIndentshift();
+	}
+	extendArray(e, t) {
+		if (!this.arraydef[e]) return;
+		let n = this.arraydef[e].split(/ /), r = [...n];
+		if (r.length > 1) {
+			for (; r.length < t;) r.push(...n);
+			this.arraydef[e] = r.slice(0, t).join(" ");
+		}
+	}
+	addIndentshift() {
+		let e = this.arraydef.columnalign.split(/ /), t = "";
+		for (let n of e.keys()) {
+			if (e[n] === "left" && n > 0) {
+				let e = t === "center" ? ".7em" : "2em";
+				for (let t of this.table) {
+					let r = t.childNodes[t.isKind("mlabeledtr") ? n + 1 : n];
+					if (r) {
+						let t = this.create("node", "mstyle", r.childNodes[0].childNodes, { indentshift: e });
+						r.childNodes[0].childNodes = [], r.appendChild(t);
+					}
+				}
+			}
+			t = e[n];
+		}
+	}
+}, V = class extends k {
+	get kind() {
+		return "mstyle";
+	}
+	constructor(e, t, n) {
+		super(e), this.attrList = t, this.setProperty("name", n);
+	}
+	checkItem(e) {
+		return e.isKind("end") && e.getName() === this.getName() ? [[this.create("node", "mstyle", [this.toMml()], this.attrList)], !0] : super.checkItem(e);
+	}
+}, H = class extends c {
+	constructor(e, ...t) {
+		super(e), this.factory.configuration.tags.start("equation", !0, t[0]);
+	}
+	get kind() {
+		return "equation";
+	}
+	get isOpen() {
+		return !0;
+	}
+	checkItem(e) {
+		if (e.isKind("end")) {
+			let t = this.toMml(), n = this.factory.configuration.tags.getTag();
+			return this.factory.configuration.tags.end(), [[n ? this.factory.configuration.tags.enTag(t, n) : t, e], !0];
+		}
+		if (e.isKind("stop")) throw new f("EnvMissingEnd", "Missing \\end{%1}", this.getName());
+		return super.checkItem(e);
+	}
+}, U = 1.2 / .85, W = {
+	fontfamily: 1,
+	fontsize: 1,
+	fontweight: 1,
+	fontstyle: 1,
+	color: 1,
+	background: 1,
+	id: 1,
+	class: 1,
+	href: 1,
+	style: 1
+};
+function G(e, t = Infinity) {
+	let n = e.replace(/\s+/g, "").split("").map((e) => {
+		let t = {
+			t: "top",
+			b: "bottom",
+			m: "middle",
+			c: "center"
+		}[e];
+		if (!t) throw new f("BadBreakAlign", "Invalid alignment character: %1", e);
+		return t;
+	});
+	if (n.length > t) throw new f("TooManyAligns", "Too many alignment characters: %1", e);
+	return t === 1 ? n[0] : n.join(" ");
+}
+function K(e, t) {
+	let n = e.stack.env, r = n.inRoot;
+	n.inRoot = !0;
+	let i = new l(t, n, e.configuration), a = i.mml(), o = i.stack.global;
+	if (o.leftRoot || o.upRoot) {
+		let t = {};
+		o.leftRoot && (t.width = o.leftRoot), o.upRoot && (t.voffset = o.upRoot, t.height = o.upRoot), a = e.create("node", "mpadded", [a], t);
+	}
+	return n.inRoot = r, a;
+}
+var q = {
+	Open(e, t) {
+		e.Push(e.itemFactory.create("open"));
+	},
+	Close(e, t) {
+		e.Push(e.itemFactory.create("close"));
+	},
+	Bar(e, t) {
+		let n = e.create("token", "mo", {
+			stretchy: !1,
+			texClass: r.ORD
+		}, t);
+		n.setProperty("keep-attrs", "stretchy"), e.Push(n);
+	},
+	Tilde(e, n) {
+		e.Push(e.create("token", "mtext", {}, t.nbsp));
+	},
+	Space(e, t) {},
+	Superscript(e, t) {
+		e.GetNext().match(/\d/) && (e.string = e.string.substring(0, e.i + 1) + " " + e.string.substring(e.i + 1));
+		let n, r, i = e.stack.Top();
+		i.isKind("prime") ? ([r, n] = i.Peek(2), e.stack.Pop()) : (r = e.stack.Prev(), r ||= e.create("token", "mi", {}, ""));
+		let a = o.getProperty(r, "movesupsub"), s = o.isType(r, "msubsup") ? r.sup : r.over;
+		if (o.isType(r, "msubsup") && !o.isType(r, "msup") && o.getChildAt(r, r.sup) || o.isType(r, "munderover") && !o.isType(r, "mover") && o.getChildAt(r, r.over) && !o.getProperty(r, "subsupOK")) throw new f("DoubleExponent", "Double exponent: use braces to clarify");
+		(!o.isType(r, "msubsup") || o.isType(r, "msup")) && (a ? ((!o.isType(r, "munderover") || o.isType(r, "mover") || o.getChildAt(r, r.over)) && (r = e.create("node", "munderover", [r], { movesupsub: !0 })), s = r.over) : (r = e.create("node", "msubsup", [r]), s = r.sup)), e.Push(e.itemFactory.create("subsup", r).setProperties({
+			position: s,
+			primes: n,
+			movesupsub: a
+		}));
+	},
+	Subscript(e, t) {
+		e.GetNext().match(/\d/) && (e.string = e.string.substring(0, e.i + 1) + " " + e.string.substring(e.i + 1));
+		let n, r, i = e.stack.Top();
+		i.isKind("prime") ? ([r, n] = i.Peek(2), e.stack.Pop()) : (r = e.stack.Prev(), r ||= e.create("token", "mi", {}, ""));
+		let a = o.getProperty(r, "movesupsub"), s = o.isType(r, "msubsup") ? r.sub : r.under;
+		if (o.isType(r, "msubsup") && !o.isType(r, "msup") && o.getChildAt(r, r.sub) || o.isType(r, "munderover") && !o.isType(r, "mover") && o.getChildAt(r, r.under) && !o.getProperty(r, "subsupOK")) throw new f("DoubleSubscripts", "Double subscripts: use braces to clarify");
+		(!o.isType(r, "msubsup") || o.isType(r, "msup")) && (a ? ((!o.isType(r, "munderover") || o.isType(r, "mover") || o.getChildAt(r, r.under)) && (r = e.create("node", "munderover", [r], { movesupsub: !0 })), s = r.under) : (r = e.create("node", "msubsup", [r]), s = r.sub)), e.Push(e.itemFactory.create("subsup", r).setProperties({
+			position: s,
+			primes: n,
+			movesupsub: a
+		}));
+	},
+	Prime(e, n) {
+		let r = e.stack.Prev();
+		if (r ||= e.create("token", "mi"), o.isType(r, "msubsup") && !o.isType(r, "msup") && o.getChildAt(r, r.sup) || o.isType(r, "munderover") && !o.isType(r, "mover") && o.getChildAt(r, r.over) && !o.getProperty(r, "subsupOK")) throw new f("DoubleExponentPrime", "Prime causes double exponent: use braces to clarify");
+		let i = "";
+		e.i--;
+		do
+			i += t.prime, e.i++, n = e.GetNext();
+		while (n === "'" || n === t.rsquo);
+		i = [
+			"",
+			"′",
+			"″",
+			"‴",
+			"⁗"
+		][i.length] || i;
+		let a = e.create("token", "mo", { variantForm: !0 }, i);
+		e.Push(e.itemFactory.create("prime", r, a));
+	},
+	Comment(e, t) {
+		for (; e.i < e.string.length && e.string.charAt(e.i) !== "\n";) e.i++;
+	},
+	Hash(e, t) {
+		throw new f("CantUseHash1", "You can't use 'macro parameter character #' in math mode");
+	},
+	MathFont(e, t, n, r = "") {
+		let i = new l(e.GetArgument(t), Object.assign(Object.assign({ multiLetterIdentifiers: e.options.identifierPattern }, e.stack.env), {
+			font: n,
+			italicFont: r,
+			noAutoOP: !0
+		}), e.configuration).mml();
+		e.Push(e.create("node", "TeXAtom", [i]));
+	},
+	SetFont(e, t, n) {
+		e.stack.env.font = n, e.Push(e.itemFactory.create("null"));
+	},
+	SetStyle(e, t, n, r, i) {
+		e.stack.env.style = n, e.stack.env.level = i, e.Push(e.itemFactory.create("style").setProperty("styles", {
+			displaystyle: r,
+			scriptlevel: i
+		}));
+	},
+	SetSize(e, t, n) {
+		e.stack.env.size = n, e.Push(e.itemFactory.create("style").setProperty("styles", { mathsize: g(n) }));
+	},
+	Spacer(e, t, n) {
+		let r = e.create("node", "mspace", [], { width: g(n) }), i = e.create("node", "mstyle", [r], { scriptlevel: 0 });
+		e.Push(i);
+	},
+	DiscretionaryTimes(e, t) {
+		e.Push(e.create("token", "mo", { linebreakmultchar: "×" }, "⁢"));
+	},
+	AllowBreak(e, t) {
+		e.Push(e.create("token", "mspace"));
+	},
+	Break(e, t) {
+		e.Push(e.create("token", "mspace", { linebreak: s.LineBreak.NEWLINE }));
+	},
+	Linebreak(e, t, n) {
+		let r = !0, i = e.stack.Prev(!0);
+		i && i.isKind("mo") && o.getMoAttribute(i, "linebreakstyle") !== s.LineBreakStyle.BEFORE && (i.attributes.set("linebreak", n), r = !1), e.Push(e.itemFactory.create("break", n, r));
+	},
+	LeftRight(e, t) {
+		let n = t.substring(1);
+		e.Push(e.itemFactory.create(n, e.GetDelimiter(t), e.stack.env.color));
+	},
+	NamedFn(e, t, n) {
+		n ||= t.substring(1);
+		let i = e.create("token", "mi", { texClass: r.OP }, n);
+		e.Push(e.itemFactory.create("fn", i));
+	},
+	NamedOp(e, t, n) {
+		n ||= t.substring(1), n = n.replace(/&thinsp;/, " ");
+		let i = e.create("token", "mo", {
+			movablelimits: !0,
+			movesupsub: !0,
+			form: s.Form.PREFIX,
+			texClass: r.OP
+		}, n);
+		e.Push(i);
+	},
+	Limits(e, t, n) {
+		let i = e.stack.Prev(!0);
+		if (!i || o.getTexClass(o.getCoreMO(i)) !== r.OP && o.getProperty(i, "movesupsub") == null) throw new f("MisplacedLimits", "%1 is allowed only on operators", e.currentCS);
+		let a = e.stack.Top(), s;
+		o.isType(i, "munderover") && !n ? (s = e.create("node", "msubsup"), o.copyChildren(i, s), i = a.Last = s) : o.isType(i, "msubsup") && n && (s = e.create("node", "munderover"), o.copyChildren(i, s), i = a.Last = s), o.setProperty(i, "movesupsub", !!n), o.setProperties(o.getCoreMO(i), { movablelimits: !1 }), ((o.isType(i, "mo") ? o.getMoAttribute(i, "movableLimits") : o.getAttribute(i, "movablelimits")) || o.getProperty(i, "movablelimits")) && o.setProperties(i, { movablelimits: !1 });
+	},
+	Over(e, t, n, r) {
+		let i = e.itemFactory.create("over").setProperty("name", e.currentCS);
+		n || r ? (i.setProperty("ldelim", n), i.setProperty("rdelim", r)) : t.match(/withdelims$/) && (i.setProperty("ldelim", e.GetDelimiter(t)), i.setProperty("rdelim", e.GetDelimiter(t))), t.match(/^\\above/) ? i.setProperty("thickness", e.GetDimen(t)) : (t.match(/^\\atop/) || n || r) && i.setProperty("thickness", 0), e.Push(i);
+	},
+	Frac(e, t) {
+		let n = e.ParseArg(t), r = e.ParseArg(t), i = e.create("node", "mfrac", [n, r]);
+		e.Push(i);
+	},
+	Sqrt(e, t) {
+		let n = e.GetBrackets(t), r = e.GetArgument(t);
+		r === "\\frac" && (r += "{" + e.GetArgument(r) + "}{" + e.GetArgument(r) + "}");
+		let i = new l(r, e.stack.env, e.configuration).mml();
+		i = n ? e.create("node", "mroot", [i, K(e, n)]) : e.create("node", "msqrt", [i]), e.Push(i);
+	},
+	Root(e, t) {
+		let n = e.GetUpTo(t, "\\of"), r = e.ParseArg(t), i = e.create("node", "mroot", [r, K(e, n)]);
+		e.Push(i);
+	},
+	MoveRoot(e, t, n) {
+		if (!e.stack.env.inRoot) throw new f("MisplacedMoveRoot", "%1 can appear only within a root", e.currentCS);
+		if (e.stack.global[n]) throw new f("MultipleMoveRoot", "Multiple use of %1", e.currentCS);
+		let r = e.GetArgument(t);
+		if (!r.match(/-?[0-9]+/)) throw new f("IntegerArg", "The argument to %1 must be an integer", e.currentCS);
+		r = parseInt(r, 10) / 15 + "em", r.substring(0, 1) !== "-" && (r = "+" + r), e.stack.global[n] = r;
+	},
+	Accent(e, t, n, r) {
+		let i = e.ParseArg(t), a = Object.assign(Object.assign({}, h.getFontDef(e)), {
+			accent: !0,
+			mathaccent: r === void 0 ? !0 : r
+		}), s = o.createEntity(n), c = e.create("token", "mo", a, s);
+		o.setAttribute(c, "stretchy", !!r);
+		let l = o.isEmbellished(i) ? o.getCoreMO(i) : i;
+		(o.isType(l, "mo") || o.getProperty(l, "movablelimits")) && o.setProperties(l, { movablelimits: !1 });
+		let u = e.create("node", "munderover");
+		o.setChild(u, 0, i), o.setChild(u, 1, null), o.setChild(u, 2, c);
+		let d = e.create("node", "TeXAtom", [u]);
+		e.Push(d);
+	},
+	UnderOver(e, t, n, r) {
+		let i = o.createEntity(n), s = e.create("token", "mo", {
+			stretchy: !0,
+			accent: !0
+		}, i);
+		i.match(a.mathaccentsWithWidth) && s.setProperty("mathaccent", !1);
+		let c = t.charAt(1) === "o" ? "over" : "under", l = e.ParseArg(t);
+		e.Push(h.underOver(e, l, s, c, r));
+	},
+	Overset(e, t) {
+		let n = e.ParseArg(t), r = e.ParseArg(t), i = n.coreMO(), a = i.isKind("mo") && o.getMoAttribute(i, "accent") === !0;
+		h.checkMovableLimits(r);
+		let s = e.create("node", "mover", [r, n], { accent: a });
+		e.Push(s);
+	},
+	Underset(e, t) {
+		let n = e.ParseArg(t), r = e.ParseArg(t), i = n.coreMO(), a = i.isKind("mo") && o.getMoAttribute(i, "accent") === !0;
+		h.checkMovableLimits(r);
+		let s = e.create("node", "munder", [r, n], { accentunder: a });
+		e.Push(s);
+	},
+	Overunderset(e, t) {
+		let n = e.ParseArg(t), r = e.ParseArg(t), i = e.ParseArg(t), a = n.coreMO(), s = r.coreMO(), c = a.isKind("mo") && o.getMoAttribute(a, "accent") === !0, l = s.isKind("mo") && o.getMoAttribute(s, "accent") === !0;
+		h.checkMovableLimits(i);
+		let u = e.create("node", "munderover", [
+			i,
+			r,
+			n
+		], {
+			accent: c,
+			accentunder: l
+		});
+		e.Push(u);
+	},
+	TeXAtom(e, t, n) {
+		let i = { texClass: n }, a, o;
+		if (n === r.OP) {
+			i.movesupsub = i.movablelimits = !0;
+			let n = e.GetArgument(t), r = n.match(/^\s*\\rm\s+([a-zA-Z0-9 ]+)$/);
+			if (r) i.mathvariant = s.Variant.NORMAL, o = e.create("token", "mi", i, r[1]);
+			else {
+				let t = new l(n, e.stack.env, e.configuration).mml();
+				o = e.create("node", "TeXAtom", [t], i);
+			}
+			a = e.itemFactory.create("fn", o);
+		} else a = e.create("node", "TeXAtom", [e.ParseArg(t)], i);
+		e.Push(a);
+	},
+	VBox(e, t, n) {
+		let i = new l(e.GetArgument(t), e.stack.env, e.configuration), a = {
+			"data-vertical-align": n,
+			texClass: r.ORD
+		};
+		i.stack.env.hsize && (a.width = i.stack.env.hsize, a["data-overflow"] = "linebreak");
+		let o = e.create("node", "mpadded", [i.mml()], a);
+		o.setProperty("vbox", n), e.Push(o);
+	},
+	Hsize(e, t) {
+		e.GetNext() === "=" && e.i++, e.stack.env.hsize = e.GetDimen(t), e.Push(e.itemFactory.create("null"));
+	},
+	ParBox(e, t) {
+		let n = e.GetBrackets(t, "c"), r = e.GetDimen(t), i = h.internalMath(e, e.GetArgument(t)), a = G(n, 1), o = e.create("node", "mpadded", i, {
+			width: r,
+			"data-overflow": "linebreak",
+			"data-vertical-align": a
+		});
+		o.setProperty("vbox", a), e.Push(o);
+	},
+	BreakAlign(e, t) {
+		let n = e.stack.Top();
+		if (!(n instanceof z)) throw new f("BreakNotInArray", "%1 must be used in an alignment environment", e.currentCS);
+		switch (e.GetArgument(t).trim()) {
+			case "c":
+				if (n.First) throw new f("BreakFirstInEntry", "%1 must be at the beginning of an alignment entry", e.currentCS + "{c}");
+				n.breakAlign.cell = G(e.GetArgument(t), 1);
+				break;
+			case "r":
+				if (n.row.length || n.First) throw new f("BreakFirstInRow", "%1 must be at the beginning of an alignment row", e.currentCS + "{r}");
+				n.breakAlign.row = G(e.GetArgument(t));
+				break;
+			case "t":
+				if (n.table.length || n.row.length || n.First) throw new f("BreakFirstInTable", "%1 must be at the beginning of an alignment", e.currentCS + "{t}");
+				n.breakAlign.table = G(e.GetArgument(t));
+				break;
+			default: throw new f("BreakType", "First argument to %1 must be one of c, r, or t", e.currentCS);
+		}
+	},
+	MmlToken(e, t) {
+		let n = e.GetArgument(t), r = e.GetBrackets(t, "").replace(/^\s+/, ""), a = e.GetArgument(t), s = {}, c = [], l;
+		try {
+			l = e.create("node", n);
+		} catch {
+			l = null;
+		}
+		if (!l || !l.isToken) throw new f("NotMathMLToken", "%1 is not a token element", n);
+		for (; r !== "";) {
+			let t = r.match(/^([a-z]+)\s*=\s*('[^'\n]*'|"[^"\n]*"|[^ ,\n]*)[\s\n]*,?[\s\n]*/i);
+			if (!t) throw new f("InvalidMathMLAttr", "Invalid MathML attribute: %1", r.split(/[\s\n=]/)[0]);
+			if (!l.attributes.hasDefault(t[1]) && !W[t[1]]) throw new f("UnknownAttrForElement", "%1 is not a recognized attribute for %2", t[1], n);
+			let i = h.mmlFilterAttribute(e, t[1], t[2].replace(/^(['"])(.*)\1$/, "$2"));
+			i && (i.toLowerCase() === "true" ? i = !0 : i.toLowerCase() === "false" && (i = !1), s[t[1]] = i, c.push(t[1])), r = r.substring(t[0].length);
+		}
+		c.length && l.setProperty("keep-attrs", c.join(" "));
+		let u = e.create("text", i(a));
+		l.appendChild(u), o.setProperties(l, s), e.Push(l);
+	},
+	Strut(e, t) {
+		let n = e.create("node", "mrow"), r = e.create("node", "mpadded", [n], {
+			height: "8.6pt",
+			depth: "3pt",
+			width: 0
+		});
+		e.Push(r);
+	},
+	Phantom(e, t, n, r) {
+		let i = e.create("node", "mphantom", [e.ParseArg(t)]);
+		(n || r) && (i = e.create("node", "mpadded", [i]), r && (o.setAttribute(i, "height", 0), o.setAttribute(i, "depth", 0)), n && o.setAttribute(i, "width", 0));
+		let a = e.create("node", "TeXAtom", [i]);
+		e.Push(a);
+	},
+	Smash(e, t) {
+		let n = m.trimSpaces(e.GetBrackets(t, "")), r = e.create("node", "mpadded", [e.ParseArg(t)]);
+		switch (n) {
+			case "b":
+				o.setAttribute(r, "depth", 0);
+				break;
+			case "t":
+				o.setAttribute(r, "height", 0);
+				break;
+			default: o.setAttribute(r, "height", 0), o.setAttribute(r, "depth", 0);
+		}
+		let i = e.create("node", "TeXAtom", [r]);
+		e.Push(i);
+	},
+	Lap(e, t) {
+		let n = e.create("node", "mpadded", [e.ParseArg(t)], { width: 0 });
+		t === "\\llap" && o.setAttribute(n, "lspace", "-1width");
+		let r = e.create("node", "TeXAtom", [n]);
+		e.Push(r);
+	},
+	RaiseLower(e, t) {
+		let n = e.GetDimen(t), r = e.itemFactory.create("position").setProperties({
+			name: e.currentCS,
+			move: "vertical"
+		});
+		n.charAt(0) === "-" && (n = n.slice(1), t = t.substring(1) === "raise" ? "\\lower" : "\\raise"), t === "\\lower" ? (r.setProperty("dh", "-" + n), r.setProperty("dd", "+" + n)) : (r.setProperty("dh", "+" + n), r.setProperty("dd", "-" + n)), e.Push(r);
+	},
+	MoveLeftRight(e, t) {
+		let n = e.GetDimen(t), r = n.charAt(0) === "-" ? n.slice(1) : "-" + n;
+		if (t === "\\moveleft") {
+			let e = n;
+			n = r, r = e;
+		}
+		e.Push(e.itemFactory.create("position").setProperties({
+			name: e.currentCS,
+			move: "horizontal",
+			left: e.create("node", "mspace", [], { width: n }),
+			right: e.create("node", "mspace", [], { width: r })
+		}));
+	},
+	Hskip(e, t, n = !1) {
+		let r = e.create("node", "mspace", [], { width: e.GetDimen(t) });
+		n && o.setAttribute(r, "linebreak", "nobreak"), e.Push(r);
+	},
+	Nonscript(e, t) {
+		e.Push(e.itemFactory.create("nonscript"));
+	},
+	Rule(e, t, n) {
+		let r = {
+			width: e.GetDimen(t),
+			height: e.GetDimen(t),
+			depth: e.GetDimen(t)
+		};
+		n !== "blank" && (r.mathbackground = e.stack.env.color || "black");
+		let i = e.create("node", "mspace", [], r);
+		e.Push(i);
+	},
+	rule(e, t) {
+		let n = e.GetBrackets(t), r = e.GetDimen(t), i = e.GetDimen(t), a = e.create("node", "mspace", [], {
+			width: r,
+			height: i,
+			mathbackground: e.stack.env.color || "black"
+		});
+		n && (a = e.create("node", "mpadded", [a], { voffset: n }), n.match(/^-/) ? (o.setAttribute(a, "height", n), o.setAttribute(a, "depth", "+" + n.substring(1))) : o.setAttribute(a, "height", "+" + n)), e.Push(a);
+	},
+	MakeBig(e, t, n, r) {
+		r *= U;
+		let i = String(r).replace(/(\.\d\d\d).+/, "$1") + "em", a = e.GetDelimiter(t, !0), o = e.create("token", "mo", {
+			minsize: i,
+			maxsize: i,
+			fence: !0,
+			stretchy: !0,
+			symmetric: !0
+		}, a), s = e.create("node", "TeXAtom", [o], { texClass: n });
+		e.Push(s);
+	},
+	BuildRel(e, t) {
+		let n = e.ParseUpTo(t, "\\over"), i = e.ParseArg(t), a = e.create("node", "munderover");
+		o.setChild(a, 0, i), o.setChild(a, 1, null), o.setChild(a, 2, n);
+		let s = e.create("node", "TeXAtom", [a], { texClass: r.REL });
+		e.Push(s);
+	},
+	HBox(e, t, n, r) {
+		e.PushAll(h.internalMath(e, e.GetArgument(t), n, r));
+	},
+	FBox(e, t) {
+		let n = h.internalMath(e, e.GetArgument(t)), r = e.create("node", "menclose", n, { notation: "box" });
+		e.Push(r);
+	},
+	FrameBox(t, n) {
+		let i = t.GetBrackets(n), a = t.GetBrackets(n) || "c", o = h.internalMath(t, t.GetArgument(n));
+		i && (o = [t.create("node", "mpadded", o, {
+			width: i,
+			"data-align": e(a, {
+				l: "left",
+				r: "right"
+			}, "center")
+		})]);
+		let s = t.create("node", "TeXAtom", [t.create("node", "menclose", o, { notation: "box" })], { texClass: r.ORD });
+		t.Push(s);
+	},
+	MakeBox(t, n) {
+		let r = t.GetBrackets(n), i = t.GetBrackets(n, "c"), a = t.create("node", "mpadded", h.internalMath(t, t.GetArgument(n)));
+		r && o.setAttribute(a, "width", r);
+		let s = e(i.toLowerCase(), {
+			c: "center",
+			r: "right"
+		}, "");
+		s && o.setAttribute(a, "data-align", s), i.toLowerCase() !== i && o.setAttribute(a, "data-overflow", "linebreak"), t.Push(a);
+	},
+	Not(e, t) {
+		e.Push(e.itemFactory.create("not"));
+	},
+	Dots(e, t) {
+		let n = o.createEntity("2026"), r = o.createEntity("22EF"), i = e.create("token", "mo", { stretchy: !1 }, n), a = e.create("token", "mo", { stretchy: !1 }, r);
+		e.Push(e.itemFactory.create("dots").setProperties({
+			ldots: i,
+			cdots: a
+		}));
+	},
+	Matrix(e, t, n, r, i, a, o, s, c, l) {
+		let u = e.GetNext();
+		if (u === "") throw new f("MissingArgFor", "Missing argument for %1", e.currentCS);
+		u === "{" ? e.i++ : (e.string = u + "}" + e.string.slice(e.i + 1), e.i = 0);
+		let d = e.itemFactory.create("array").setProperty("requireClose", !0);
+		(n || !i) && d.setProperty("arrayPadding", ".2em .125em"), d.arraydef = {
+			rowspacing: o || "4pt",
+			columnspacing: a || "1em"
+		}, c && d.setProperty("isCases", !0), l && (d.setProperty("isNumbered", !0), d.arraydef.side = l), (n || r) && (d.setProperty("open", n), d.setProperty("close", r)), s === "D" && (d.arraydef.displaystyle = !0), i != null && (d.arraydef.columnalign = i), e.Push(d);
+	},
+	Entry(e, t) {
+		e.Push(e.itemFactory.create("cell").setProperties({
+			isEntry: !0,
+			name: t
+		}));
+		let n = e.stack.Top(), r = n.getProperty("casesEnv");
+		if (!n.getProperty("isCases") && !r) return;
+		let i = e.string, a = 0, o = -1, s = e.i, c = i.length, l = r ? RegExp(`^\\\\end\\s*\\{${r.replace(/\*/, "\\*")}\\}`) : null;
+		for (; s < c;) {
+			let t = i.charAt(s);
+			if (t === "{") a++, s++;
+			else if (t === "}") a === 0 ? c = 0 : (a--, a === 0 && o < 0 && (o = s - e.i), s++);
+			else if (t === "&" && a === 0) throw new f("ExtraAlignTab", "Extra alignment tab in \\cases text");
+			else if (t === "\\") {
+				let e = i.substring(s);
+				e.match(/^((\\cr)[^a-zA-Z]|\\\\)/) || l && e.match(l) ? c = 0 : s += 2;
+			} else s++;
+		}
+		let u = i.substring(e.i, s);
+		if (!u.match(/^\s*\\text[^a-zA-Z]/) || o !== u.replace(/\s+$/, "").length - 1) {
+			let t = h.internalMath(e, m.trimSpaces(u), 0);
+			e.PushAll(t), e.i = s;
+		}
+	},
+	Cr(e, t) {
+		e.Push(e.itemFactory.create("cell").setProperties({
+			isCR: !0,
+			name: t
+		}));
+	},
+	CrLaTeX(e, t, n = !1) {
+		let r;
+		if (!n && (e.string.charAt(e.i) === "*" && e.i++, e.string.charAt(e.i) === "[")) {
+			let n = e.GetBrackets(t, ""), [i, a] = m.matchDimen(n);
+			if (n && !i) throw new f("BracketMustBeDimension", "Bracket argument to %1 must be a dimension", e.currentCS);
+			r = i + a;
+		}
+		e.Push(e.itemFactory.create("cell").setProperties({
+			isCR: !0,
+			name: t,
+			linebreak: !0
+		}));
+		let i = e.stack.Top(), a;
+		i instanceof z ? r && i.addRowSpacing(r) : (a = e.create("node", "mspace", [], { linebreak: s.LineBreak.NEWLINE }), r && o.setAttribute(a, "data-lineleading", r), e.Push(a));
+	},
+	HLine(e, t, n) {
+		n ??= "solid";
+		let r = e.stack.Top();
+		if (!(r instanceof z) || r.Size()) throw new f("Misplaced", "Misplaced %1", e.currentCS);
+		if (!r.table.length) r.frame.push(["top", n]);
+		else {
+			let e = r.arraydef.rowlines ? r.arraydef.rowlines.split(/ /) : [];
+			for (; e.length < r.table.length;) e.push("none");
+			e[r.table.length - 1] = n, r.arraydef.rowlines = e.join(" ");
+		}
+	},
+	HFill(e, t) {
+		let n = e.stack.Top();
+		if (n instanceof z) n.hfill.push(n.Size());
+		else throw new f("UnsupportedHFill", "Unsupported use of %1", e.currentCS);
+	},
+	NewColumnType(e, t) {
+		let n = e.GetArgument(t), r = e.GetBrackets(t, "0"), i = e.GetArgument(t);
+		if (n.length !== 1) throw new f("BadColumnName", "Column specifier must be exactly one character: %1", n);
+		if (!r.match(/^\d+$/)) throw new f("PositiveIntegerArg", "Argument to %1 must be a positive integer", r);
+		let a = e.configuration.columnParser;
+		a.columnHandler[n] = (e) => a.macroColumn(e, i, parseInt(r)), e.Push(e.itemFactory.create("null"));
+	},
+	BeginEnd(e, t) {
+		let n = e.GetArgument(t);
+		if (n.match(/\\/)) throw new f("InvalidEnv", "Invalid environment name '%1'", n);
+		let r = e.configuration.handlers.get(p.ENVIRONMENT).lookup(n);
+		if (r && t === "\\end") {
+			if (!r.args[0]) {
+				let t = e.itemFactory.create("end").setProperty("name", n);
+				e.Push(t);
+				return;
+			}
+			e.stack.env.closing = n;
+		}
+		h.checkMaxMacros(e, !1), e.parse(p.ENVIRONMENT, [e, n]);
+	},
+	Array(e, t, n, r, i, a, o, s, c) {
+		i ||= e.GetArgument("\\begin{" + t.getName() + "}");
+		let l = e.itemFactory.create("array");
+		return t.getName() === "array" && l.setProperty("arrayPadding", ".5em .125em"), l.parser = e, l.arraydef = {
+			columnspacing: a || "1em",
+			rowspacing: o || "4pt"
+		}, e.configuration.columnParser.process(e, i, l), n && l.setProperty("open", e.convertDelimiter(n)), r && l.setProperty("close", e.convertDelimiter(r)), (s || "").charAt(1) === "'" && (l.arraydef["data-cramped"] = !0, s = s.charAt(0)), s === "D" ? l.arraydef.displaystyle = !0 : s && (l.arraydef.displaystyle = !1), l.arraydef.scriptlevel = +(s === "S"), c && (l.arraydef.useHeight = !1), e.Push(t), l.StartEntry(), l;
+	},
+	AlignedArray(e, t, n = "") {
+		let r = e.GetBrackets("\\begin{" + t.getName() + "}"), i = q.Array(e, t, null, null, null, null, null, n);
+		return h.setArrayAlign(i, r);
+	},
+	IndentAlign(e, t) {
+		let n = `\\begin{${t.getName()}}`, r = e.GetBrackets(n, ""), i = e.GetBrackets(n, ""), a = e.GetBrackets(n, "");
+		if (r && !m.matchDimen(r)[0] || i && !m.matchDimen(i)[0] || a && !m.matchDimen(a)[0]) throw new f("BracketMustBeDimension", "Bracket argument to %1 must be a dimension", n);
+		let o = e.GetArgument(n);
+		if (o && !o.match(/^([lcr]{1,3})?$/)) throw new f("BadAlignment", "Alignment must be one to three copies of l, c, or r");
+		let s = [...o].map((e) => ({
+			l: "left",
+			c: "center",
+			r: "right"
+		})[e]);
+		s.length === 1 && s.push(s[0]);
+		let c = {};
+		for (let [e, t] of [
+			["indentshiftfirst", r],
+			["indentshift", i || r],
+			["indentshiftlast", a],
+			["indentalignfirst", s[0]],
+			["indentalign", s[1]],
+			["indentalignlast", s[2]]
+		]) t && (c[e] = t);
+		e.Push(e.itemFactory.create("mstyle", c, t.getName()));
+	},
+	Equation(e, t, n, r = !0) {
+		return e.configuration.mathItem.display = r, e.stack.env.display = r, h.checkEqnEnv(e), e.Push(t), e.itemFactory.create("equation", n).setProperty("name", t.getName());
+	},
+	EqnArray(e, t, n, r, i, a, o) {
+		let s = t.getName(), c = s === "gather" || s === "gather*";
+		r && h.checkEqnEnv(e, !c), e.Push(t), i = i.replace(/[^clr]/g, "").split("").join(" "), i = i.replace(/l/g, "left").replace(/r/g, "right").replace(/c/g, "center"), a = G(a);
+		let l = e.itemFactory.create("eqnarray", s, n, r, e.stack.global);
+		return l.arraydef = {
+			displaystyle: !0,
+			columnalign: i,
+			columnspacing: o || "1em",
+			rowspacing: "3pt",
+			"data-break-align": a,
+			side: e.options.tagSide,
+			minlabelspacing: e.options.tagIndent
+		}, c && l.setProperty("nestable", !0), l;
+	},
+	HandleNoTag(e, t) {
+		e.tags.notag();
+	},
+	HandleLabel(e, t) {
+		let n = e.GetArgument(t);
+		if (n !== "" && !e.tags.refUpdate) {
+			if (e.tags.label) throw new f("MultipleCommand", "Multiple %1", e.currentCS);
+			if (e.tags.label = n, (e.tags.allLabels[n] || e.tags.labels[n]) && !e.options.ignoreDuplicateLabels) throw new f("MultipleLabel", "Label '%1' multiply defined", n);
+			e.tags.labels[n] = new u();
+		}
+	},
+	HandleRef(e, t, n) {
+		let r = e.GetArgument(t), i = e.tags.allLabels[r] || e.tags.labels[r];
+		i ||= (e.tags.refUpdate || (e.tags.redo = !0), new u());
+		let a = i.tag;
+		n && (a = e.tags.formatRef(a));
+		let o = e.create("node", "mrow", h.internalMath(e, Array.isArray(a) ? a.join("") : a), {
+			href: e.tags.formatUrl(i.id, e.options.baseURL),
+			class: "MathJax_ref"
+		});
+		e.Push(o);
+	},
+	Macro(e, t, n, r, i) {
+		if (r) {
+			let a = [];
+			if (i != null) {
+				let n = e.GetBrackets(t);
+				a.push(n ?? i);
+			}
+			for (let n = a.length; n < r; n++) a.push(e.GetArgument(t));
+			n = h.substituteArgs(e, a, n);
+		}
+		e.string = h.addArgs(e, n, e.string.slice(e.i)), e.i = 0, h.checkMaxMacros(e);
+	},
+	MathChoice(e, t) {
+		let n = e.ParseArg(t), r = e.ParseArg(t), i = e.ParseArg(t), a = e.ParseArg(t);
+		e.Push(e.create("node", "MathChoice", [
+			n,
+			r,
+			i,
+			a
+		]));
+	}
+}, J = s.Variant, Y = {
+	variable(e, t) {
+		let n = h.getFontDef(e), r = e.stack.env;
+		if (r.multiLetterIdentifiers && r.font !== "" && (t = e.string.substring(e.i - 1).match(r.multiLetterIdentifiers)?.[0] || t, e.i += t.length - 1, n.mathvariant === J.NORMAL && r.noAutoOP && t.length > 1 && (n.autoOP = !1)), !n.mathvariant && h.isLatinOrGreekChar(t)) {
+			let r = e.configuration.mathStyle(t);
+			r && (n.mathvariant = r);
+		}
+		let i = e.create("token", "mi", n, t);
+		e.Push(i);
+	},
+	digit(e, t) {
+		let n = e.configuration.options.numberPattern, r = e.string.slice(e.i - 1).match(n);
+		if (!r) return !1;
+		let i = h.getFontDef(e), a = e.create("token", "mn", i, r[0].replace(/[{}]/g, ""));
+		return e.i += r[0].length - 1, e.Push(a), !0;
+	},
+	controlSequence(e, t) {
+		let n = e.GetCS();
+		e.parse(p.MACRO, [e, n]);
+	},
+	lcGreek(e, t) {
+		let n = { mathvariant: e.configuration.mathStyle(t.char) || J.ITALIC }, r = e.create("token", "mi", n, t.char);
+		e.Push(r);
+	},
+	ucGreek(e, t) {
+		let n = { mathvariant: e.stack.env.font || e.configuration.mathStyle(t.char, !0) || J.NORMAL }, r = e.create("token", "mi", n, t.char);
+		e.Push(r);
+	},
+	mathchar0mi(e, t) {
+		let n = t.attributes || { mathvariant: J.ITALIC }, r = e.create("token", "mi", n, t.char);
+		e.Push(r);
+	},
+	mathchar0mo(e, t) {
+		let n = t.attributes || {};
+		n.stretchy = !1;
+		let r = e.create("token", "mo", n, t.char);
+		o.setProperty(r, "fixStretchy", !0), e.configuration.addNode("fixStretchy", r), e.Push(r);
+	},
+	mathchar7(e, t) {
+		let n = t.attributes || { mathvariant: J.NORMAL };
+		e.stack.env.font && (n.mathvariant = e.stack.env.font);
+		let r = e.create("token", "mi", n, t.char);
+		e.Push(r);
+	},
+	delimiter(e, t) {
+		let n = t.attributes || {};
+		n = Object.assign({
+			fence: !1,
+			stretchy: !1
+		}, n);
+		let r = e.create("token", "mo", n, t.char);
+		e.Push(r);
+	},
+	environment(e, t, n, r) {
+		let i = e.itemFactory.create("begin").setProperty("name", t);
+		e.Push(n(e, i, ...r.slice(1)));
+	}
+};
+//#endregion
+export { M as C, v as D, _ as E, j as O, w as S, D as T, V as _, k as a, x as b, b as c, B as d, H as f, P as g, E as h, z as i, C as k, R as l, T as m, q as n, O as o, F as p, G as r, N as s, Y as t, A as u, L as v, S as w, y as x, I as y };

@@ -2,7 +2,7 @@
 
 ## Outils / fonctionnalités
 
-- [ ] **A. Outil Texte** — Shape `Text` (outil `text`) : clic pour placer, saisie inline, rendu canvas, snap sur points existants
+- [x] **A. Outil Texte** — Shape `Text` (outil `text`) : clic pour placer, saisie inline, rendu canvas, snap sur points existants
 - [x] **B. Clear / Reset** — Exposer `engine.clearAll()` dans l'UI (bouton dans NoteHistory ou NoteTools) avec confirmation
 - [ ] **C. Sélection multiple** — Drag-select ou Shift+clic pour grouper des shapes, puis déplacer/supprimer le groupe
 - [x] **D. Outil Arrow** — Shape dérivée de Segment avec options `arrowStart`/`arrowEnd` (flèches aux extrémités)
@@ -38,8 +38,8 @@
 ## Workflow / UX
 
 - [ ] **P. Raccourcis clavier** — `Ctrl+Z/Y` undo/redo, `Suppr` supprime la sélection, `D` duplique, `Échap` désélectionne / annule polygone en cours
-- [ ] **Q. Grille visuelle toggleable** — Afficher/masquer la grille de snap dans le background (couplée à `snapGridEnabled`)
-- [ ] **R. Propriétés de shape sélectionnée** — Panel contextuel sur sélection : modifier couleur, largeur, layer d'une shape existante
+- [x] **Q. Grille visuelle toggleable** — Afficher/masquer la grille de snap dans le background (couplée à `snapGridEnabled`)
+- [x] **R. Propriétés de shape sélectionnée** — Panel contextuel sur sélection : modifier couleur, largeur, layer d'une shape existante
 - [ ] **S. Verrouillage de shape** — Propriété `locked: boolean` sur `Adaptable` — shape non déplaçable/supprimable par l'UI
 - [ ] **T. Snapshots nommés** — `saveSnapshot(name)` dans localStorage, liste et restauration d'états nommés
 

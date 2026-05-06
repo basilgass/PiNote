@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
-import type {Adaptable, ShapePatch} from '../../shapes/Adaptable'
-import type {ArrowStyle, LayerName, LineStyle} from '../../types'
-import ColorSelector from './ColorSelector.vue'
-import PiIcon from './PiIcon.vue'
-import WidthSelector from './WidthSelector.vue'
-import LayerSelector from './LayerSelector.vue'
+import ColorSelector from '../controls/ColorSelector.vue'
+import PiIcon from '../PiIcon.vue'
+import WidthSelector from '../controls/WidthSelector.vue'
+import LayerSelector from '../controls/LayerSelector.vue'
+import {Adaptable, ShapePatch} from "../../../shapes/Adaptable"
+import {ArrowStyle, LayerName, LineStyle} from "../../../types"
 
 const props = defineProps<{ shape: Adaptable }>()
 const emit = defineEmits<{ update: [id: string, patch: ShapePatch] }>()
@@ -25,6 +25,7 @@ const bezier      = ref<boolean>(s.bezier ?? true)
 const closed      = ref<boolean>(s.closed ?? false)
 const fill        = ref<boolean>(s.fill ?? false)
 const fillOpacity = ref<number>(s.fillOpacity ?? 0.3)
+const sector      = ref<boolean>(s.sector ?? false)
 
 // Émet les changements vers NoteCanvas → Engine.updateShapeProps
 watch(color,       val => emit('update', props.shape.id, { color: val }))
@@ -38,6 +39,7 @@ watch(bezier,      val => emit('update', props.shape.id, { bezier: val }))
 watch(closed,      val => emit('update', props.shape.id, { closed: val }))
 watch(fill,        val => emit('update', props.shape.id, { fill: val }))
 watch(fillOpacity, val => emit('update', props.shape.id, { fillOpacity: val }))
+watch(sector,      val => emit('update', props.shape.id, { sector: val }))
 
 const tool = props.shape.tool
 const showColor      = tool !== 'eraser'
@@ -47,6 +49,7 @@ const showArrows     = computed(() => props.shape.canHaveArrows)
 const showFill       = computed(() => props.shape.canBeFilled)
 const showBezier     = tool === 'pen'
 const showClosed     = tool === 'polygon'
+const showSector     = tool === 'arc'
 const showArrowStyle = computed(() => arrowStart.value || arrowEnd.value)
 </script>
 
@@ -198,6 +201,20 @@ const showArrowStyle = computed(() => arrowStart.value || arrowEnd.value)
 						@click="closed = !closed"
 					>
 						{{ closed ? 'oui' : 'non' }}
+					</button>
+				</section>
+			</template>
+
+			<template v-if="showSector">
+				<div class="sp-divider" />
+				<section class="sp-row">
+					<span class="sp-label">Secteur</span>
+					<button
+						class="sp-toggle"
+						:class="{ active: sector }"
+						@click="sector = !sector"
+					>
+						{{ sector ? 'oui' : 'non' }}
 					</button>
 				</section>
 			</template>

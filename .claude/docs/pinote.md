@@ -22,17 +22,24 @@ Bibliothèque Vue 3 de dessin canvas pour notes mathématiques. Construite en mo
 ## 2. Types (`src/types/index.ts`)
 
 ```
-ToolType   = 'pen' | 'highlighter' | 'eraser' | 'select' | 'move'
+ToolType   = 'pen' | 'highlighter' | 'eraser' | 'select' | 'move' | 'vector'
            | 'line' | 'segment' | 'circle' | 'rectangle' | 'polygon'
-LayerName  = 'BACKGROUND' | 'MAIN' | 'LAYER'
-BackgroundMode = 'grid' | 'ruled' | 'axes' | 'none'
+LayerName  = 'BACKGROUND' | 'REFERENCE' | 'OVERLAY' | 'MAIN' | 'LAYER'
+BackgroundMode = 'grid' | 'ruled' | 'hex' | 'none'
+ArrowStyle = 'filled' | 'open'
+LineStyle  = 'solid' | 'dashed' | 'dotted'
+GeomType   = 'line' | 'segment' | 'rectangle' | 'circle' | 'polygon'
 ```
 
 **Interfaces clés :**
 - `StrokePoint` — `{x, y, t, pressure}`
-- `ToolConfig` — `{tool, color, width, layer, bezier}`
+- `ToolMode` — `{id: string; icon: string}` (un mode d'outil : identifiant + clé icône)
+- `ToolConfig` — `{tool, color, width, layer, bezier, toolModes: Partial<Record<ToolType, string>>}`
 - `ToolMemory` — `Record<ToolType, {color, width}>` (mémoire par outil)
-- `BackgroundState` — `{mode, grid?, ruled?, axes?}`
+- `BackgroundState` — `{mode, grid?, ruled?, hex?}`
+- `GridOptions` — `{size, color?, lineWidth?, majorEvery?, majorColor?, majorWidth?}`
+- `RuledOptions` — `{spacing, color?, lineWidth?, marginTop?}`
+- `HexOptions` — `{size, orientation?: 'pointy'|'flat', color?, lineWidth?}`
 - `ShapeStartConfig` — paramètres passés à `Engine.startShape()`
 
 ---
@@ -52,14 +59,17 @@ NoteCanvas.vue  (events pointer)
 
 **Layers (z-index) :**
 
-| Layer | Z | Transform | Fond |
-|---|---|---|---|
-| BACKGROUND | 1 | non | blanc |
-| MAIN | 2 | oui | transparent |
-| LAYER | 3 | oui | transparent |
-| overlay | 99 | oui | transparent |
+| Layer | Z | Transform | Fond | Rôle |
+|---|---|---|---|---|
+| BACKGROUND | 1 | non | blanc | fond (grille, réglé, hex) |
+| REFERENCE | 2 | oui | transparent | image PDF de référence |
+| OVERLAY | 3 | oui | transparent | calque utilisateur supplémentaire |
+| MAIN | 4 | oui | transparent | calque principal |
+| LAYER | 5 | oui | transparent | calque secondaire |
+| _tempLayer | 6 | oui | transparent | preview en cours de dessin |
+| overlay | 99 | oui | transparent | snap, handles de sélection |
 
-Le BACKGROUND ne subit pas le `translate/scale` — il est rendu en coordonnées monde direct. Les autres layers sont transformés.
+Le BACKGROUND ne subit pas le `translate/scale` — il est rendu en coordonnées écran direct. Tous les autres layers sont transformés (pan/zoom).
 
 ---
 
@@ -80,32 +90,40 @@ Le BACKGROUND ne subit pas le `translate/scale` — il est rendu en coordonnées
 **Méthodes publiques importantes :**
 
 ```
-startShape(config)         → crée + snap du point de départ
-updateShape(x, y)          → met à jour + snap + redessine
-endShape()                 → finalise, push dans _shapes, saveLocal
-cancelShape()              → annule sans sauvegarder
+startShape(config)           → crée + snap du point de départ
+updateShape(x, y)            → met à jour + snap + redessine sur _tempLayer
+endShape()                   → finalise, push dans _shapes, saveLocal
+cancelShape()                → annule sans sauvegarder
 
-setRectP2(x, y)            → phase 2 rectangle
-addPolygonVertex(x, y)     → ajoute sommet, retourne true si fermé
+phaseTransition(x, y)        → transition phase 1 → phase 2 (ex: rectangle)
+handleDrawClick(x, y)        → multi-click (polygone), retourne 'continue'|'done'
 
-highlightShape(id)         → dessine overlay de sélection
-clearHighlight()           → efface overlay
-isOverMoveHandle(x, y)     → hit-test handle déplacement
-isOverDuplicateHandle(x,y) → hit-test handle duplication
-isOverDeleteHandle(x, y)   → hit-test handle suppression
+highlightShape(id)           → dessine overlay de sélection
+clearHighlight()             → efface overlay
+isOverMoveHandle(x, y)       → hit-test handle déplacement
+isOverDuplicateHandle(x, y)  → hit-test handle duplication
+isOverDeleteHandle(x, y)     → hit-test handle suppression
 
-moveShape(id, dx, dy)      → translate shape + redessine + saveLocal
-duplicateShape(id)         → clone JSON + offset 15px + saveLocal
-destroyById(id)            → supprime de _shapes + saveLocal
-toggleVisibility(id)       → hidden toggle + redessine
+moveShape(id, dx, dy)        → translate shape + redessine + saveLocal
+duplicateShape(id)           → clone JSON + offset 15px + saveLocal
+destroyById(id)              → supprime de _shapes + saveLocal
+toggleVisibility(id)         → hidden toggle + redessine
+updateShapeProps(id, patch)  → patch partiel d'une shape + redessine
 
-findShapeAt(x, y)          → hit-test du plus récent au plus ancien
-undo() / redo()            → pile undo/redo
+findShapeAt(x, y)            → hit-test du plus récent au plus ancien
+undo() / redo()              → pile undo/redo
 
-saveLocal() / loadLocal()  → localStorage key = 'pi_note_draft'
-setBackground(state)       → met à jour le fond
+setPageId(id)                → change la clé localStorage (multi-page)
+saveLocal() / loadLocal()    → localStorage key = 'pi_note_draft_<pageId>'
+toJSONData() / loadFromJSONData(parsed) → sérialisation complète
+setBackground(state)         → met à jour le fond
+setReferenceBitmap(bitmap)   → image PDF sur le layer REFERENCE
+syncRemote(url)              → POST JSON vers une URL distante
+setViewTransform(x, y, scale)→ met à jour la transform pan/zoom
+
 getLayer(name) / setLayerVisibility / setLayerOpacity
 clearLayer(name) / clearAll()
+exportPNG() / exportA4()     → export PNG écran ou format A4
 ```
 
 **Handles de sélection** (positions en coordonnées monde) :
@@ -131,16 +149,20 @@ Wrapper `<canvas>` avec `position: absolute`, `pointerEvents: none`. Chaque laye
 
 Factory statique. Génère les IDs `shape-N` (compteur statique).
 
-| ToolType | Classe |
-|---|---|
-| pen, highlighter, eraser | `Stroke` |
-| line | `Line` |
-| segment | `Segment` |
-| circle | `Circle` |
-| rectangle | `Rectangle` |
-| polygon | `Polygon` |
+| ToolType | Classe | Notes |
+|---|---|---|
+| pen, highlighter, eraser | `Stroke` | |
+| line | `Line` | droite infinie |
+| segment | `Segment` | |
+| vector | `Segment` | avec `arrowEnd: true` pré-appliqué |
+| circle | `Circle` | mode via `config.toolMode ?? 'center-radius'` |
+| rectangle | `Rectangle` | mode via `config.toolMode ?? '2pts'` |
+| polygon | `Polygon` | |
+| text | `TextShape` | |
 
 `fromJSON(data)` — désérialisation pour `loadLocal()`.
+
+`getModes(tool): ToolMode[]` — retourne les modes disponibles pour un outil (`Rectangle.modes`, `Circle.modes`, ou `[]`).
 
 ---
 
@@ -179,6 +201,7 @@ Ces propriétés sont des **champs propres** (`readonly` sur l'instance), pas de
 | `Circle` | — | `true` |
 | `Rectangle` | — | `true` |
 | `Polygon` | — | `true` |
+| `TextShape` | `false` | `false` |
 
 ### Shapes concrètes
 
@@ -196,19 +219,62 @@ Ces propriétés sont des **champs propres** (`readonly` sur l'instance), pas de
 **`Segment`** — segment fini
 - Snap points : endpoints + midpoint
 
-**`Circle`**
-- `cx, cy, radius`
+**`Circle`** — deux modes
+- `cx, cy, radius` (format de stockage commun aux deux modes)
+- Mode `'center-radius'` (défaut) : `drawingMode = 'drag'`, `update()` met à jour le rayon
+- Mode `'3pts'` : `drawingMode = 'multi-click'`, 3 clics (P1→P2→P3), preview segment pointillé puis cercle pointillé, circumcercle calculé par `_circumcircle()`
+- `static modes: ToolMode[]` = `[{id:'center-radius', icon:'circle'}, {id:'3pts', icon:'circle-3pts'}]`
 - Snap points : centre + 4 cardinaux (N/S/E/W)
 
-**`Rectangle`** — parallélogramme aligné sur une arête
+**`Rectangle`** — parallélogramme aligné sur une arête, deux modes
 - `p1, p2` (arête), `w` (largeur perpendiculaire signée)
-- Phase 1 : arête en pointillés; Phase 2 : rectangle complet
+- Mode `'2pts'` (défaut) : `drawingMode = 'drag'`, un seul drag
+- Mode `'3pts'` : `drawingMode = 'two-phase'`, phase 1 = arête, phase 2 = largeur
+- `static modes: ToolMode[]` = `[{id:'2pts', icon:'tool-rect-2pts'}, {id:'3pts', icon:'tool-rect-3pts'}]`
 - `getCorners()` retourne 4 coins
+
+**`TextShape`** — zone de texte avec rendu LaTeX/MathJax
+- `x, y, source, fontSize, fontFamily, maxWidth`
+- `source` : texte brut + LaTeX inline (`$...$`) et display (`$$...$$`)
+- `scheduleRender()` : rendu async via `parseContent` → `renderParagraphs` → cache `_renderedLines`
+- `update(x, y)` : redimensionne `maxWidth` lors du drag initial
+- Pendant le drag : rectangle en pointillés (placeholder) ; après : texte rendu
+- Édition : `TextEditDialog.vue` s'ouvre via double-clic sur la shape
+- Snap points : 4 coins + centre de la bounding box
+- `isEmpty()` : `source.trim() === ''`
+- `static redrawCallback` : injecté par l'Engine/NoteCanvas pour déclencher un re-rendu après le rendu async
 
 **`Polygon`**
 - `points[]`, `closed`, `cursorPos?`
 - Auto-fermeture si distance ≤ 15px écran du 1er sommet
 - Snap points : tous les sommets (corner) + midpoints des arêtes
+
+### Système de modes d'outils
+
+Certaines shapes exposent plusieurs modes de dessin (ex : Rectangle 2pts/3pts, Circle center-radius/3pts). Le mécanisme est entièrement générique.
+
+**Côté shape** — chaque shape avec modes déclare :
+```typescript
+static readonly modes: ToolMode[] = [
+  { id: 'mode-a', icon: 'icon-key-a' },
+  { id: 'mode-b', icon: 'icon-key-b' },
+]
+```
+Le constructeur accepte un paramètre `mode` et initialise `drawingMode` en conséquence.
+
+**Côté factory** — `ShapeFactory.getModes(tool)` retourne `Shape.modes` ou `[]`.
+
+**Côté store** — `selectTool(tool)` : si l'outil est déjà actif et a des modes, cycle vers le mode suivant en mettant à jour `tool.toolModes[tool]`.
+
+**Côté UI** — `ToolSelector.vue` appelle `ShapeFactory.getModes(tool)` pour choisir l'icône à afficher (icône du mode courant).
+
+**Côté NoteCanvas** — `startShape()` reçoit `toolMode: store.tool.toolModes[tool]` ; un watch sur `toolModes` annule tout dessin en cours lors d'un changement de mode.
+
+**Pour ajouter un mode à un outil existant :**
+1. Ajouter `{ id, icon }` dans `static modes` de la shape
+2. Enregistrer dans `ShapeFactory.getModes()`
+3. Ajouter l'icône dans `src/vue/icons.ts`
+4. Le store, NoteCanvas et ToolSelector fonctionnent sans modification
 
 ---
 
@@ -216,19 +282,23 @@ Ces propriétés sont des **champs propres** (`readonly` sur l'instance), pas de
 
 ### `SnapManager`
 
-À chaque update, rebuild le `SpatialIndex` depuis toutes les shapes, puis essaie les stratégies par ordre de priorité décroissante.
+À chaque update, collecte la géométrie de toutes les shapes (via `SnapWorkerClient` — web worker), puis essaie les stratégies par ordre de priorité décroissante.
 
 **Stratégies actives :**
 
 | Stratégie | Priorité | Comportement |
 |---|---|---|
 | `PointSnap` | 20 | snap sur endpoints/centres/coins |
+| `GridSnap` | 10 | arrondi sur grille (désactivé par défaut) |
 | `MidpointSnap` | 5 | snap sur milieux de segments |
-| `GridSnap` | 10 | arrondi sur grille (par défaut désactivé) |
 
 **Stratégies stub (non implémentées) :** `AngleSnap`, `AxisSnap`, `IntersectionSnap`, `ProjectionSnap`
 
-Filtre optionnel par `activeLayer` — snaps cross-layer possibles si layer = null.
+Filtre optionnel par `activeLayer` — snaps cross-layer possibles si `layer = null`.
+
+### `SnapWorkerClient` + `snap.worker.ts`
+
+La collecte de géométrie depuis toutes les shapes est déléguée à un Web Worker (`src/snap/snap.worker.ts`) via `SnapWorkerClient`. L'Engine marque la géométrie "dirty" à chaque modification, déclenche un recalcul async, et met en cache `_cachedGeometry` jusqu'au prochain changement.
 
 ### `SpatialIndex`
 
@@ -243,7 +313,36 @@ Hash spatial 100px/cellule. Stocke `snapPoints[]`, `segments[]`, `circles[]` par
 
 ---
 
-## 9. Store Pinia (`src/store/useNoteStore.ts`)
+## 9. Système d'icônes
+
+### `src/vue/icons.ts`
+
+Catalogue centralisé de toutes les icônes FontAwesome utilisées dans l'UI. Chaque entrée :
+
+```typescript
+interface IconDef { viewBox: string; content: string }
+export const ICONS: Record<string, IconDef> = { ... }
+```
+
+Le `content` est le SVG path brut copié depuis FontAwesome (pas de dépendance npm). **Pour ajouter une icône** : copier le SVG FontAwesome (viewBox + `<path d="..."/>`) et l'ajouter dans ce fichier.
+
+**Clés disponibles :** `arrow-pointer`, `pen-nib`, `highlighter`, `eraser`, `arrows-up-down-left-right`, `draw-polygon`, `rotate-left`, `rotate-right`, `chevron-right/left/up/down`, `xmark`, `magnifying-glass-plus/minus`, `expand`, `compress`, `arrow-left/right`, `play`, `angle-right`, `eye`, `eye-slash`, `trash-can`, `circle`, `circle-3pts`, `square`, `file-arrow-down`, `tool-text`, `tool-line`, `tool-segment`, `tool-vector`, `tool-rect-2pts`, `tool-rect-3pts`.
+
+### `src/vue/components/PiIcon.vue`
+
+```vue
+<PiIcon icon="nom-de-licone" />
+```
+
+Rendu SVG inline via `v-html` depuis `ICONS[props.icon]`. L'icône hérite de `fill="currentColor"` → contrôlée par CSS `color`.
+
+### `ToolSelector.vue` — `TOOL_ICON`
+
+Mappe chaque `ToolType` à un nom d'icône. **À mettre à jour** lors de l'ajout d'un outil.
+
+---
+
+## 10. Store Pinia (`src/store/useNoteStore.ts`)
 
 PiNote utilise Pinia pour centraliser tout l'état UI. Le store est instancié dans `NoteCanvas.vue` et accessible dans tous les composants enfants via `useNoteStore()` sans prop drilling.
 
@@ -283,6 +382,7 @@ Si l'app hôte a déjà un Pinia actif, on le réutilise. Sinon on en crée un l
 - `exportJSON()` / `importJSON(file)` — sauvegarde/chargement fichier JSON
 - `zoomIn()` / `zoomOut()` / `resetView()` / `fitView()` — délégués à `useCanvasTransform` via `registerZoom()`
 - **Multi-page :** `initSession()` · `createPage(name?)` · `switchPage(id)` · `deletePage(id)` · `renamePage(id, name)` · `dismissExpiredPages()`
+- **Multi-page PDF :** `appendPdfPages(pdfId, count, baseName)` · `setPdfReference(pageId, pdfId, index)` · `newDocument()`
 - **Sync distante :** `syncRemote()` — POST vers `remoteUrl`
 
 **État multi-page :**
@@ -299,7 +399,60 @@ Si l'app hôte a déjà un Pinia actif, on le réutilise. Sinon on en crée un l
 
 ---
 
-## 10. Vue layer (`src/vue/`)  <!-- anciennement §9 -->
+## 11. Store Pinia (`src/store/usePdfStore.ts`)
+
+Gère le cycle de vie des PDFs importés comme référence.
+
+- `importPdf(file)` — importe un PDF, le stocke dans IndexedDB via `PdfStorage`
+- `renderPageForCurrentPage()` — rendu de la page PDF courante → `ImageBitmap` → `engine.setReferenceBitmap()`
+- `getThumbnail(pdfId, pageIndex)` / `ensureThumbnail(...)` — cache de miniatures
+- `getPdfCanvasSize(pdfId, pageIndex)` — dimensions de la page PDF
+- `clearReference()` / `clearCacheForPdf(pdfId)`
+
+**Services associés (`src/services/`) :**
+- `PdfRenderer.ts` — rendu d'une page PDF en `ImageBitmap` (via `pdf.js`)
+- `PdfStorage.ts` — stockage des fichiers PDF dans IndexedDB
+- `PdfThumbnailDb.ts` — cache des miniatures en IndexedDB
+- `PageExporter.ts` — export PNG de pages (screen / A4)
+
+---
+
+## 12. Configuration globale (`src/config/PiNoteConfig.ts`)
+
+```typescript
+interface PiNoteConfig {
+  backendUrl: string
+  storageRetentionDays: number   // défaut: 30
+  appTitle: string               // défaut: 'PiNote'
+  theme: 'light' | 'dark'
+  defaults: {
+    tool: ToolType               // défaut: 'pen'
+    color: string                // défaut: '#000000'
+    width: number                // défaut: 2
+    background: Partial<BackgroundState>
+    snapEnabled: boolean         // défaut: false
+    snapSize: number             // défaut: 80
+    bezier: boolean              // défaut: true
+  }
+  colorPresets: { value: string; label: string }[]
+  maxPages: number               // défaut: 0 = illimité
+}
+```
+
+---
+
+## 13. Vue layer (`src/vue/`)
+
+### Organisation des composants
+
+Les composants sont organisés en sous-dossiers par domaine dans `src/vue/components/` :
+
+| Dossier | Contenu |
+|---|---|
+| `Sidebar/` | Composants de la barre latérale : `NoteSidebar`, `SidebarPanel*`, `ShapeProperties` |
+| `Widget/` | Dialogues et sous-composants des widgets : `WidgetDialog`, `GraphEditDialog`, `GraphPanel`, `TextEditDialog` |
+| `controls/` | Sélecteurs de contrôle réutilisables : `ToolSelector`, `ColorSelector`, `WidthSelector`, `LayerSelector` |
+| (racine) | Composants isolés et pages : `PiIcon`, `ToolHint`, `UtilityMenu`, `PageCard`, `PagePreview`, `PagesDialog`, `ZoomControls` |
 
 ### `NoteCanvas.vue`
 
@@ -318,8 +471,10 @@ pointerleave/cancel → onPointerUp
 ```
 
 **Cas spéciaux :**
-- Rectangle : 2 phases (clic P1 → clic P2 → drag largeur)
+- Rectangle 3pts : 2 phases (clic P1 → clic P2 → drag largeur) via `two-phase`
+- Circle 3pts : 3 clics (P1, P2, P3) via `multi-click`, preview segment puis cercle en pointillés
 - Polygon : clic par clic, double-clic ou auto-close
+- Text : pointerdown pose l'origine, drag fixe `maxWidth`, double-clic sur shape existante ouvre `TextEditDialog`
 - Select : gestion des 3 handles (move/duplicate/delete) via store
 - `touchstart` ≥ 2 doigts → annule le dessin en cours
 
@@ -335,10 +490,11 @@ Shell accordéon uniquement (topbar + 4 sections). Chaque section délègue à u
 
 | Panel | Fichier | Contenu |
 |---|---|---|
-| Historique | `SidebarPanelHistory.vue` | Liste des formes + undo/redo |
-| Canvas | `SidebarPanelCanvas.vue` | Titre, fond, snap, export |
-| Propriétés | `SidebarPanelProperties.vue` | `ShapeProperties` de la shape sélectionnée |
-| Zoom | `SidebarPanelZoom.vue` | Boutons zoom/fit/reset |
+| Historique | `Sidebar/SidebarPanelHistory.vue` | Liste des formes + undo/redo (`TOOL_LABEL`) |
+| Canvas | `Sidebar/SidebarPanelCanvas.vue` | Titre, fond, snap, export |
+| Propriétés | `Sidebar/SidebarPanelProperties.vue` | `Sidebar/ShapeProperties` de la shape sélectionnée |
+| Calques | `Sidebar/SidebarPanelLayers.vue` | Visibilité et opacité des calques |
+| Zoom | `Sidebar/SidebarPanelZoom.vue` | Boutons zoom/fit/reset |
 
 Tous les panels lisent et écrivent le store directement — aucun prop ni emit.
 
@@ -348,22 +504,31 @@ Composant autonome (non utilisé dans `NoteCanvas`). Panel fixe haut-droite, ré
 
 ### Sub-components
 
-| Composant | Rôle |
-|---|---|
-| `ToolSelector` | Grille d'outils avec icônes SVG |
-| `ColorSelector` | Palette + picker custom (`input[type=color]`) |
-| `WidthSelector` | Presets largeur selon outil actif |
-| `LayerSelector` | Sélecteur MAIN / LAYER |
-| `ZoomControls` | Boutons zoom/fit/reset (bas-droite) |
-| `ShapeProperties` | Formulaire de propriétés d'une shape sélectionnée |
+| Composant | Dossier | Rôle |
+|---|---|---|
+| `ToolSelector` | `controls/` | Grille d'outils avec icônes SVG via `PiIcon` |
+| `ColorSelector` | `controls/` | Palette + picker custom (`input[type=color]`) |
+| `WidthSelector` | `controls/` | Presets largeur selon outil actif |
+| `LayerSelector` | `controls/` | Sélecteur MAIN / LAYER |
+| `ShapeProperties` | `Sidebar/` | Formulaire de propriétés d'une shape sélectionnée |
+| `GraphEditDialog` | `Widget/` | Dialogue d'édition de graphique |
+| `TextEditDialog` | `Widget/` | Dialogue d'édition de texte LaTeX |
+| `WidgetDialog` | `Widget/` | Conteneur générique pour dialogues de widget |
+| `GraphPanel` | `Widget/` | Panneau de configuration graphique (sous-composant) |
+| `ZoomControls` | — | Boutons zoom/fit/reset (bas-droite) |
+| `ToolHint` | — | Indice contextuel (raccourcis clavier par outil) |
+| `PiIcon` | — | Rendu SVG inline depuis `icons.ts` |
+| `PagesDialog` | — | Dialogue de gestion multi-page |
+| `PageCard` | — | Carte d'une page dans le dialogue |
+| `PagePreview` | — | Miniature d'une page |
 
 ### `NotePreview.vue`
 
-Vue lecture seule. Charge `'pi_note_draft'` du localStorage, désérialise via `ShapeFactory.fromJSON`, zoom/pan mais pas d'édition.
+Vue lecture seule. Désérialise via `ShapeFactory.fromJSON`, zoom/pan mais pas d'édition.
 
 ---
 
-## 11. Composable `useCanvasTransform`
+## 14. Composable `useCanvasTransform`
 
 - **Transform state :** `{x, y, scale}` — scale clampé 0.1–10
 - `zoomIn/Out` : × 1.15 / × 0.85 centré sur canvas
@@ -374,21 +539,25 @@ Vue lecture seule. Charge `'pi_note_draft'` du localStorage, désérialise via `
 
 ---
 
-## 12. Background (`src/core/helper.ts`)
+## 15. Background (`src/core/helper.ts`)
 
 | Fonction | Mode |
 |---|---|
 | `drawGrid` | grille carrée, support major lines |
 | `drawRuled` | lignes horizontales (papier réglé) |
-| `drawAxes` | axes X/Y avec flèches et graduations |
-
-Modes d'origine pour axes : `'center'`, `'bottom'`, `'bottom-left'`, `'manual'`.
+| `drawHex` | grille hexagonale (`pointy` ou `flat`) |
 
 ---
 
-## 13. CSS — règles de style pour les composants Vue
+## 16. CSS — règles de style pour les composants Vue
 
-Les classes globales PiNote sont définies dans `dist/pi-note.css` (source : les `<style>` non-scoped des composants, compilés par Vite). **Toujours utiliser ces classes en priorité** avant d'en créer de nouvelles.
+**Source unique :** `src/styles/pi-note.css` — compilé par Vite en `dist/pi-note.css`. C'est l'**unique endroit** où ajouter des styles. La bibliothèque étant portable sur d'autres frameworks que Vue, **aucun style ne doit vivre dans les composants**.
+
+**Règles absolues :**
+- **Zéro `<style>` dans les fichiers `.vue`** — ni `scoped`, ni global. Tout style va dans `src/styles/pi-note.css`.
+- **Toujours utiliser les classes existantes en priorité** avant d'en créer une nouvelle.
+- Si une classe manque vraiment, l'ajouter dans `src/styles/pi-note.css` avec un commentaire de section.
+- Les variables CSS (`--pn-*`) sont disponibles partout : `--pn-primary`, `--pn-border`, `--pn-text`, `--pn-bg`, etc.
 
 **Classes réutilisables clés :**
 
@@ -402,15 +571,11 @@ Les classes globales PiNote sont définies dans `dist/pi-note.css` (source : les
 | `.history-body` | Conteneur scrollable pour liste de lignes |
 | `.btn` / `.btn-active` / `.btn-ghost` / `.btn-sm` / `.btn-danger` | Boutons génériques |
 | `.sec-header` / `.sec-title` / `.chevron` / `.chevron.open` | Accordéon sidebar |
-
-**Règles :**
-- **Pas de `<style scoped>`** dans les composants Vue de PiNote — utiliser les classes globales existantes.
-- Si une classe manque vraiment, la demander avant de la créer.
-- Les variables CSS (`--pn-*`) sont disponibles partout : `--pn-primary`, `--pn-border`, `--pn-text`, `--pn-bg`, etc.
+| `.text-edit-overlay` | Textarea overlay édition texte (positionnée en absolu sur le canvas) |
 
 ---
 
-## 14. Règles de conduite
+## 17. Règles de conduite
 
 - **Pas de snap** pour `pen`, `highlighter`, `eraser`
 - **Snaps cross-layer** autorisés si `layer = null`
@@ -418,7 +583,7 @@ Les classes globales PiNote sont définies dans `dist/pi-note.css` (source : les
 - **Undo/Redo** : pile simple, toute nouvelle shape vide le redo
 - **IDs** : compteur statique `ShapeFactory`, format `shape-N` — ne pas manuellement assigner sauf pour `fromJSON`
 - **Cache Stroke** : invalider via `addPoint` ou `translate`, jamais manuellement
-- **localStorage** clé fixe `'pi_note_draft'` — rollback silencieux
+- **localStorage** clé par page `'pi_note_draft_<pageId>'`, index `'pi_note_index'` — rollback silencieux
 - **shallowRef** pour Engine dans NoteCanvas (éviter la réactivité profonde)
 - **Handles** : toujours en coordonnées monde, hit radius = 14px écran
 - **`canHaveArrows` / `canBeFilled`** : toujours déclarés comme `readonly` sur l'instance (pas de getter de prototype) — requis pour que Vue les détecte dans `ShapeProperties`

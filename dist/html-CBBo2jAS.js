@@ -1,0 +1,830 @@
+import { a as e, i as t, n, o as r, t as i } from "./Options-xGJmd5BJ.js";
+import { i as a, t as o } from "./mathjax-KVeV0VvI.js";
+import { t as s } from "./PrioritizedList-OKfur1cD.js";
+import { _ as c, b as l, f as u, p as d, t as f, u as p, v as m } from "./mo-CHa-ZBtr.js";
+import { t as ee } from "./InputJax-Ws8a0gwI.js";
+import { A as te, C as ne, D as re, E as ie, F as ae, I as oe, L as se, M as ce, N as le, O as ue, P as de, S as h, T as g, _, a as v, b as y, c as b, d as x, f as S, g as C, h as w, i as T, j as E, k as D, l as O, m as k, n as A, o as j, p as M, r as N, s as P, t as F, u as I, v as L, w as R, x as z, y as B } from "./HtmlNode-BQnv5-b7.js";
+import { i as fe, n as V, r as H, t as pe } from "./Factory-BKM7FEO-.js";
+//#region node_modules/@mathjax/src/mjs/util/LinkedList.js
+var U = Symbol(), W = class {
+	constructor(e = null) {
+		this.next = null, this.prev = null, this.data = e;
+	}
+}, me = class e {
+	constructor(...e) {
+		this.list = new W(U), this.list.next = this.list.prev = this.list, this.push(...e);
+	}
+	isBefore(e, t) {
+		return e < t;
+	}
+	push(...e) {
+		for (let t of e) {
+			let e = new W(t);
+			e.next = this.list, e.prev = this.list.prev, this.list.prev = e, e.prev.next = e;
+		}
+		return this;
+	}
+	pop() {
+		let e = this.list.prev;
+		return e.data === U ? null : (this.list.prev = e.prev, e.prev.next = this.list, e.next = e.prev = null, e.data);
+	}
+	unshift(...e) {
+		for (let t of e.slice(0).reverse()) {
+			let e = new W(t);
+			e.next = this.list.next, e.prev = this.list, this.list.next = e, e.next.prev = e;
+		}
+		return this;
+	}
+	shift() {
+		let e = this.list.next;
+		return e.data === U ? null : (this.list.next = e.next, e.next.prev = this.list, e.next = e.prev = null, e.data);
+	}
+	remove(...e) {
+		let t = /* @__PURE__ */ new Map();
+		for (let n of e) t.set(n, !0);
+		let n = this.list.next;
+		for (; n.data !== U;) {
+			let e = n.next;
+			t.has(n.data) && (n.prev.next = n.next, n.next.prev = n.prev, n.next = n.prev = null), n = e;
+		}
+		return this;
+	}
+	clear() {
+		return this.list.next.prev = this.list.prev.next = null, this.list.next = this.list.prev = this.list, this;
+	}
+	*[Symbol.iterator]() {
+		let e = this.list.next;
+		for (; e.data !== U;) yield e.data, e = e.next;
+	}
+	*reversed() {
+		let e = this.list.prev;
+		for (; e.data !== U;) yield e.data, e = e.prev;
+	}
+	insert(e, t = null) {
+		t === null && (t = this.isBefore.bind(this));
+		let n = new W(e), r = this.list.next;
+		for (; r.data !== U && t(r.data, n.data);) r = r.next;
+		return n.prev = r.prev, n.next = r, r.prev.next = r.prev = n, this;
+	}
+	sort(t = null) {
+		t === null && (t = this.isBefore.bind(this));
+		let n = [];
+		for (let t of this) n.push(new e(t));
+		for (this.list.next = this.list.prev = this.list; n.length > 1;) {
+			let e = n.shift(), r = n.shift();
+			e.merge(r, t), n.push(e);
+		}
+		return n.length && (this.list = n[0].list), this;
+	}
+	merge(e, t = null) {
+		t === null && (t = this.isBefore.bind(this));
+		let n = this.list.next, r = e.list.next;
+		for (; n.data !== U && r.data !== U;) t(r.data, n.data) ? ([r.prev.next, n.prev.next] = [n, r], [r.prev, n.prev] = [n.prev, r.prev], [this.list.prev.next, e.list.prev.next] = [e.list, this.list], [this.list.prev, e.list.prev] = [e.list.prev, this.list.prev], [n, r] = [r.next, n]) : n = n.next;
+		return r.data !== U && (this.list.prev.next = e.list.next, e.list.next.prev = this.list.prev, e.list.prev.next = this.list, this.list.prev = e.list.prev, e.list.next = e.list.prev = e.list), this;
+	}
+}, he = class extends me {
+	isBefore(e, t) {
+		return e.start.i < t.start.i || e.start.i === t.start.i && e.start.n < t.start.n;
+	}
+}, ge = class extends pe {
+	create(e, t = {}, n = []) {
+		return this.node[e](t, n);
+	}
+}, G = class extends u {
+	get kind() {
+		return "mstyle";
+	}
+	get notParent() {
+		return this.childNodes[0] && this.childNodes[0].childNodes.length === 1;
+	}
+	setInheritedAttributes(e = {}, t = !1, n = 0, r = !1) {
+		this.attributes.setInherited("displaystyle", t), this.attributes.setInherited("scriptlevel", n), super.setInheritedAttributes(e, t, n, r);
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		let i = this.attributes.getExplicit("scriptlevel");
+		i != null && (i = i.toString(), i.match(/^\s*[-+]/) ? n += parseInt(i) : n = parseInt(i), r = !1);
+		let a = this.attributes.getExplicit("displaystyle");
+		a != null && (t = a === !0, r = !1);
+		let o = this.attributes.getExplicit("data-cramped");
+		o != null && (r = o), e = this.addInheritedAttributes(e, this.attributes.getAllAttributes()), this.childNodes[0].setInheritedAttributes(e, t, n, r);
+	}
+};
+G.defaults = Object.assign(Object.assign({}, u.defaults), {
+	scriptlevel: l,
+	displaystyle: l,
+	scriptsizemultiplier: 1 / Math.sqrt(2),
+	scriptminsize: ".4em",
+	mathbackground: l,
+	mathcolor: l,
+	dir: l,
+	infixlinebreakstyle: "before"
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/maligngroup.js
+var K = class extends u {
+	get kind() {
+		return "maligngroup";
+	}
+	get isSpacelike() {
+		return !0;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		e = this.addInheritedAttributes(e, this.attributes.getAllAttributes()), super.setChildInheritedAttributes(e, t, n, r);
+	}
+};
+K.defaults = Object.assign(Object.assign({}, u.defaults), { groupalign: l });
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/malignmark.js
+var q = class extends d {
+	get kind() {
+		return "malignmark";
+	}
+	get arity() {
+		return 0;
+	}
+	get isSpacelike() {
+		return !0;
+	}
+};
+q.defaults = Object.assign(Object.assign({}, d.defaults), { edge: "left" });
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mathchoice.js
+var J = class extends p {
+	get kind() {
+		return "MathChoice";
+	}
+	get arity() {
+		return 4;
+	}
+	get notParent() {
+		return !0;
+	}
+	setInheritedAttributes(e, t, n, r) {
+		let i = t ? 0 : Math.max(0, Math.min(n, 2)) + 1, a = this.childNodes[i] || this.factory.create("mrow");
+		this.parent.replaceChild(a, this), a.setInheritedAttributes(e, t, n, r);
+	}
+};
+J.defaults = Object.assign({}, p.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MML.js
+var _e = {
+	[oe.prototype.kind]: oe,
+	[ae.prototype.kind]: ae,
+	[de.prototype.kind]: de,
+	[f.prototype.kind]: f,
+	[le.prototype.kind]: le,
+	[ce.prototype.kind]: ce,
+	[E.prototype.kind]: E,
+	[te.prototype.kind]: te,
+	[D.prototype.kind]: D,
+	[ue.prototype.kind]: ue,
+	[re.prototype.kind]: re,
+	[ie.prototype.kind]: ie,
+	[G.prototype.kind]: G,
+	[g.prototype.kind]: g,
+	[R.prototype.kind]: R,
+	[ne.prototype.kind]: ne,
+	[h.prototype.kind]: h,
+	[z.prototype.kind]: z,
+	[y.prototype.kind]: y,
+	[_.prototype.kind]: _,
+	[B.prototype.kind]: B,
+	[L.prototype.kind]: L,
+	[w.prototype.kind]: w,
+	[k.prototype.kind]: k,
+	[C.prototype.kind]: C,
+	[x.prototype.kind]: x,
+	[S.prototype.kind]: S,
+	[M.prototype.kind]: M,
+	[I.prototype.kind]: I,
+	[b.prototype.kind]: b,
+	[O.prototype.kind]: O,
+	[P.prototype.kind]: P,
+	[K.prototype.kind]: K,
+	[q.prototype.kind]: q,
+	[j.prototype.kind]: j,
+	[v.prototype.kind]: v,
+	[N.prototype.kind]: N,
+	[T.prototype.kind]: T,
+	[A.prototype.kind]: A,
+	[J.prototype.kind]: J,
+	[c.prototype.kind]: c,
+	[m.prototype.kind]: m,
+	[F.prototype.kind]: F
+}, ve = class extends ge {
+	get MML() {
+		return this.node;
+	}
+};
+ve.defaultNodes = _e;
+//#endregion
+//#region node_modules/@mathjax/src/mjs/util/BitField.js
+var Y = class e {
+	constructor() {
+		this.bits = 0;
+	}
+	static allocate(...t) {
+		for (let n of t) {
+			if (this.has(n)) throw Error("Bit already allocated for " + n);
+			if (this.next === e.MAXBIT) throw Error("Maximum number of bits already allocated");
+			this.names.set(n, this.next), this.next <<= 1;
+		}
+	}
+	static has(e) {
+		return this.names.has(e);
+	}
+	set(e) {
+		this.bits |= this.getBit(e);
+	}
+	clear(e) {
+		this.bits &= ~this.getBit(e);
+	}
+	isSet(e) {
+		return !!(this.bits & this.getBit(e));
+	}
+	reset() {
+		this.bits = 0;
+	}
+	getBit(e) {
+		let t = this.constructor.names.get(e);
+		if (!t) throw Error("Unknown bit-field name: " + e);
+		return t;
+	}
+};
+Y.MAXBIT = 1 << 31, Y.next = 1, Y.names = /* @__PURE__ */ new Map();
+function ye(...e) {
+	let t = class extends Y {};
+	return t.allocate(...e), t;
+}
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MathDocument.js
+var X = function(e, t, n, r) {
+	function i(e) {
+		return e instanceof n ? e : new n(function(t) {
+			t(e);
+		});
+	}
+	return new (n ||= Promise)(function(n, a) {
+		function o(e) {
+			try {
+				c(r.next(e));
+			} catch (e) {
+				a(e);
+			}
+		}
+		function s(e) {
+			try {
+				c(r.throw(e));
+			} catch (e) {
+				a(e);
+			}
+		}
+		function c(e) {
+			e.done ? n(e.value) : i(e.value).then(o, s);
+		}
+		c((r = r.apply(e, t || [])).next());
+	});
+}, be = class extends s {
+	static create(e) {
+		let t = new this();
+		for (let n of Object.keys(e)) {
+			let [r, i] = this.action(n, e[n]);
+			i && t.add(r, i);
+		}
+		return t;
+	}
+	static action(e, t) {
+		let n, r, i = !0, a = t[0];
+		if (t.length === 1 || typeof t[1] == "boolean") t.length === 2 && (i = t[1]), [n, r] = this.methodActions(e);
+		else if (typeof t[1] == "string") if (typeof t[2] == "string") {
+			t.length === 4 && (i = t[3]);
+			let [e, a] = t.slice(1);
+			[n, r] = this.methodActions(e, a);
+		} else t.length === 3 && (i = t[2]), [n, r] = this.methodActions(t[1]);
+		else t.length === 4 && (i = t[3]), [n, r] = t.slice(1);
+		return [{
+			id: e,
+			renderDoc: n,
+			renderMath: r,
+			convert: i
+		}, a];
+	}
+	static methodActions(e, t = e) {
+		return [(t) => (e && t[e](), !1), (e, n) => (t && e[t](n), !1)];
+	}
+	renderDoc(e, t = H.UNPROCESSED) {
+		for (let n of this.items) if (n.priority >= t && n.item.renderDoc(e)) return;
+	}
+	renderMath(e, t, n = H.UNPROCESSED) {
+		for (let r of this.items) if (r.priority >= n && r.item.renderMath(e, t)) return;
+	}
+	renderConvert(e, t, n = H.LAST) {
+		for (let r of this.items) if (r.priority > n || r.item.convert && r.item.renderMath(e, t)) return;
+	}
+	findID(e) {
+		for (let t of this.items) if (t.item.id === e) return t.item;
+		return null;
+	}
+}, xe = {
+	all: !1,
+	processed: !1,
+	inputJax: null,
+	outputJax: null
+}, Se = {
+	all: !0,
+	processed: !0,
+	inputJax: [],
+	outputJax: []
+}, Ce = class extends ee {
+	compile(e) {
+		return null;
+	}
+}, we = class extends se {
+	typeset(e, t = null) {
+		return null;
+	}
+	escaped(e, t) {
+		return null;
+	}
+}, Te = class extends he {}, Ee = class extends V {}, Z = class e {
+	constructor(t, n, a) {
+		let o = this.constructor;
+		this.document = t, this.options = r(i({}, o.OPTIONS), a), this.math = new (this.options.MathList || Te)(), this.renderActions = be.create(this.options.renderActions), this._actionPromises = [], this._readyPromise = Promise.resolve(), this.processed = new e.ProcessBits(), this.outputJax = this.options.OutputJax || new we();
+		let s = this.options.InputJax || [new Ce()];
+		Array.isArray(s) || (s = [s]), this.inputJax = s, this.adaptor = n, this.outputJax.setAdaptor(n), this.inputJax.map((e) => e.setAdaptor(n)), this.mmlFactory = this.options.MmlFactory || new ve(), this.inputJax.map((e) => e.setMmlFactory(this.mmlFactory)), this.outputJax.initialize(), this.inputJax.map((e) => e.initialize());
+	}
+	get kind() {
+		return this.constructor.KIND;
+	}
+	addRenderAction(e, ...t) {
+		let [n, r] = be.action(e, t);
+		this.renderActions.add(n, r);
+	}
+	removeRenderAction(e) {
+		let t = this.renderActions.findID(e);
+		t && this.renderActions.remove(t);
+	}
+	render() {
+		return this.clearPromises(), this.renderActions.renderDoc(this), this;
+	}
+	renderPromise() {
+		return this.whenReady(() => a(() => X(this, void 0, void 0, function* () {
+			return this.render(), yield this.actionPromises(), this.clearPromises(), this;
+		})));
+	}
+	rerender(e = H.RERENDER) {
+		return this.state(e - 1), this.render(), this;
+	}
+	rerenderPromise(e = H.RERENDER) {
+		return this.whenReady(() => a(() => X(this, void 0, void 0, function* () {
+			return this.rerender(e), yield this.actionPromises(), this.clearPromises(), this;
+		})));
+	}
+	convert(e, t = {}) {
+		let { format: n, display: i, end: a, ex: o, em: s, containerWidth: c, scale: l, family: u } = r({
+			format: this.inputJax[0].name,
+			display: !0,
+			end: H.LAST,
+			em: 16,
+			ex: 8,
+			containerWidth: null,
+			scale: 1,
+			family: ""
+		}, t);
+		c === null && (c = 80 * o);
+		let d = this.inputJax.reduce((e, t) => t.name === n ? t : e, null), f = new this.options.MathItem(e, d, i);
+		return f.start.node = this.adaptor.body(this.document), f.setMetrics(s, o, c, l), u && this.outputJax.options.mtextInheritFont && (f.outputData.mtextFamily = u), u && this.outputJax.options.merrorInheritFont && (f.outputData.merrorFamily = u), this.clearPromises(), f.convert(this, a), f.typesetRoot || f.root;
+	}
+	convertPromise(e, t = {}) {
+		return this.whenReady(() => a(() => X(this, void 0, void 0, function* () {
+			let n = this.convert(e, t);
+			return yield this.actionPromises(), this.clearPromises(), n;
+		})));
+	}
+	whenReady(e) {
+		return this._readyPromise = this._readyPromise.catch((e) => {}).then(() => {
+			let t = this._readyPromise;
+			this._readyPromise = Promise.resolve();
+			let n = e(), r = this._readyPromise.then(() => n);
+			return this._readyPromise = t, r;
+		});
+	}
+	actionPromises() {
+		return Promise.all(this._actionPromises);
+	}
+	clearPromises() {
+		this._actionPromises = [];
+	}
+	savePromise(e) {
+		this._actionPromises.push(e);
+	}
+	findMath(e = null) {
+		return this.processed.set("findMath"), this;
+	}
+	compile() {
+		if (!this.processed.isSet("compile")) {
+			let e = [];
+			for (let t of this.math) this.compileMath(t), t.inputData.recompile !== void 0 && e.push(t);
+			for (let t of e) {
+				let e = t.inputData.recompile;
+				t.state(e.state), t.inputData.recompile = e, this.compileMath(t);
+			}
+			this.processed.set("compile");
+		}
+		return this;
+	}
+	compileMath(e) {
+		try {
+			e.compile(this);
+		} catch (t) {
+			if (t.retry || t.restart) throw t;
+			this.options.compileError(this, e, t), e.inputData.error = t;
+		}
+	}
+	compileError(e, t) {
+		e.root = this.mmlFactory.create("math", null, [this.mmlFactory.create("merror", {
+			"data-mjx-error": t.message,
+			title: t.message
+		}, [this.mmlFactory.create("mtext", null, [this.mmlFactory.create("text").setText("Math input error")])])]), e.display && e.root.attributes.set("display", "block"), e.inputData.error = t.message;
+	}
+	typeset() {
+		if (!this.processed.isSet("typeset")) {
+			for (let e of this.math) try {
+				e.typeset(this);
+			} catch (t) {
+				if (t.retry || t.restart) throw t;
+				this.options.typesetError(this, e, t), e.outputData.error = t;
+			}
+			this.processed.set("typeset");
+		}
+		return this;
+	}
+	typesetError(e, t) {
+		e.typesetRoot = this.adaptor.node("mjx-container", {
+			class: "MathJax mjx-output-error",
+			jax: this.outputJax.name
+		}, [this.adaptor.node("span", {
+			"data-mjx-error": t.message,
+			title: t.message,
+			style: {
+				color: "red",
+				"background-color": "yellow",
+				"line-height": "normal"
+			}
+		}, [this.adaptor.text("Math output error")])]), e.display && this.adaptor.setAttributes(e.typesetRoot, { style: {
+			display: "block",
+			margin: "1em 0",
+			"text-align": "center"
+		} }), e.outputData.error = t.message;
+	}
+	getMetrics() {
+		return this.processed.isSet("getMetrics") || (this.outputJax.getMetrics(this), this.processed.set("getMetrics")), this;
+	}
+	updateDocument() {
+		if (!this.processed.isSet("updateDocument")) {
+			for (let e of this.math.reversed()) e.updateDocument(this);
+			this.processed.set("updateDocument");
+		}
+		return this;
+	}
+	removeFromDocument(e = !1) {
+		return this;
+	}
+	state(e, t = !1) {
+		for (let n of this.math) n.state(e, t);
+		return e < H.INSERTED && this.processed.clear("updateDocument"), e < H.TYPESET && (this.processed.clear("typeset"), this.processed.clear("getMetrics")), e < H.COMPILED && this.processed.clear("compile"), e < H.FINDMATH && this.processed.clear("findMath"), this;
+	}
+	reset(e = { processed: !0 }) {
+		return e = r(Object.assign({}, xe), e), e.all && Object.assign(e, Se), e.processed && this.processed.reset(), e.inputJax && this.inputJax.forEach((t) => t.reset(...e.inputJax)), e.outputJax && this.outputJax.reset(...e.outputJax), this;
+	}
+	clear() {
+		return this.reset(), this.math.clear(), this;
+	}
+	done() {
+		return Promise.resolve();
+	}
+	concat(e) {
+		return this.math.merge(e), this;
+	}
+	clearMathItemsWithin(e) {
+		let t = this.getMathItemsWithin(e);
+		for (let e of t.slice(0).reverse()) e.clear();
+		return this.math.remove(...t), t;
+	}
+	getMathItemsWithin(e) {
+		Array.isArray(e) || (e = [e]);
+		let t = this.adaptor, n = [], r = t.getElements(e, this.document);
+		ITEMS: for (let e of this.math) for (let i of r) if (e.start.node && t.contains(i, e.start.node)) {
+			n.push(e);
+			continue ITEMS;
+		}
+		return n;
+	}
+};
+Z.KIND = "MathDocument", Z.OPTIONS = {
+	OutputJax: null,
+	InputJax: null,
+	MmlFactory: null,
+	MathList: Te,
+	MathItem: Ee,
+	compileError: (e, t, n) => {
+		e.compileError(t, n);
+	},
+	typesetError: (e, t, n) => {
+		e.typesetError(t, n);
+	},
+	renderActions: n({
+		find: [
+			H.FINDMATH,
+			"findMath",
+			"",
+			!1
+		],
+		compile: [H.COMPILED],
+		metrics: [
+			H.METRICS,
+			"getMetrics",
+			"",
+			!1
+		],
+		typeset: [H.TYPESET],
+		update: [
+			H.INSERTED,
+			"updateDocument",
+			!1
+		]
+	})
+}, Z.ProcessBits = ye("findMath", "compile", "getMetrics", "typeset", "updateDocument");
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/Handler.js
+var De = class extends Z {}, Oe = class {
+	constructor(e, t = 5) {
+		this.documentClass = De, this.adaptor = e, this.priority = t;
+	}
+	get name() {
+		return this.constructor.NAME;
+	}
+	handlesDocument(e) {
+		return !1;
+	}
+	create(e, t) {
+		return new this.documentClass(e, this.adaptor, t);
+	}
+};
+Oe.NAME = "generic";
+//#endregion
+//#region node_modules/@mathjax/src/mjs/handlers/html/HTMLMathItem.js
+var ke = class extends V {
+	get adaptor() {
+		return this.inputJax.adaptor;
+	}
+	constructor(e, t, n = !0, r = {
+		node: null,
+		n: 0,
+		delim: ""
+	}, i = {
+		node: null,
+		n: 0,
+		delim: ""
+	}) {
+		super(e, t, n, r, i);
+	}
+	updateDocument(e) {
+		if (this.state() < H.INSERTED) {
+			if (this.inputJax.processStrings) {
+				let e = this.start.node;
+				if (e === this.end.node) this.end.n && this.end.n < this.adaptor.value(this.end.node).length && this.adaptor.split(this.end.node, this.end.n), this.start.n && (e = this.adaptor.split(this.start.node, this.start.n)), this.adaptor.parent(e) && this.adaptor.replace(this.typesetRoot, e);
+				else {
+					for (this.start.n && (e = this.adaptor.split(e, this.start.n)); e !== this.end.node;) {
+						let t = this.adaptor.next(e);
+						this.adaptor.remove(e), e = t;
+					}
+					this.adaptor.insert(this.typesetRoot, e), this.end.n < this.adaptor.value(e).length && this.adaptor.split(e, this.end.n), this.adaptor.remove(e);
+				}
+			} else this.adaptor.replace(this.typesetRoot, this.start.node);
+			this.start.node = this.end.node = this.typesetRoot, this.start.n = this.end.n = 0, this.state(H.INSERTED);
+		}
+	}
+	updateStyleSheet(e) {
+		e.addStyleSheet();
+	}
+	removeFromDocument(e = !1) {
+		if (super.removeFromDocument(e), this.state() >= H.TYPESET) {
+			let t = this.adaptor, n = this.start.node, r = t.text("");
+			if (e) {
+				let e = this.start.delim + this.math + this.end.delim;
+				if (this.inputJax.processStrings) r = t.text(e);
+				else {
+					let n = t.parse(e, "text/html");
+					r = t.firstChild(t.body(n));
+				}
+			}
+			t.parent(n) && t.replace(r, n), this.start.node = this.end.node = r, this.start.n = this.end.n = 0;
+		}
+	}
+}, Ae = class extends he {}, Q = class {
+	constructor(e = null) {
+		let t = this.constructor;
+		this.options = r(i({}, t.OPTIONS), e), this.init(), this.getPatterns();
+	}
+	init() {
+		this.strings = [], this.string = "", this.snodes = [], this.nodes = [], this.stack = [];
+	}
+	getPatterns() {
+		let e = t(this.options.skipHtmlTags), n = t(this.options.ignoreHtmlClass), r = t(this.options.processHtmlClass);
+		this.skipHtmlTags = RegExp("^(?:" + e.join("|") + ")$", "i"), this.ignoreHtmlClass = RegExp("(?:^| )(?:" + n.join("|") + ")(?: |$)"), this.processHtmlClass = RegExp("(?:^| )(?:" + r + ")(?: |$)");
+	}
+	pushString() {
+		this.string.match(/\S/) && (this.strings.push(this.string), this.nodes.push(this.snodes)), this.string = "", this.snodes = [];
+	}
+	extendString(e, t) {
+		this.snodes.push([e, t.length]), this.string += t;
+	}
+	handleText(e, t) {
+		return t || this.extendString(e, this.adaptor.value(e)), this.adaptor.next(e);
+	}
+	handleTag(e, t) {
+		if (!t) {
+			let t = this.options.includeHtmlTags[this.adaptor.kind(e)];
+			t instanceof Function ? this.extendString(e, t(e, this.adaptor)) : this.extendString(e, t);
+		}
+		return this.adaptor.next(e);
+	}
+	handleContainer(e, t) {
+		this.pushString();
+		let n = this.adaptor.getAttribute(e, "class") || "", r = this.adaptor.kind(e) || "", i = this.processHtmlClass.exec(n), a = e;
+		return this.adaptor.firstChild(e) && !this.adaptor.getAttribute(e, "data-MJX") && (i || !this.skipHtmlTags.exec(r)) ? (this.adaptor.next(e) && this.stack.push([this.adaptor.next(e), t]), a = this.adaptor.firstChild(e), t = (t || this.ignoreHtmlClass.exec(n)) && !i) : a = this.adaptor.next(e), [a, t];
+	}
+	handleOther(e, t) {
+		return this.pushString(), this.adaptor.next(e);
+	}
+	find(e) {
+		this.init();
+		let t = this.adaptor.next(e), n = !1, r = this.options.includeHtmlTags;
+		for (; e && e !== t;) {
+			let t = this.adaptor.kind(e);
+			t === "#text" ? e = this.handleText(e, n) : Object.hasOwn(r, t) ? e = this.handleTag(e, n) : t ? [e, n] = this.handleContainer(e, n) : e = this.handleOther(e, n), !e && this.stack.length && (this.pushString(), [e, n] = this.stack.pop());
+		}
+		this.pushString();
+		let i = [this.strings, this.nodes];
+		return this.init(), i;
+	}
+};
+//#endregion
+//#region node_modules/@mathjax/src/mjs/handlers/html/HTMLDocument.js
+Q.OPTIONS = {
+	skipHtmlTags: [
+		"script",
+		"noscript",
+		"style",
+		"textarea",
+		"pre",
+		"code",
+		"math",
+		"select",
+		"option",
+		"mjx-container"
+	],
+	includeHtmlTags: n({
+		br: "\n",
+		wbr: "",
+		"#comment": ""
+	}),
+	ignoreHtmlClass: "mathjax_ignore",
+	processHtmlClass: "mathjax_process"
+}, fe("STYLES", H.INSERTED + 1);
+var $ = class extends Z {
+	constructor(t, n, r) {
+		let [i, a] = e(r, Q.OPTIONS);
+		super(t, n, i), this.domStrings = this.options.DomStrings || new Q(a), this.domStrings.adaptor = n, this.styles = [];
+	}
+	findPosition(e, t, n, r) {
+		let i = this.adaptor, a = 1 / (r[e].length || 1), o = e;
+		for (let [s, c] of r[e]) {
+			if (t <= c && i.kind(s) === "#text") return {
+				i: o,
+				node: s,
+				n: Math.max(t, 0),
+				delim: n
+			};
+			t -= c, o += a;
+		}
+		return {
+			node: null,
+			n: 0,
+			delim: n
+		};
+	}
+	mathItem(e, t, n) {
+		let r = e.math, i = this.findPosition(e.n, e.start.n, e.open, n), a = this.findPosition(e.n, e.end.n, e.close, n);
+		return new this.options.MathItem(r, t, e.display, i, a);
+	}
+	findMath(e) {
+		if (!this.processed.isSet("findMath")) {
+			this.adaptor.document = this.document, e = r({ elements: this.options.elements || [this.adaptor.body(this.document)] }, e);
+			let t = this.adaptor.getElements(e.elements, this.document);
+			for (let e of this.inputJax) {
+				let n = e.processStrings ? this.findMathFromStrings(e, t) : this.findMathFromDOM(e, t);
+				this.math.merge(n);
+			}
+			this.processed.set("findMath");
+		}
+		return this;
+	}
+	findMathFromStrings(e, t) {
+		let n = [], r = [];
+		for (let e of t) {
+			let [t, i] = this.domStrings.find(e);
+			n.push(...t), r.push(...i);
+		}
+		let i = new this.options.MathList();
+		for (let t of e.findMath(n)) i.push(this.mathItem(t, e, r));
+		return i;
+	}
+	findMathFromDOM(e, t) {
+		let n = [];
+		for (let r of t) for (let t of e.findMath(r)) n.push(new this.options.MathItem(t.math, e, t.display, t.start, t.end));
+		return new this.options.MathList(...n);
+	}
+	updateDocument() {
+		return this.processed.isSet("updateDocument") || (this.addPageElements(), this.addStyleSheet(), super.updateDocument(), this.processed.set("updateDocument")), this;
+	}
+	addPageElements() {
+		let e = this.adaptor, t = e.body(this.document), n = this.documentPageElements();
+		if (n) {
+			let r = e.firstChild(t);
+			r ? e.insert(n, r) : e.append(t, n);
+		}
+	}
+	addStyleSheet() {
+		let e = this.documentStyleSheet(), t = this.adaptor;
+		if (e && !t.parent(e)) {
+			let n = t.head(this.document), r = this.findSheet(n, t.getAttribute(e, "id"));
+			r ? t.replace(e, r) : t.append(n, e);
+		}
+	}
+	findSheet(e, t) {
+		if (t) {
+			for (let n of this.adaptor.tags(e, "style")) if (this.adaptor.getAttribute(n, "id") === t) return n;
+		}
+		return null;
+	}
+	removeFromDocument(e = !1) {
+		if (this.processed.isSet("updateDocument")) for (let t of this.math) t.state() >= H.INSERTED && t.state(H.TYPESET, e);
+		return this.processed.clear("updateDocument"), this;
+	}
+	documentStyleSheet() {
+		return this.outputJax.styleSheet(this);
+	}
+	documentPageElements() {
+		return this.outputJax.pageElements(this);
+	}
+	addStyles(e) {
+		this.styles.push(e), "insertStyles" in this.outputJax && this.outputJax.insertStyles(e);
+	}
+	getStyles() {
+		return this.styles;
+	}
+};
+$.KIND = "HTML", $.OPTIONS = Object.assign(Object.assign({}, Z.OPTIONS), {
+	renderActions: n(Object.assign(Object.assign({}, Z.OPTIONS.renderActions), { styles: [
+		H.STYLES,
+		"",
+		"updateStyleSheet",
+		!1
+	] })),
+	MathList: Ae,
+	MathItem: ke,
+	DomStrings: null
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/handlers/html/HTMLHandler.js
+var je = class extends Oe {
+	constructor() {
+		super(...arguments), this.documentClass = $;
+	}
+	handlesDocument(e) {
+		let t = this.adaptor;
+		if (typeof e == "string") try {
+			e = t.parse(e, "text/html");
+		} catch {}
+		return e instanceof t.window.Document || e instanceof t.window.HTMLElement || e instanceof t.window.DocumentFragment;
+	}
+	create(e, t) {
+		let n = this.adaptor;
+		if (typeof e == "string") e = n.parse(e, "text/html");
+		else if (e instanceof n.window.HTMLElement || e instanceof n.window.DocumentFragment) {
+			let t = e;
+			e = n.parse("", "text/html"), n.append(n.body(e), t);
+		}
+		return super.create(e, t);
+	}
+};
+//#endregion
+//#region node_modules/@mathjax/src/mjs/handlers/html.js
+function Me(e) {
+	let t = new je(e);
+	return o.handlers.register(t), t;
+}
+//#endregion
+export { Me as RegisterHTMLHandler };

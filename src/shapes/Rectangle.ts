@@ -2,6 +2,7 @@ import {AbstractShape} from "./AbstractShape"
 import {DrawingMode, ShapeOptions} from "./Adaptable"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
 import type {IDrawingContext} from "../core/DrawingContext"
+import type {ToolMode} from "../types"
 
 export interface RectangleConfig {
     p1: { x: number; y: number }
@@ -17,6 +18,11 @@ export class Rectangle extends AbstractShape {
     w: number
     cursorPos: Pt | null = null
     readonly mode: '2pts' | '3pts'
+
+    static readonly modes: ToolMode[] = [
+        { id: '2pts', icon: 'tool-rect-2pts' },
+        { id: '3pts', icon: 'tool-rect-3pts' },
+    ]
 
     override readonly canBeFilled = true
     readonly drawingMode: DrawingMode

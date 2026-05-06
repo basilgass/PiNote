@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ToolType } from "../../types"
-import { useNoteStore } from "../../store/useNoteStore"
-import PiIcon from "./PiIcon.vue"
+import {ShapeFactory} from "@core/ShapeFactory"
+import PiIcon from "../PiIcon.vue"
+import {useNoteStore} from "../../../store/useNoteStore"
+import {ToolType} from "../../../types"
 
 const store = useNoteStore()
 
@@ -15,18 +16,20 @@ const TOOL_ICON: Record<string, string> = {
   highlighter: 'highlighter',
   eraser:      'eraser',
   move:        'arrows-up-down-left-right',
+  text:        'tool-text',
   line:        'tool-line',
   segment:     'tool-segment',
   vector:      'tool-vector',
-  circle:      'circle',
   polygon:     'draw-polygon',
+  arc:         'arc',
+  graph:       'tool-graph',
 }
 
 function toolIcon(tool: string): string {
-  if (tool === 'rectangle') {
-    return store.tool.tool === 'rectangle' && store.tool.rectMode === '3pts'
-      ? 'tool-rect-3pts'
-      : 'tool-rect-2pts'
+  const modes = ShapeFactory.getModes(tool as ToolType)
+  if (modes.length > 1) {
+    const cur = store.tool.toolModes[tool as ToolType] ?? modes[0].id
+    return modes.find(m => m.id === cur)?.icon ?? tool
   }
   return TOOL_ICON[tool] ?? tool
 }

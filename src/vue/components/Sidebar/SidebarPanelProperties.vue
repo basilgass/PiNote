@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import {computed} from 'vue'
 import ShapeProperties from './ShapeProperties.vue'
-import { useNoteStore } from '../../store/useNoteStore'
+import {useNoteStore} from "../../../store/useNoteStore"
 
 const store = useNoteStore()
 

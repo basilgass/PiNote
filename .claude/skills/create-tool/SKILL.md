@@ -13,10 +13,11 @@ description: >
 ## Contexte à lire en premier
 
 Avant de générer quoi que ce soit, lire :
-- `C:\websites\PiNote\.claude\docs\pinote.md` — architecture complète (pipeline, shapes, snap, types)
+- `C:\websites\PiNote\.claude\docs\pinote.md` — architecture complète (pipeline, shapes, snap, types, système de modes §7)
 - `C:\websites\PiNote\src\shapes\AbstractShape.ts` — contrat à implémenter (méthodes obligatoires et optionnelles)
-- `C:\websites\PiNote\src\shapes\Segment.ts` — exemple de référence pour un outil 2-clics
-- `C:\websites\PiNote\src\types\index.ts` — `ToolType`, `ToolMemory`, `ToolConfig`
+- `C:\websites\PiNote\src\shapes\Segment.ts` — exemple de référence pour un outil 2-clics (drag)
+- `C:\websites\PiNote\src\shapes\Circle.ts` — référence pour un outil multi-mode avec `multi-click`
+- `C:\websites\PiNote\src\types\index.ts` — `ToolType`, `ToolMode`, `ToolMemory`, `ToolConfig`
 
 ## Langue
 
@@ -34,9 +35,29 @@ Appeler `EnterPlanMode` immédiatement. Tout le travail de cette skill se fait e
 
 En une phrase : nom de l'outil (tiré de ARGUMENTS) et son rôle dans PiNote.
 
-### Étape 3 — Proposer les options
+### Étape 3 — Modes ou outil unique ?
 
-Lister les aspects configurables de l'outil sous forme de choix lettrés (A, B, C…).
+Avant de lister les options, déterminer si l'outil a plusieurs **modes de dessin** (interactions canvas différentes, icônes distinctes) ou s'il est monolithique.
+
+**Quand créer un mode plutôt qu'un nouvel outil :**
+- Le résultat final est le même type de shape (ex : deux façons de dessiner un cercle → même `Circle`)
+- L'interaction change mais les propriétés visuelles restent identiques (couleur, épaisseur, remplissage)
+- L'utilisateur bascule entre les modes en recliquant sur le même bouton d'outil
+
+**Quand créer un outil séparé :**
+- Le résultat est une shape de nature différente (ex : `Line` ≠ `Segment`)
+- Les propriétés visuelles ou le comportement post-dessin diffèrent
+
+**Si l'outil a des modes :**
+- Déclarer `static readonly modes: ToolMode[]` sur la shape (voir §7 de pinote.md)
+- Enregistrer dans `ShapeFactory.getModes()`
+- Ajouter une icône par mode dans `src/vue/icons.ts`
+- Le store, NoteCanvas et ToolSelector fonctionnent sans modification
+
+**Si l'outil est unique :**
+- Pas de `static modes` nécessaire
+
+Ensuite, lister les aspects configurables sous forme de choix lettrés (A, B, C…).
 
 Pour chaque option :
 - Décrire ce qu'elle fait
@@ -62,18 +83,37 @@ Expliquer pas à pas comment l'outil se dessine :
 
 ### Étape 5 — Suggestions constructives
 
+#### Checklist outil complet (nouvel outil = nouvelle shape)
+
 Lister les points techniques à ne pas oublier lors de l'implémentation :
 
-- **ToolType** : comment étendre le type union dans `src/types/index.ts`
-- **ToolMemory** : ajouter l'entrée dans `NoteTools.vue`
-- **ShapeFactory** : ajouter le case dans `create()` et `fromJSON()`
-- **Snap** : quels points exposer dans `getSnapPoints()` (endpoints, midpoint, etc.)
+- **ToolType** : étendre le type union dans `src/types/index.ts` (et `GeomType` si c'est une forme géométrique)
+- **ToolMemory** : ajouter `{ color: '', width: 2 }` dans `toolMemory` du store (`useNoteStore.ts`)
+- **ShapeFactory** : ajouter le `case` dans `create()`
+- **Snap** : quels points exposer dans `getSnapPoints()` (endpoints, midpoint, corners, etc.)
 - **`getSegments()`** : exposer les segments pour que `MidpointSnap` et `IntersectionSnap` puissent les utiliser
 - **`getBounds()`** : cas dégénéré si l'outil est un point unique
 - **`hitTest()`** : stratégie (distance au segment, au contour, à la zone de la tête de flèche ?)
-- **NoteHistory** : label à ajouter dans `TOOL_LABEL` de `NoteHistory.vue`
+- **Icône** : ajouter l'entrée dans `src/vue/icons.ts` (`{ viewBox, content }` — chemin SVG) puis ajouter le nom dans `TOOL_ICON` de `ToolSelector.vue` ; rendu via `<PiIcon>`
+- **NoteHistory** : label à ajouter dans `TOOL_LABEL` de `NoteHistory.vue` **et** de `SidebarPanelHistory.vue`
 - **NoteTools** : onglet "Formes" ou "Dessin" ? position dans le tableau d'outils
 - **Rendu overlay** : est-ce que la sélection (bounding box) couvre bien l'outil ?
+
+#### Checklist mode d'outil (variante d'une shape existante)
+
+Si l'étape 3 a conclu qu'il s'agit d'un **nouveau mode** d'un outil existant :
+
+- **Shape** : ajouter `{ id, icon }` dans `static readonly modes: ToolMode[]` de la classe
+- **Constructeur** : le 3e paramètre `mode` conditionne `drawingMode` et la logique `update/onDrawMove/onDrawClick`
+- **Hooks** : implémenter les hooks nécessaires selon le `drawingMode` choisi :
+  - `'drag'` : `update(x, y)` suffit
+  - `'two-phase'` : `onPhaseTransition(x, y, ctx)` pour la transition
+  - `'multi-click'` : `onDrawStart`, `onDrawMove` (retourne `true`), `onDrawClick` (retourne `'continue'|'done'`), `onDrawEnd`
+- **Preview pointillés** : dans `draw()`, distinguer la phase de preview (état interne `_cursor != null`) pour dessiner en pointillés ; `onDrawEnd()` vide l'état temporaire
+- **Sérialisation** : vérifier que `toJSON()` stocke le format final (ex : `{cx, cy, radius}`) indépendamment du mode de dessin
+- **ShapeFactory.getModes()** : enregistrer la shape si ce n'est pas déjà fait
+- **Icône** : une icône par mode dans `src/vue/icons.ts` (viewBox + content SVG)
+- **Store, NoteCanvas, ToolSelector** : aucune modification nécessaire grâce au système générique
 
 ### Étape 6 — Questions ouvertes
 
@@ -104,4 +144,19 @@ Une fois toutes les réponses reçues :
 
 ## Rappel post-implémentation
 
-À la fin de l'implémentation, ne pas cocher le todo correspondant dans `.claude/docs/todo.md` avant d'avoir posé : **"A-t-on fini avec le todo #titre ? oui / non"** et reçu **"oui"**.
+À la fin de l'implémentation :
+
+1. **Todo** : ne pas cocher le todo correspondant dans `.claude/docs/todo.md` avant d'avoir posé : **"A-t-on fini avec le todo #titre ? oui / non"** et reçu **"oui"**.
+
+2. **Doc** : mettre à jour `C:\websites\PiNote\.claude\docs\pinote.md` pour refléter le nouvel outil. Sections à vérifier et corriger si nécessaire :
+
+   *Nouvel outil (nouvelle shape) :*
+   - §2 Types — ajouter le nouveau `ToolType` dans l'union (et `GeomType` si applicable)
+   - §6 ShapeFactory — ajouter la ligne dans le tableau ToolType → Classe
+   - §7 Shapes — tableau des capacités + description de la shape
+   - §9 Icônes — ajouter la clé d'icône dans la liste des clés disponibles
+   - §13 Vue layer — cas spécial si interaction non standard dans NoteCanvas
+
+   *Nouveau mode d'un outil existant :*
+   - §7 Shapes — mettre à jour la description de la shape (modes, drawingMode, hooks)
+   - §9 Icônes — ajouter la clé d'icône du nouveau mode

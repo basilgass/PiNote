@@ -20,7 +20,7 @@ export interface ShapeOptions {
     fillOpacity?: number
 }
 
-export type ShapePatch = Partial<ShapeOptions> & { bezier?: boolean; closed?: boolean }
+export type ShapePatch = Partial<ShapeOptions> & { bezier?: boolean; closed?: boolean; sector?: boolean }
 
 export interface Capabilities {
     canHaveArrows: boolean

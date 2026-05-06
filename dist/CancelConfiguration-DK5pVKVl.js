@@ -1,0 +1,43 @@
+import { S as e, b as t, o as n, t as r, x as i } from "./Configuration-D9a4xjiL.js";
+import { t as a } from "./ParseUtil-DNGKyXxF.js";
+//#region node_modules/@mathjax/src/mjs/input/tex/enclose/EncloseConfiguration.js
+var o = {
+	"data-arrowhead": 1,
+	color: 1,
+	mathcolor: 1,
+	background: 1,
+	mathbackground: 1,
+	"data-padding": 1,
+	"data-thickness": 1
+};
+new n("enclose", { enclose: { Enclose(e, t) {
+	let n = e.GetArgument(t).replace(/,/g, " "), r = e.GetBrackets(t, ""), i = e.ParseArg(t), s = a.keyvalOptions(r, o);
+	s.notation = n, e.Push(e.create("node", "menclose", [i], s));
+} }.Enclose }), r.create("enclose", { [t.HANDLER]: { [i.MACRO]: ["enclose"] } });
+//#endregion
+//#region node_modules/@mathjax/src/mjs/input/tex/cancel/CancelConfiguration.js
+var s = {
+	Cancel(e, t, n) {
+		let r = e.GetBrackets(t, ""), i = e.ParseArg(t), s = a.keyvalOptions(r, o);
+		s.notation = n, e.Push(e.create("node", "menclose", [i], s));
+	},
+	CancelTo(t, n) {
+		let r = t.GetBrackets(n, ""), i = t.ParseArg(n), s = t.ParseArg(n), c = a.keyvalOptions(r, o);
+		c.notation = [
+			e.Notation.UPDIAGONALSTRIKE,
+			e.Notation.UPDIAGONALARROW,
+			e.Notation.NORTHEASTARROW
+		].join(" "), i = t.create("node", "mpadded", [i], {
+			depth: "-.1em",
+			height: "+.1em",
+			voffset: ".1em"
+		}), t.Push(t.create("node", "msup", [t.create("node", "menclose", [s], c), i]));
+	}
+};
+new n("cancel", {
+	cancel: [s.Cancel, e.Notation.UPDIAGONALSTRIKE],
+	bcancel: [s.Cancel, e.Notation.DOWNDIAGONALSTRIKE],
+	xcancel: [s.Cancel, e.Notation.UPDIAGONALSTRIKE + " " + e.Notation.DOWNDIAGONALSTRIKE],
+	cancelto: s.CancelTo
+}), r.create("cancel", { [t.HANDLER]: { [i.MACRO]: ["cancel"] } });
+//#endregion

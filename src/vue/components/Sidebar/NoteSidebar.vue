@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import {ref, watch} from 'vue'
-import {useNoteStore} from '../../store/useNoteStore'
 import SidebarPanelHistory from './SidebarPanelHistory.vue'
 import SidebarPanelCanvas from './SidebarPanelCanvas.vue'
 import SidebarPanelProperties from './SidebarPanelProperties.vue'
-import SidebarPanelZoom from './SidebarPanelZoom.vue'
 import SidebarPanelLayers from './SidebarPanelLayers.vue'
-import PiIcon from './PiIcon.vue'
+import PiIcon from '../PiIcon.vue'
+import {useNoteStore} from "../../../store/useNoteStore"
 
 const store = useNoteStore()
 
-const openHistory = ref(true)
+const openHistory = ref(false)
 const openCanvas  = ref(false)
-const openProps   = ref(true)
-const openLayers  = ref(true)
+const openProps   = ref(false)
+const openLayers  = ref(false)
 
 // Ouvre automatiquement le panel Propriétés quand une shape est sélectionnée
 watch(() => store.selectedShapeId, (id) => {
@@ -117,14 +116,6 @@ watch(() => store.selectedShapeId, (id) => {
 				><PiIcon icon="chevron-right" /></span>
 			</button>
 			<sidebar-panel-properties v-show="openProps" />
-		</div>
-
-		<!-- 4. Zoom ─────────────────────────────────────── -->
-		<div class="sec-zoom">
-			<div class="sec-row">
-				<span class="sec-label">Zoom</span>
-				<sidebar-panel-zoom />
-			</div>
 		</div>
 	</div>
 </template>

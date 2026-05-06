@@ -11,6 +11,7 @@ export type GeomType =
     | 'rectangle'
     | 'circle'
     | 'polygon'
+    | 'arc'
 
 export type ArrowStyle = 'filled' | 'open'
 export type LineStyle = 'solid' | 'dashed' | 'dotted'
@@ -22,8 +23,15 @@ export type ToolType =
     | 'move'
     | 'select'
     | 'vector'
+    | 'text'
+    | 'graph'
     | GeomType
 
+
+export interface ToolMode {
+    id: string
+    icon: string
+}
 
 export interface ToolConfig {
     tool: ToolType
@@ -31,7 +39,7 @@ export interface ToolConfig {
     width: number
     layer: LayerName | null
     bezier: boolean
-    rectMode?: '2pts' | '3pts'
+    toolModes: Partial<Record<ToolType, string>>
 }
 
 interface ToolState {

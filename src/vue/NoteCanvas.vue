@@ -1,15 +1,19 @@
 <script lang="ts" setup>
-import {onMounted, onUnmounted, ref, shallowRef, watch} from 'vue'
+import type {Component} from 'vue'
+import {computed, onMounted, onUnmounted, ref, shallowRef, watch} from 'vue'
 import {createPinia, getActivePinia, setActivePinia} from 'pinia'
 import {Engine} from '@core/Engine'
 import type {Adaptable} from '../shapes/Adaptable'
-import type {BackgroundState, ToolConfig} from '../types'
+import type {BackgroundState, ToolConfig, ToolType} from '../types'
 import NoteTools from '@pi-vue/NoteTools.vue'
-import NoteSidebar from '@pi-vue/components/NoteSidebar.vue'
+import NoteSidebar from '@pi-vue/components/Sidebar/NoteSidebar.vue'
 import ToolHint from '@pi-vue/components/ToolHint.vue'
+import TextEditDialog from '@pi-vue/components/Widget/TextEditDialog.vue'
+import GraphEditDialog from '@pi-vue/components/Widget/GraphEditDialog.vue'
 import {useCanvasTransform} from '../composables/useCanvasTransform'
 import {useNoteStore} from '../store/useNoteStore'
 import PiIcon from '@pi-vue/components/PiIcon.vue'
+import {AbstractWidgetShape} from '../shapes/AbstractWidgetShape'
 
 // ── Initialisation Pinia (library-safe) ─────────────────────────────────────
 if (!getActivePinia()) setActivePinia(createPinia())
@@ -71,6 +75,18 @@ let movePrevPos = {x: 0, y: 0}
 let isPanning = false
 let panStart = {x: 0, y: 0}
 
+// Widget dialog générique
+const WIDGET_DIALOGS: Partial<Record<ToolType, Component>> = {
+  text:  TextEditDialog,
+  graph: GraphEditDialog,
+}
+
+const isWidgetEditing = ref(false)
+const activeWidgetDialogComponent = shallowRef<Component | null>(null)
+const _activeWidget = shallowRef<AbstractWidgetShape | null>(null)
+const activeWidgetProps = computed(() => _activeWidget.value?.getDialogProps() ?? {})
+let _activeWidgetIsNew = true
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Convertit les coordonnées client d'un PointerEvent en coordonnées canvas (avec transform) */
@@ -88,6 +104,7 @@ function toCanvasCoords(event: PointerEvent): { x: number; y: number } {
 function onPointerDown(event: PointerEvent) {
   if (!event.isPrimary || event.button !== 0) return
   if (!canvasEl.value || !engine.value) return
+  if (isWidgetEditing.value) return
 
   if (store.tool.tool === 'move') {
     isPanning = true
@@ -172,7 +189,7 @@ function onPointerDown(event: PointerEvent) {
     createdAt: startTime,
     x: pos.x,
     y: pos.y,
-    rectMode: store.tool.rectMode,
+    toolMode: store.tool.toolModes[store.tool.tool],
   })
 
   const mode = currentShape.drawingMode ?? 'drag'
@@ -279,10 +296,65 @@ function onPointerUp(event: PointerEvent) {
   }
   isDrawing = false
   if (currentShape) {
+    // Widget : on n'appelle pas endShape() tout de suite — on ouvre le dialog
+    const dialogComp = WIDGET_DIALOGS[currentShape.tool]
+    if (dialogComp && currentShape instanceof AbstractWidgetShape) {
+      if (!currentShape.hasSufficientSize()) {
+        engine.value?.cancelShape()
+        currentShape = null
+        return
+      }
+      _activeWidget.value = currentShape
+      _activeWidgetIsNew = true
+      activeWidgetDialogComponent.value = dialogComp
+      isWidgetEditing.value = true
+      currentShape = null
+      return
+    }
     engine.value?.endShape()
     store.syncFromEngine()
     currentShape = null
   }
+}
+
+function commitWidget(config: unknown) {
+  if (!_activeWidget.value || !engine.value) return
+  _activeWidget.value.applyConfig(config)
+  if (_activeWidgetIsNew) {
+    engine.value.endShape()
+    store.syncFromEngine()
+  } else {
+    engine.value.draw()
+    try { engine.value.saveLocal() } catch { /* ignore */ }
+  }
+  _activeWidget.value = null
+  activeWidgetDialogComponent.value = null
+  isWidgetEditing.value = false
+}
+
+function cancelWidget() {
+  if (!engine.value) return
+  if (_activeWidgetIsNew) engine.value.cancelShape()
+  _activeWidget.value = null
+  activeWidgetDialogComponent.value = null
+  isWidgetEditing.value = false
+}
+
+function onDblClick(event: MouseEvent) {
+  if (!engine.value || isWidgetEditing.value) return
+  const rect = canvasEl.value!.getBoundingClientRect()
+  const x = (event.clientX - rect.left - transform.x) / transform.scale
+  const y = (event.clientY - rect.top  - transform.y) / transform.scale
+  const id = engine.value.findShapeAt(x, y)
+  if (!id) return
+  const shape = engine.value.getShapeById(id)
+  if (!(shape instanceof AbstractWidgetShape)) return
+  const dialogComp = WIDGET_DIALOGS[shape.tool]
+  if (!dialogComp) return
+  _activeWidget.value = shape
+  _activeWidgetIsNew = false
+  activeWidgetDialogComponent.value = dialogComp
+  isWidgetEditing.value = true
 }
 
 // ── Watchers ─────────────────────────────────────────────────────────────────
@@ -292,16 +364,17 @@ watch(() => store.tool.bezier, (val) => {
   if (engine.value) engine.value.bezier = val
 })
 
-// Annule un dessin en cours si l'utilisateur change d'outil ou de mode rectangle
-watch(() => store.tool.rectMode, () => {
-  if (isPhase1Dragging || isPhase2Ready) {
+// Annule un dessin en cours si l'utilisateur change de mode
+watch(() => store.tool.toolModes, () => {
+  if (isPhase1Dragging || isPhase2Ready || isMultiClickDrawing) {
     engine.value?.cancelShape()
     isPhase1Dragging = false
     isPhase2Ready = false
+    isMultiClickDrawing = false
     isDrawing = false
     currentShape = null
   }
-})
+}, { deep: true })
 
 watch(() => store.tool.tool, (newTool) => {
   if (isMultiClickDrawing || isPhase1Dragging || isPhase2Ready) {
@@ -414,7 +487,18 @@ defineExpose({engine})
 			@pointerup.prevent="onPointerUp"
 			@pointerleave.prevent="onPointerUp"
 			@pointercancel="onPointerUp"
+			@dblclick.prevent="onDblClick"
 			@contextmenu.prevent
+		/>
+
+		<!-- Dialog widget (texte, graphe, etc.) -->
+		<component
+			:is="activeWidgetDialogComponent"
+			v-if="isWidgetEditing && activeWidgetDialogComponent"
+			:open="isWidgetEditing"
+			v-bind="activeWidgetProps"
+			@confirm="commitWidget"
+			@cancel="cancelWidget"
 		/>
 
 		<!-- Indication contextuelle de l'outil actif -->

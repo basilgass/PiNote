@@ -1,37 +1,37 @@
 <script lang="ts" setup>
+import {useNoteStore} from '../../store/useNoteStore'
 import PiIcon from './PiIcon.vue'
 
-const emit = defineEmits<{
-  'zoom-in': []
-  'zoom-out': []
-  'fit-view': []
-  'reset-view': []
-}>()
+const store = useNoteStore()
 </script>
 
 <template>
-	<div class="zoom-controls">
+	<div>
 		<button
+			class="btn"
 			title="Zoom +"
-			@click="emit('zoom-in')"
+			@click="store.zoomIn()"
 		>
 			<PiIcon icon="magnifying-glass-plus" />
 		</button>
 		<button
+			class="btn"
 			title="Zoom −"
-			@click="emit('zoom-out')"
+			@click="store.zoomOut()"
 		>
 			<PiIcon icon="magnifying-glass-minus" />
 		</button>
 		<button
+			class="btn"
 			title="Tout afficher"
-			@click="emit('fit-view')"
+			@click="store.fitView()"
 		>
 			<PiIcon icon="expand" />
 		</button>
 		<button
+			class="btn"
 			title="Réinitialiser"
-			@click="emit('reset-view')"
+			@click="store.resetView()"
 		>
 			<PiIcon icon="compress" />
 		</button>

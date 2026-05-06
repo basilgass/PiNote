@@ -4,6 +4,7 @@ import type {Engine} from '@core/Engine'
 import type {Adaptable, ShapePatch} from '../shapes/Adaptable'
 import type {BackgroundState, LayerName, ToolConfig, ToolMemory, ToolType} from '../types'
 import {getConfig} from '../config/PiNoteConfig'
+import {ShapeFactory} from '@core/ShapeFactory'
 import {usePdfStore} from './usePdfStore'
 import {clearPdfCache, clearPdfThumbnails} from '../services/PdfRenderer'
 import {pdfStorageRemove} from '../services/PdfStorage'
@@ -56,7 +57,7 @@ export const useNoteStore = defineStore('note', () => {
     width: _cfg.defaults.width,
     color: _cfg.defaults.color,
     bezier: _cfg.defaults.bezier,
-    rectMode: '2pts',
+    toolModes: {},
   })
 
   /** Mémoire couleur/largeur par outil, pour restaurer la config au changement d'outil */
@@ -72,16 +73,24 @@ export const useNoteStore = defineStore('note', () => {
     circle:      { color: '', width: 2 },
     rectangle:   { color: '', width: 2 },
     polygon:     { color: '', width: 2 },
+    arc:         { color: '', width: 2 },
+    text:        { color: _cfg.defaults.color, width: 24 },
+    graph:       { color: '#333333', width: 2 },
   })
 
   const toolSelectCount = ref(0)
 
   /** Change l'outil actif et restaure sa mémoire couleur/largeur */
   function selectTool(newTool: ToolType) {
-    if (newTool === 'rectangle' && tool.tool === 'rectangle') {
-      tool.rectMode = tool.rectMode === '3pts' ? '2pts' : '3pts'
-      toolSelectCount.value++
-      return
+    if (newTool === tool.tool) {
+      const modes = ShapeFactory.getModes(newTool)
+      if (modes.length > 1) {
+        const cur = tool.toolModes[newTool] ?? modes[0].id
+        const idx = modes.findIndex(m => m.id === cur)
+        tool.toolModes = { ...tool.toolModes, [newTool]: modes[(idx + 1) % modes.length].id }
+        toolSelectCount.value++
+        return
+      }
     }
 
     toolMemory[tool.tool].color = tool.color

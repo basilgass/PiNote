@@ -1,0 +1,617 @@
+import { o as e, t } from "./Options-xGJmd5BJ.js";
+import { t as n } from "./AsyncLoad-Ld932pKv.js";
+import { n as r } from "./Entities-IELpojcS.js";
+import { t as i } from "./Styles-NrSKVl_0.js";
+//#region node_modules/@mathjax/src/mjs/core/DOMAdaptor.js
+var a = class {
+	constructor(e = null) {
+		this.canMeasureNodes = !0, this.document = e;
+	}
+	node(e, t = {}, n = [], r) {
+		let i = this.create(e, r);
+		this.setAttributes(i, t);
+		for (let e of n) this.append(i, e);
+		return i;
+	}
+	setProperty(e, t, n) {
+		e[t] = n;
+	}
+	getProperty(e, t) {
+		return e[t];
+	}
+	setAttributes(e, t) {
+		if (t.style && typeof t.style != "string") for (let n of Object.keys(t.style)) this.setStyle(e, n.replace(/-([a-z])/g, (e, t) => t.toUpperCase()), t.style[n]);
+		if (t.properties) for (let n of Object.keys(t.properties)) e[n] = t.properties[n];
+		for (let n of Object.keys(t)) (n !== "style" || typeof t.style == "string") && n !== "properties" && this.setAttribute(e, n, t[n]);
+	}
+	replace(e, t) {
+		return this.insert(e, t), this.remove(t), t;
+	}
+	childNode(e, t) {
+		return this.childNodes(e)[t];
+	}
+	allClasses(e) {
+		let t = this.getAttribute(e, "class");
+		return t ? t.replace(/  +/g, " ").replace(/^ /, "").replace(/ $/, "").split(/ /) : [];
+	}
+	cssText(e) {
+		return this.kind(e) === "style" ? this.textContent(e) : "";
+	}
+}, o = function(e, t, n, r) {
+	function i(e) {
+		return e instanceof n ? e : new n(function(t) {
+			t(e);
+		});
+	}
+	return new (n ||= Promise)(function(n, a) {
+		function o(e) {
+			try {
+				c(r.next(e));
+			} catch (e) {
+				a(e);
+			}
+		}
+		function s(e) {
+			try {
+				c(r.throw(e));
+			} catch (e) {
+				a(e);
+			}
+		}
+		function c(e) {
+			e.done ? n(e.value) : i(e.value).then(o, s);
+		}
+		c((r = r.apply(e, t || [])).next());
+	});
+}, s = {
+	badCSS: !0,
+	badSizes: !0
+};
+function c(r, i = {}) {
+	var a;
+	return i = e(t({}, s), i), a = class extends r {
+		constructor(...n) {
+			super(n[0]), this.canMeasureNodes = !1;
+			let r = this.constructor;
+			this.options = e(t({}, r.OPTIONS), n[1]);
+		}
+		fontSize(e) {
+			return i.badCSS ? this.options.fontSize : super.fontSize(e);
+		}
+		fontFamily(e) {
+			return i.badCSS ? this.options.fontFamily : super.fontFamily(e);
+		}
+		nodeSize(e, t = 1, n = null) {
+			if (!i.badSizes) return super.nodeSize(e, t, n);
+			let r = this.textContent(e), o = Array.from(r.replace(a.cjkPattern, "")).length;
+			return [(Array.from(r).length - o) * this.options.cjkCharWidth + o * this.options.unknownCharWidth, this.options.unknownCharHeight];
+		}
+		nodeBBox(e) {
+			return i.badSizes ? {
+				left: 0,
+				right: 0,
+				top: 0,
+				bottom: 0
+			} : super.nodeBBox(e);
+		}
+		createWorker(e, t) {
+			return o(this, void 0, void 0, function* () {
+				let { Worker: r } = yield n("node:worker_threads");
+				class i {
+					constructor(e, t = {}) {
+						this.worker = new r(e, t);
+					}
+					addEventListener(e, t) {
+						this.worker.on(e, t);
+					}
+					postMessage(e) {
+						this.worker.postMessage({ data: e });
+					}
+					terminate() {
+						this.worker.terminate();
+					}
+				}
+				let { path: a, maps: o } = t, s = new i(`${a}/${t.worker}`, {
+					type: "module",
+					workerData: { maps: o }
+				});
+				return s.addEventListener("message", e), s;
+			});
+		}
+	}, a.OPTIONS = Object.assign(Object.assign({}, i.badCSS ? {
+		fontSize: 16,
+		fontFamily: "Times"
+	} : {}), i.badSizes ? {
+		cjkCharWidth: 1,
+		unknownCharWidth: .6,
+		unknownCharHeight: .8
+	} : {}), a.cjkPattern = new RegExp([
+		"[",
+		"ᄀ-ᅟ",
+		"〈〉",
+		"⺀-〾",
+		"぀-㉇",
+		"㉐-䶿",
+		"一-꓆",
+		"ꥠ-ꥼ",
+		"가-힣",
+		"豈-﫿",
+		"︐-︙",
+		"︰-﹫",
+		"！-｠￠-￦",
+		"𛀀-𛀁",
+		"🈀-🉑",
+		"𠀀-𿿽",
+		"]"
+	].join(""), "gu"), a;
+}
+//#endregion
+//#region node_modules/@mathjax/src/mjs/adaptors/lite/Element.js
+var l = class {
+	constructor(e, t = {}, n = []) {
+		this.kind = e, this.attributes = Object.assign({}, t), this.children = [...n];
+		for (let e of this.children) e.parent = this;
+		this.styles = null;
+	}
+}, u = class {
+	get kind() {
+		return "#document";
+	}
+	constructor(e = null) {
+		this.defaultView = null, this.root = new l("html", {}, [this.head = new l("head"), this.body = new l("body")]), this.type = "", this.defaultView = e;
+	}
+}, d = class {
+	get kind() {
+		return "#text";
+	}
+	constructor(e = "") {
+		this.value = e;
+	}
+}, f = class extends d {
+	get kind() {
+		return "#comment";
+	}
+}, p = class {
+	constructor(e) {
+		this.nodes = [], this.nodes = [...e];
+	}
+	append(e) {
+		this.nodes.push(e);
+	}
+	[Symbol.iterator]() {
+		let e = 0;
+		return { next() {
+			return e === this.nodes.length ? {
+				value: null,
+				done: !0
+			} : {
+				value: this.nodes[e++],
+				done: !1
+			};
+		} };
+	}
+}, m = "[ \\n]+", h = "[ \\n]*", g = "[A-Za-z][^\0- \"'>/=-]*", _ = "[^\0- \"'>/=-]+", v = `(?:'[^']*'|"[^"]*"|${m})`, y = `(?:'([^']*)'|"([^"]*)"|(${m}))`, b = `${_}(?:${h}=${h}${v})?`, x = `(${_})(?:${h}=${h}${y})?`, S = `(<(?:${g}(?:${m}${b})*${h}/?|/${g}|!--[^]*?--|![^]*?)(?:>|$))`, C = {
+	tag: new RegExp(S, "u"),
+	attr: new RegExp(b, "u"),
+	attrsplit: new RegExp(x, "u")
+}, w = class {
+	parseFromString(e, t = "text/html", n = null) {
+		let r = n.createDocument(), i = n.body(r), a = e.replace(/<\?.*?\?>/g, "").split(C.tag);
+		for (; a.length;) {
+			let e = a.shift(), t = a.shift();
+			e && this.addText(n, i, e), t && t.charAt(t.length - 1) === ">" && (t.charAt(1) === "!" ? this.addComment(n, i, t) : i = t.charAt(1) === "/" ? this.closeTag(n, i, t) : this.openTag(n, i, t, a));
+		}
+		return this.checkDocument(n, r), r;
+	}
+	addText(e, t, n) {
+		return n = r(n), e.append(t, e.text(n));
+	}
+	addComment(e, t, n) {
+		return e.append(t, new f(n));
+	}
+	closeTag(e, t, n) {
+		let r = n.slice(2, n.length - 1).toLowerCase();
+		for (; e.parent(t) && e.kind(t) !== r;) t = e.parent(t);
+		return e.parent(t);
+	}
+	openTag(e, t, n, r) {
+		let i = this.constructor.PCDATA, a = this.constructor.SELF_CLOSING, o = n.match(/<(.*?)[\s\n>/]/)[1].toLowerCase(), s = e.node(o), c = n.replace(/^<.*?[\s\n>]/, "").split(C.attrsplit);
+		return (c.pop().match(/>$/) || c.length < 5) && (this.addAttributes(e, s, c), e.append(t, s), !a[o] && !n.match(/\/>$/) && (i[o] ? this.handlePCDATA(e, s, o, r) : t = s)), t;
+	}
+	addAttributes(e, t, n) {
+		for (; n.length;) {
+			let [, i, a, o, s] = n.splice(0, 5), c = r(a || o || s || "");
+			e.setAttribute(t, i, c);
+		}
+	}
+	handlePCDATA(e, t, n, r) {
+		let i = [], a = "</" + n + ">", o = "";
+		for (; r.length && o !== a;) i.push(o), i.push(r.shift()), o = r.shift();
+		e.append(t, e.text(i.join("")));
+	}
+	checkDocument(e, t) {
+		let n = this.getOnlyChild(e, e.body(t));
+		if (n) {
+			for (let r of e.childNodes(e.body(t))) {
+				if (r === n) break;
+				r instanceof f && r.value.match(/^<!DOCTYPE/) && (t.type = r.value);
+			}
+			switch (e.kind(n)) {
+				case "html":
+					for (let r of n.children) switch (e.kind(r)) {
+						case "head":
+							t.head = r;
+							break;
+						case "body":
+							t.body = r;
+							break;
+					}
+					t.root = n, e.remove(n), e.parent(t.body) !== n && e.append(n, t.body), e.parent(t.head) !== n && e.insert(t.head, t.body);
+					break;
+				case "head":
+					t.head = e.replace(n, t.head);
+					break;
+				case "body":
+					t.body = e.replace(n, t.body);
+					break;
+			}
+		}
+	}
+	getOnlyChild(e, t) {
+		let n = null;
+		for (let r of e.childNodes(t)) if (r instanceof l) {
+			if (n) return null;
+			n = r;
+		}
+		return n;
+	}
+	serialize(e, t, n = !1) {
+		let r = this.constructor.SELF_CLOSING, i = e.kind(t), a = this.allAttributes(e, t, n).map((e) => e.name + "=\"" + this.protectAttribute(e.value, n) + "\"").join(" "), o = this.serializeInner(e, t, n);
+		return `<${i}` + (a ? " " + a : "") + ((!n || o) && !r[i] ? `>${o}</${i}>` : n ? "/>" : ">");
+	}
+	serializeInner(e, t, n = !1) {
+		let r = this.constructor.PCDATA;
+		return Object.hasOwn(r, t.kind) ? e.childNodes(t).map((t) => e.value(t)).join("") : e.childNodes(t).map((t) => {
+			let r = e.kind(t);
+			return r === "#text" ? this.protectHTML(e.value(t)) : r === "#comment" ? t.value : this.serialize(e, t, n);
+		}).join("");
+	}
+	allAttributes(e, t, n) {
+		let r = e.allAttributes(t);
+		if (!n) return r;
+		let i = e.kind(t), a = this.constructor.XMLNS;
+		if (!Object.hasOwn(a, i)) return r;
+		for (let { name: e } of r) if (e === "xmlns") return r;
+		return r.push({
+			name: "xmlns",
+			value: a[i]
+		}), r;
+	}
+	protectAttribute(e, t) {
+		return typeof e != "string" && (e = String(e)), e = e.replace(/&/g, "&amp;").replace(/"/g, "&quot;"), t && (e = e.replace(/</g, "&lt;").replace(/>/g, "&gt;")), e;
+	}
+	protectHTML(e) {
+		return e.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	}
+};
+w.SELF_CLOSING = {
+	area: !0,
+	base: !0,
+	br: !0,
+	col: !0,
+	command: !0,
+	embed: !0,
+	hr: !0,
+	img: !0,
+	input: !0,
+	keygen: !0,
+	link: !0,
+	menuitem: !0,
+	meta: !0,
+	param: !0,
+	source: !0,
+	track: !0,
+	wbr: !0
+}, w.PCDATA = {
+	option: !0,
+	textarea: !0,
+	fieldset: !0,
+	title: !0,
+	style: !0,
+	script: !0
+}, w.XMLNS = {
+	svg: "http://www.w3.org/2000/svg",
+	math: "http://www.w3.org/1998/Math/MathML",
+	html: "http://www.w3.org/1999/xhtml"
+};
+//#endregion
+//#region node_modules/@mathjax/src/mjs/adaptors/lite/Window.js
+var T = class {
+	constructor() {
+		this.DOMParser = w, this.NodeList = p, this.HTMLCollection = p, this.HTMLElement = l, this.DocumentFragment = p, this.Document = u, this.document = new u(this);
+	}
+}, E = function(e, t, n, r) {
+	function i(e) {
+		return e instanceof n ? e : new n(function(t) {
+			t(e);
+		});
+	}
+	return new (n ||= Promise)(function(n, a) {
+		function o(e) {
+			try {
+				c(r.next(e));
+			} catch (e) {
+				a(e);
+			}
+		}
+		function s(e) {
+			try {
+				c(r.throw(e));
+			} catch (e) {
+				a(e);
+			}
+		}
+		function c(e) {
+			e.done ? n(e.value) : i(e.value).then(o, s);
+		}
+		c((r = r.apply(e, t || [])).next());
+	});
+}, D = class extends a {
+	constructor() {
+		super(), this.parser = new w(), this.window = new T();
+	}
+	parse(e, t) {
+		return this.parser.parseFromString(e, t, this);
+	}
+	create(e, t = null) {
+		return new l(e);
+	}
+	text(e) {
+		return new d(e);
+	}
+	comment(e) {
+		return new f(e);
+	}
+	createDocument() {
+		return new u();
+	}
+	head(e = this.document) {
+		return e.head;
+	}
+	body(e = this.document) {
+		return e.body;
+	}
+	root(e = this.document) {
+		return e.root;
+	}
+	doctype(e = this.document) {
+		return e.type;
+	}
+	tags(e, t, n = null, r = null) {
+		let i = [], a = [];
+		if (n) return a;
+		let o = e;
+		for (; o;) {
+			let e = o.kind;
+			if (e !== "#text" && e !== "#comment") {
+				if (o = o, e === t && (a.push(o), a.length === r)) return a;
+				o.children.length && (i = o.children.concat(i));
+			}
+			o = i.shift();
+		}
+		return a;
+	}
+	elementById(e, t) {
+		let n = [], r = e;
+		for (; r;) {
+			if (r.kind !== "#text" && r.kind !== "#comment") {
+				if (r = r, r.attributes.id === t) return r;
+				r.children.length && (n = r.children.concat(n));
+			}
+			r = n.shift();
+		}
+		return null;
+	}
+	elementsByClass(e, t, n = null) {
+		let r = [], i = [], a = e;
+		for (; a;) {
+			if (a.kind !== "#text" && a.kind !== "#comment") {
+				if (a = a, (a.attributes.class || "").trim().split(/ +/).includes(t) && (i.push(a), i.length === n)) return i;
+				a.children.length && (r = a.children.concat(r));
+			}
+			a = r.shift();
+		}
+		return i;
+	}
+	elementsByAttribute(e, t, n, r = null) {
+		let i = [], a = [], o = e;
+		for (; o;) {
+			if (o.kind !== "#text" && o.kind !== "#comment") {
+				if (o = o, o.attributes[t] === n && (a.push(o), a.length === r)) return a;
+				o.children.length && (i = o.children.concat(i));
+			}
+			o = i.shift();
+		}
+		return a;
+	}
+	getElements(e, t) {
+		let n = [], r = this.body(t);
+		for (let t of e) if (typeof t == "string") if (t.charAt(0) === "#") {
+			let e = this.elementById(r, t.slice(1));
+			e && n.push(e);
+		} else if (t.charAt(0) === ".") n = n.concat(this.elementsByClass(r, t.slice(1)));
+		else if (t.match(/^[-a-z][-a-z0-9]*$/i)) n = n.concat(this.tags(r, t));
+		else {
+			let e = t.match(/^\[(.*?)="(.*?)"\]$/);
+			e && (n = n.concat(this.elementsByAttribute(r, e[1], e[2])));
+		}
+		else Array.isArray(t) ? n = n.concat(t) : t instanceof this.window.NodeList || t instanceof this.window.HTMLCollection ? n = n.concat(t.nodes) : n.push(t);
+		return n;
+	}
+	getElement(e, t = this.document) {
+		if (t instanceof u && (t = this.body(t)), e.charAt(0) === "#") return this.elementById(t, e.slice(1));
+		if (e.charAt(0) === ".") return this.elementsByClass(t, e.slice(1), 1)[0];
+		if (e.match(/^[-a-z][-a-z0-9]*$/i)) return this.tags(t, e, null, 1)[0];
+		let n = e.match(/^\[(.*?)="(.*?)"\]$/);
+		return n ? this.elementsByAttribute(t, n[1], n[2], 1)[0] : null;
+	}
+	contains(e, t) {
+		for (; t && t !== e;) t = this.parent(t);
+		return !!t;
+	}
+	parent(e) {
+		return e.parent;
+	}
+	childIndex(e) {
+		return e.parent ? e.parent.children.findIndex((t) => t === e) : -1;
+	}
+	append(e, t) {
+		return t.parent && this.remove(t), e.children.push(t), t.parent = e, t;
+	}
+	insert(e, t) {
+		if (e.parent && this.remove(e), t && t.parent) {
+			let n = this.childIndex(t);
+			t.parent.children.splice(n, 0, e), e.parent = t.parent;
+		}
+	}
+	remove(e) {
+		let t = this.childIndex(e);
+		return t >= 0 && e.parent.children.splice(t, 1), e.parent = null, e;
+	}
+	replace(e, t) {
+		let n = this.childIndex(t);
+		return n >= 0 && (t.parent.children[n] = e, e.parent = t.parent, t.parent = null), t;
+	}
+	clone(e, t = !0) {
+		let n = new l(e.kind);
+		return n.attributes = Object.assign({}, e.attributes), n.children = t ? e.children.map((e) => {
+			if (e.kind === "#text") return new d(e.value);
+			if (e.kind === "#comment") return new f(e.value);
+			{
+				let t = this.clone(e);
+				return t.parent = n, t;
+			}
+		}) : [], n;
+	}
+	split(e, t) {
+		let n = new d(e.value.slice(t));
+		return e.value = e.value.slice(0, t), e.parent.children.splice(this.childIndex(e) + 1, 0, n), n.parent = e.parent, n;
+	}
+	next(e) {
+		let t = e.parent;
+		if (!t) return null;
+		let n = this.childIndex(e) + 1;
+		return n >= 0 && n < t.children.length ? t.children[n] : null;
+	}
+	previous(e) {
+		let t = e.parent;
+		if (!t) return null;
+		let n = this.childIndex(e) - 1;
+		return n >= 0 ? t.children[n] : null;
+	}
+	firstChild(e) {
+		return e.children[0];
+	}
+	lastChild(e) {
+		return e.children[e.children.length - 1];
+	}
+	childNodes(e) {
+		return [...e.children];
+	}
+	childNode(e, t) {
+		return e.children[t];
+	}
+	kind(e) {
+		return e.kind;
+	}
+	value(e) {
+		return e.kind === "#text" ? e.value : e.kind === "#comment" ? e.value.replace(/^<!(--)?((?:.|\n)*)\1>$/, "$2") : "";
+	}
+	textContent(e) {
+		return e.children.reduce((e, t) => e + (t.kind === "#text" ? t.value : t.kind === "#comment" ? "" : this.textContent(t)), "");
+	}
+	innerHTML(e) {
+		return this.parser.serializeInner(this, e);
+	}
+	outerHTML(e) {
+		return this.parser.serialize(this, e);
+	}
+	serializeXML(e) {
+		return this.parser.serialize(this, e, !0);
+	}
+	setAttribute(e, t, n, r = null) {
+		typeof n != "string" && (n = String(n)), r && (t = r.replace(/.*\//, "") + ":" + t.replace(/^.*:/, "")), e.attributes[t] = n, t === "style" && (e.styles = null);
+	}
+	getAttribute(e, t) {
+		return e.attributes[t];
+	}
+	removeAttribute(e, t) {
+		delete e.attributes[t];
+	}
+	hasAttribute(e, t) {
+		return Object.hasOwn(e.attributes, t);
+	}
+	allAttributes(e) {
+		let t = e.attributes, n = [];
+		for (let e of Object.keys(t)) n.push({
+			name: e,
+			value: t[e]
+		});
+		return n;
+	}
+	addClass(e, t) {
+		let n = e.attributes.class?.split(/ /) || [];
+		n.includes(t) || (n.push(t), e.attributes.class = n.join(" "));
+	}
+	removeClass(e, t) {
+		let n = e.attributes.class?.split(/ /) || [], r = n.indexOf(t);
+		r >= 0 && (n.splice(r, 1), e.attributes.class = n.join(" "));
+	}
+	hasClass(e, t) {
+		return (e.attributes.class || "").split(/ /).includes(t);
+	}
+	setStyle(e, t, n) {
+		e.styles ||= new i(this.getAttribute(e, "style")), e.styles.set(t, n), e.attributes.style = e.styles.cssText;
+	}
+	getStyle(e, t) {
+		if (!e.styles) {
+			let t = this.getAttribute(e, "style");
+			if (!t) return "";
+			e.styles = new i(t);
+		}
+		return e.styles.get(t);
+	}
+	allStyles(e) {
+		return this.getAttribute(e, "style");
+	}
+	insertRules(e, t) {
+		e.children = [this.text(this.textContent(e) + "\n\n" + t.join("\n\n"))];
+	}
+	fontSize(e) {
+		return 0;
+	}
+	fontFamily(e) {
+		return "";
+	}
+	nodeSize(e, t = 1, n = null) {
+		return [0, 0];
+	}
+	nodeBBox(e) {
+		return {
+			left: 0,
+			right: 0,
+			top: 0,
+			bottom: 0
+		};
+	}
+	createWorker() {
+		return E(this, void 0, void 0, function* () {
+			return null;
+		});
+	}
+}, O = class extends c(D) {};
+function k(e = null) {
+	return new O(null, e);
+}
+//#endregion
+export { k as liteAdaptor };

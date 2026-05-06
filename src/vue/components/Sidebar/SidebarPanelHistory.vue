@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useNoteStore } from '../../store/useNoteStore'
-import PiIcon from './PiIcon.vue'
+import PiIcon from '../PiIcon.vue'
+import {useNoteStore} from "../../../store/useNoteStore"
 
 const store = useNoteStore()
 
 const TOOL_LABEL: Record<string, string> = {
   pen: 'Stylo', highlighter: 'Surligneur', eraser: 'Gomme', select: 'Sélection',
   line: 'Droite', segment: 'Segment', vector: 'Vecteur', circle: 'Cercle',
-  rectangle: 'Rectangle', polygon: 'Polygone', move: 'Dépl.',
+  rectangle: 'Rectangle', polygon: 'Polygone', arc: 'Arc', move: 'Dépl.', text: 'Texte',
 }
 </script>
 

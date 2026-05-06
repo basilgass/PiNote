@@ -5,6 +5,10 @@ export interface IconDef {
 
 export const ICONS: Record<string, IconDef> = {
   // ── FA Solid ──────────────────────────────────────────────────────────────
+  'tool-text': {
+    viewBox: '0 0 448 512',
+    content: '<path d="M254 52.8C249.3 40.3 237.3 32 224 32s-25.3 8.3-30 20.8L57.8 416H32c-17.7 0-32 14.3-32 32s14.3 32 32 32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32h-1.8l18-48H303.8l18 48H320c-17.7 0-32 14.3-32 32s14.3 32 32 32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32H390.2L254 52.8zm22.8 256H171.2L224 112l52.8 196.8z"/>',
+  },
   'arrow-pointer': {
     viewBox: '0 0 448 512',
     content: '<path d="M77.3 2.5c8.1-4.1 17.9-3.2 25.1 2.3l320 239.9c8.3 6.2 11.6 17 8.4 26.8s-12.4 16.4-22.8 16.4l-152.3 0 88.9 177.7c7.9 15.8 1.5 35-14.3 42.9s-35 1.5-42.9-14.3l-88.9-177.7-91.3 121.8c-6.2 8.3-17 11.6-26.8 8.4S64 434.3 64 424L64 24c0-9.1 5.1-17.4 13.3-21.5z"/>',
@@ -134,5 +138,17 @@ export const ICONS: Record<string, IconDef> = {
   'tool-rect-3pts': {
     viewBox: '0 0 24 24',
     content: '<rect x="5" y="7" width="14" height="10" rx="2" stroke="currentColor" stroke-width="2" fill="none" transform="rotate(-18, 12, 12)"/>',
+  },
+  'circle-3pts': {
+    viewBox: '0 0 24 24',
+    content: '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="3" r="2.5"/><circle cx="19.8" cy="16.5" r="2.5"/><circle cx="4.2" cy="16.5" r="2.5"/>',
+  },
+  'arc': {
+    viewBox: '0 0 24 24',
+    content: '<circle cx="4" cy="20" r="2" fill="currentColor"/><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="20" x2="4" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M 12 20 A 8 8 0 0 0 4 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
+  },
+  'tool-graph': {
+    viewBox: '0 0 24 24',
+    content: '<rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1" opacity="0.4"/><line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1" opacity="0.4"/><path d="M5 17 Q8 9 12 12 Q16 15 19 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
   },
 }

@@ -1,0 +1,981 @@
+import { o as e, t } from "./Options-xGJmd5BJ.js";
+import { b as n, f as r, h as i, m as a, o, p as s, t as c, u as l, v as u, x as d, y as f } from "./mo-CHa-ZBtr.js";
+//#region node_modules/@mathjax/src/mjs/core/OutputJax.js
+var p = class {
+	constructor(n = {}) {
+		this.adaptor = null;
+		let r = this.constructor;
+		this.options = e(t({}, r.OPTIONS), n), this.preFilters = new d(this.options.preFilters), this.postFilters = new d(this.options.postFilters);
+	}
+	get name() {
+		return this.constructor.NAME;
+	}
+	setAdaptor(e) {
+		this.adaptor = e;
+	}
+	initialize() {}
+	reset(...e) {}
+	getMetrics(e) {}
+	styleSheet(e) {
+		return null;
+	}
+	pageElements(e) {
+		return null;
+	}
+	executeFilters(e, t, n, r) {
+		let i = {
+			math: t,
+			document: n,
+			data: r
+		};
+		return e.execute(i), i.data;
+	}
+};
+p.NAME = "generic", p.OPTIONS = {
+	preFilters: [],
+	postFilters: []
+};
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/math.js
+var m = class extends r {
+	get kind() {
+		return "math";
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	get linebreakAlign() {
+		return "";
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		this.attributes.get("mode") === "display" && this.attributes.setInherited("display", "block"), e = this.addInheritedAttributes(e, this.attributes.getAllAttributes()), t = !!this.attributes.get("displaystyle") || !this.attributes.get("displaystyle") && this.attributes.get("display") === "block", this.attributes.setInherited("displaystyle", t), n = this.attributes.get("scriptlevel") || this.constructor.defaults.scriptlevel, super.setChildInheritedAttributes(e, t, n, r);
+	}
+	verifyTree(e = null) {
+		super.verifyTree(e), this.parent && this.mError("Improper nesting of math tags", e, !0);
+	}
+};
+m.defaults = Object.assign(Object.assign({}, r.defaults), {
+	mathvariant: "normal",
+	mathsize: "normal",
+	mathcolor: "",
+	mathbackground: "transparent",
+	dir: "ltr",
+	scriptlevel: 0,
+	displaystyle: !1,
+	display: "inline",
+	maxwidth: "",
+	overflow: "linebreak",
+	altimg: "",
+	"altimg-width": "",
+	"altimg-height": "",
+	"altimg-valign": "",
+	alttext: "",
+	cdgroup: "",
+	scriptsizemultiplier: 1 / Math.sqrt(2),
+	scriptminsize: ".4em",
+	infixlinebreakstyle: "before",
+	lineleading: "100%",
+	linebreakmultchar: "⁢",
+	indentshift: "auto",
+	indentalign: "auto",
+	indenttarget: "",
+	indentalignfirst: "indentalign",
+	indentshiftfirst: "indentshift",
+	indentalignlast: "indentalign",
+	indentshiftlast: "indentshift"
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mi.js
+var h = class e extends a {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mi";
+	}
+	setInheritedAttributes(t = {}, n = !1, r = 0, i = !1) {
+		super.setInheritedAttributes(t, n, r, i), this.getText().match(e.singleCharacter) && !t.mathvariant && this.attributes.setInherited("mathvariant", "italic");
+	}
+	setTeXclass(t) {
+		this.getPrevClass(t);
+		let n = this.getText();
+		return n.length > 1 && n.match(e.operatorName) && this.attributes.get("mathvariant") === "normal" && this.getProperty("autoOP") === void 0 && this.getProperty("texClass") === void 0 && (this.texClass = i.OP, this.setProperty("autoOP", !0)), this;
+	}
+};
+h.defaults = Object.assign({}, a.defaults), h.operatorName = /^[a-z][a-z0-9]*$/i, h.singleCharacter = /^[\uD800-\uDBFF]?.[\u0300-\u036F\u1AB0-\u1ABE\u1DC0-\u1DFF\u20D0-\u20EF]*$/;
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mn.js
+var g = class extends a {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mn";
+	}
+};
+g.defaults = Object.assign({}, a.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mtext.js
+var _ = class e extends a {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mtext";
+	}
+	get isSpacelike() {
+		return !!this.getText().match(/^\s*$/) && !this.attributes.hasOneOf(e.NONSPACELIKE);
+	}
+};
+_.NONSPACELIKE = [
+	"style",
+	"mathbackground",
+	"background"
+], _.defaults = Object.assign({}, a.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mspace.js
+var v = class e extends a {
+	constructor() {
+		super(...arguments), this.texclass = i.NONE;
+	}
+	setTeXclass(e) {
+		return e;
+	}
+	get kind() {
+		return "mspace";
+	}
+	get arity() {
+		return 0;
+	}
+	get isSpacelike() {
+		return !this.attributes.hasExplicit("linebreak") && this.canBreak;
+	}
+	get hasNewline() {
+		let e = this.attributes.get("linebreak");
+		return this.canBreak && (e === "newline" || e === "indentingnewline");
+	}
+	get canBreak() {
+		return !this.attributes.hasOneOf(e.NONSPACELIKE) && String(this.attributes.get("width")).trim().charAt(0) !== "-";
+	}
+};
+v.NONSPACELIKE = [
+	"height",
+	"depth",
+	"style",
+	"mathbackground",
+	"background"
+], v.defaults = Object.assign(Object.assign({}, a.defaults), {
+	width: "0em",
+	height: "0ex",
+	depth: "0ex",
+	linebreak: "auto",
+	indentshift: "auto",
+	indentalign: "auto",
+	indenttarget: "",
+	indentalignfirst: "indentalign",
+	indentshiftfirst: "indentshift",
+	indentalignlast: "indentalign",
+	indentshiftlast: "indentshift"
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/ms.js
+var y = class extends a {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "ms";
+	}
+};
+y.defaults = Object.assign(Object.assign({}, a.defaults), {
+	lquote: "\"",
+	rquote: "\""
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mrow.js
+var b = class extends s {
+	constructor() {
+		super(...arguments), this._core = null;
+	}
+	get kind() {
+		return "mrow";
+	}
+	get isSpacelike() {
+		for (let e of this.childNodes) if (!e.isSpacelike) return !1;
+		return !0;
+	}
+	get isEmbellished() {
+		let e = !1, t = 0;
+		for (let n of this.childNodes) {
+			if (n) {
+				if (n.isEmbellished) {
+					if (e) return !1;
+					e = !0, this._core = t;
+				} else if (!n.isSpacelike) return !1;
+			}
+			t++;
+		}
+		return e;
+	}
+	core() {
+		return !this.isEmbellished || this._core == null ? this : this.childNodes[this._core];
+	}
+	coreMO() {
+		return !this.isEmbellished || this._core == null ? this : this.childNodes[this._core].coreMO();
+	}
+	nonSpaceLength() {
+		let e = 0;
+		for (let t of this.childNodes) t && !t.isSpacelike && e++;
+		return e;
+	}
+	firstNonSpace() {
+		for (let e of this.childNodes) if (e && !e.isSpacelike) return e;
+		return null;
+	}
+	lastNonSpace() {
+		let e = this.childNodes.length;
+		for (; --e >= 0;) {
+			let t = this.childNodes[e];
+			if (t && !t.isSpacelike) return t;
+		}
+		return null;
+	}
+	setTeXclass(e) {
+		if (this.getProperty("open") != null || this.getProperty("close") != null) {
+			this.getPrevClass(e), e = null;
+			for (let t of this.childNodes) e = t.setTeXclass(e);
+			return this.texClass ??= i.INNER, this;
+		}
+		for (let t of this.childNodes) e = t.setTeXclass(e);
+		return this.childNodes[0] && this.updateTeXclass(this.childNodes[0]), e;
+	}
+};
+b.defaults = Object.assign({}, s.defaults);
+var x = class extends b {
+	get kind() {
+		return "inferredMrow";
+	}
+	get isInferred() {
+		return !0;
+	}
+	get notParent() {
+		return !0;
+	}
+	toString() {
+		return "[" + this.childNodes.join(",") + "]";
+	}
+};
+x.defaults = b.defaults;
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mfrac.js
+var S = class extends l {
+	get kind() {
+		return "mfrac";
+	}
+	get arity() {
+		return 2;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	get linebreakAlign() {
+		return "";
+	}
+	setTeXclass(e) {
+		this.getPrevClass(e);
+		for (let e of this.childNodes) e.setTeXclass(null);
+		return this;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		(!t || n > 0) && n++;
+		let i = this.attributes.get("numalign"), a = this.attributes.get("denomalign"), o = this.addInheritedAttributes(Object.assign({}, e), {
+			numalign: i,
+			indentshift: "0",
+			indentalignfirst: i,
+			indentshiftfirst: "0",
+			indentalignlast: "indentalign",
+			indentshiftlast: "indentshift"
+		}), s = this.addInheritedAttributes(Object.assign({}, e), {
+			denalign: a,
+			indentshift: "0",
+			indentalignfirst: a,
+			indentshiftfirst: "0",
+			indentalignlast: "indentalign",
+			indentshiftlast: "indentshift"
+		});
+		this.childNodes[0].setInheritedAttributes(o, !1, n, r), this.childNodes[1].setInheritedAttributes(s, !1, n, !0);
+	}
+};
+S.defaults = Object.assign(Object.assign({}, l.defaults), {
+	linethickness: "medium",
+	numalign: "center",
+	denomalign: "center",
+	bevelled: !1
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/msqrt.js
+var C = class extends s {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "msqrt";
+	}
+	get arity() {
+		return -1;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	setTeXclass(e) {
+		return this.getPrevClass(e), this.childNodes[0].setTeXclass(null), this;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		this.childNodes[0].setInheritedAttributes(e, t, n, !0);
+	}
+};
+C.defaults = Object.assign(Object.assign({}, s.defaults), { "data-vertical-align": "bottom" });
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mroot.js
+var w = class extends s {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mroot";
+	}
+	get arity() {
+		return 2;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	setTeXclass(e) {
+		return this.getPrevClass(e), this.childNodes[0].setTeXclass(null), this.childNodes[1].setTeXclass(null), this;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		this.childNodes[0].setInheritedAttributes(e, t, n, !0), this.childNodes[1].setInheritedAttributes(e, !1, n + 2, r);
+	}
+};
+w.defaults = Object.assign(Object.assign({}, s.defaults), { "data-vertical-align": "bottom" });
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/merror.js
+var T = class extends s {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "merror";
+	}
+	get arity() {
+		return -1;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+};
+T.defaults = Object.assign({}, s.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mpadded.js
+var E = class extends r {
+	get kind() {
+		return "mpadded";
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	setTeXclass(e) {
+		return this.getProperty("vbox") ? (this.getPrevClass(e), this.texClass = i.ORD, this.childNodes[0].setTeXclass(null), this) : super.setTeXclass(e);
+	}
+};
+E.defaults = Object.assign(Object.assign({}, r.defaults), {
+	width: "",
+	height: "",
+	depth: "",
+	lspace: 0,
+	voffset: 0
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mphantom.js
+var D = class extends r {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mphantom";
+	}
+};
+D.defaults = Object.assign({}, r.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mfenced.js
+var O = class extends s {
+	constructor() {
+		super(...arguments), this.texclass = i.INNER, this.separators = [], this.open = null, this.close = null;
+	}
+	get kind() {
+		return "mfenced";
+	}
+	setTeXclass(e) {
+		this.getPrevClass(e), this.open && (e = this.open.setTeXclass(e)), this.childNodes[0] && (e = this.childNodes[0].setTeXclass(e));
+		for (let t = 1, n = this.childNodes.length; t < n; t++) this.separators[t - 1] && (e = this.separators[t - 1].setTeXclass(e)), this.childNodes[t] && (e = this.childNodes[t].setTeXclass(e));
+		return this.close && (e = this.close.setTeXclass(e)), (!this.open || !this.close) && this.updateTeXclass(this.open || this.childNodes[0] || this.close), e;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		this.addFakeNodes();
+		for (let i of [this.open, this.close].concat(this.separators)) i && i.setInheritedAttributes(e, t, n, r);
+		super.setChildInheritedAttributes(e, t, n, r);
+	}
+	addFakeNodes() {
+		let { open: e, close: t, separators: n } = this.attributes.getList("open", "close", "separators");
+		if (e = e.replace(/[ \t\n\r]/g, ""), t = t.replace(/[ \t\n\r]/g, ""), n = n.replace(/[ \t\n\r]/g, ""), e && (this.open = this.fakeNode(e, {
+			fence: !0,
+			form: "prefix"
+		}, i.OPEN)), n) {
+			for (; n.length < this.childNodes.length - 1;) n += n.charAt(n.length - 1);
+			let e = 0;
+			for (let t of this.childNodes.slice(1)) t && this.separators.push(this.fakeNode(n.charAt(e++)));
+		}
+		t && (this.close = this.fakeNode(t, {
+			fence: !0,
+			form: "postfix"
+		}, i.CLOSE));
+	}
+	fakeNode(e, t = {}, n = null) {
+		let r = this.factory.create("text").setText(e), i = this.factory.create("mo", t, [r]);
+		return i.texClass = n, i.parent = this, i;
+	}
+};
+O.defaults = Object.assign(Object.assign({}, s.defaults), {
+	open: "(",
+	close: ")",
+	separators: ","
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/menclose.js
+var k = class extends s {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "menclose";
+	}
+	get arity() {
+		return -1;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	setTeXclass(e) {
+		return e = this.childNodes[0].setTeXclass(e), this.updateTeXclass(this.childNodes[0]), e;
+	}
+};
+k.defaults = Object.assign(Object.assign({}, s.defaults), { notation: "longdiv" });
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/maction.js
+var A = class extends s {
+	get kind() {
+		return "maction";
+	}
+	get arity() {
+		return 1;
+	}
+	get selected() {
+		let e = this.attributes.get("selection"), t = Math.max(1, Math.min(this.childNodes.length, e)) - 1;
+		return this.childNodes[t] || this.factory.create("mrow");
+	}
+	get isEmbellished() {
+		return this.selected.isEmbellished;
+	}
+	get isSpacelike() {
+		return this.selected.isSpacelike;
+	}
+	core() {
+		return this.selected.core();
+	}
+	coreMO() {
+		return this.selected.coreMO();
+	}
+	verifyAttributes(e) {
+		super.verifyAttributes(e), this.attributes.get("actiontype") !== "toggle" && this.attributes.hasExplicit("selection") && this.attributes.unset("selection");
+	}
+	setTeXclass(e) {
+		this.attributes.get("actiontype") === "tooltip" && this.childNodes[1] && this.childNodes[1].setTeXclass(null);
+		let t = this.selected;
+		return e = t.setTeXclass(e), this.updateTeXclass(t), e;
+	}
+	nextToggleSelection() {
+		let e = Math.max(1, parseInt(this.attributes.get("selection")) + 1);
+		e > this.childNodes.length && (e = 1), this.attributes.set("selection", e);
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		var i, a;
+		if (this.attributes.get("actiontype").toLowerCase() !== "tooltip") {
+			super.setChildInheritedAttributes(e, t, n, r);
+			return;
+		}
+		(i = this.childNodes[0]) == null || i.setInheritedAttributes(e, t, n, r), (a = this.childNodes[1]) == null || a.setInheritedAttributes(e, !1, 1, !1);
+	}
+};
+A.defaults = Object.assign(Object.assign({}, s.defaults), {
+	actiontype: "toggle",
+	selection: 1
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/msubsup.js
+var j = class extends l {
+	get kind() {
+		return "msubsup";
+	}
+	get arity() {
+		return 3;
+	}
+	get base() {
+		return 0;
+	}
+	get sub() {
+		return 1;
+	}
+	get sup() {
+		return 2;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		let i = this.childNodes;
+		i[0].setInheritedAttributes(e, t, n, r), i[1].setInheritedAttributes(e, !1, n + 1, r || this.sub === 1), i[2] && i[2].setInheritedAttributes(e, !1, n + 1, r || this.sub === 2);
+	}
+};
+j.defaults = Object.assign(Object.assign({}, l.defaults), {
+	subscriptshift: "",
+	superscriptshift: ""
+});
+var M = class extends j {
+	get kind() {
+		return "msub";
+	}
+	get arity() {
+		return 2;
+	}
+};
+M.defaults = Object.assign({}, j.defaults);
+var N = class extends j {
+	get kind() {
+		return "msup";
+	}
+	get arity() {
+		return 2;
+	}
+	get sup() {
+		return 1;
+	}
+	get sub() {
+		return 2;
+	}
+};
+N.defaults = Object.assign({}, j.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/munderover.js
+var P = class extends l {
+	get kind() {
+		return "munderover";
+	}
+	get arity() {
+		return 3;
+	}
+	get base() {
+		return 0;
+	}
+	get under() {
+		return 1;
+	}
+	get over() {
+		return 2;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		let i = this.childNodes;
+		i[0].setInheritedAttributes(e, t, n, r || !!i[this.over]);
+		let a = !!(!t && i[0].coreMO().attributes.get("movablelimits")), o = this.constructor.ACCENTS;
+		i[1].setInheritedAttributes(e, !1, this.getScriptlevel(o[1], a, n), r || this.under === 1), this.setInheritedAccent(1, o[1], t, n, r, a), i[2] && (i[2].setInheritedAttributes(e, !1, this.getScriptlevel(o[2], a, n), r || this.under === 2), this.setInheritedAccent(2, o[2], t, n, r, a));
+	}
+	getScriptlevel(e, t, n) {
+		return (t || !this.attributes.get(e)) && n++, n;
+	}
+	setInheritedAccent(e, t, n, r, i, a) {
+		let o = this.childNodes[e];
+		if (!this.attributes.hasExplicit(t) && o.isEmbellished) {
+			let e = o.coreMO().attributes.get("accent");
+			this.attributes.setInherited(t, e), e !== this.attributes.getDefault(t) && o.setInheritedAttributes({}, n, this.getScriptlevel(t, a, r), i);
+		}
+	}
+};
+P.defaults = Object.assign(Object.assign({}, l.defaults), {
+	accent: !1,
+	accentunder: !1,
+	align: "center"
+}), P.ACCENTS = [
+	"",
+	"accentunder",
+	"accent"
+];
+var F = class extends P {
+	get kind() {
+		return "munder";
+	}
+	get arity() {
+		return 2;
+	}
+};
+F.defaults = Object.assign({}, P.defaults);
+var I = class extends P {
+	get kind() {
+		return "mover";
+	}
+	get arity() {
+		return 2;
+	}
+	get over() {
+		return 1;
+	}
+	get under() {
+		return 2;
+	}
+};
+I.defaults = Object.assign({}, P.defaults), I.ACCENTS = [
+	"",
+	"accent",
+	"accentunder"
+];
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mmultiscripts.js
+var L = class extends j {
+	get kind() {
+		return "mmultiscripts";
+	}
+	get arity() {
+		return 1;
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		this.childNodes[0].setInheritedAttributes(e, t, n, r);
+		let i = !1;
+		for (let t = 1, a = 0; t < this.childNodes.length; t++) {
+			let o = this.childNodes[t];
+			if (o.isKind("mprescripts")) {
+				if (!i && (i = !0, t % 2 == 0)) {
+					let e = this.factory.create("none");
+					this.childNodes.splice(t, 0, e), e.parent = this, t++;
+				}
+			} else {
+				let t = r || a % 2 == 0;
+				o.setInheritedAttributes(e, !1, n + 1, t), a++;
+			}
+		}
+		this.childNodes.length % 2 == +!!i && (this.appendChild(this.factory.create("none")), this.childNodes[this.childNodes.length - 1].setInheritedAttributes(e, !1, n + 1, r));
+	}
+	verifyChildren(e) {
+		let t = !1, n = e.fixMmultiscripts;
+		for (let r = 0; r < this.childNodes.length; r++) {
+			let i = this.childNodes[r];
+			i.isKind("mprescripts") && (t ? i.mError(i.kind + " can only appear once in " + this.kind, e, !0) : (t = !0, r % 2 == 0 && !n && this.mError("There must be an equal number of prescripts of each type", e)));
+		}
+		this.childNodes.length % 2 == +!!t && !n && this.mError("There must be an equal number of scripts of each type", e), super.verifyChildren(e);
+	}
+};
+L.defaults = Object.assign({}, j.defaults);
+var R = class extends s {
+	get kind() {
+		return "mprescripts";
+	}
+	get arity() {
+		return 0;
+	}
+	verifyTree(e) {
+		super.verifyTree(e), this.parent && !this.parent.isKind("mmultiscripts") && this.mError(this.kind + " must be a child of mmultiscripts", e, !0);
+	}
+};
+R.defaults = Object.assign({}, s.defaults);
+var z = class extends s {
+	get kind() {
+		return "none";
+	}
+	get arity() {
+		return 0;
+	}
+	verifyTree(e) {
+		super.verifyTree(e), this.parent && !this.parent.isKind("mmultiscripts") && this.mError(this.kind + " must be a child of mmultiscripts", e, !0);
+	}
+};
+z.defaults = Object.assign({}, s.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mtable.js
+var B = class extends s {
+	constructor() {
+		super(...arguments), this.properties = { useHeight: !0 }, this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mtable";
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	get linebreakAlign() {
+		return "";
+	}
+	setInheritedAttributes(e, t, n, r) {
+		for (let t of f) e[t] && this.attributes.setInherited(t, e[t][1]), this.attributes.hasExplicit(t) && this.attributes.unset(t);
+		super.setInheritedAttributes(e, t, n, r);
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		for (let e of this.childNodes) e.isKind("mtr") || this.replaceChild(this.factory.create("mtr"), e).appendChild(e);
+		t = !!(this.attributes.getExplicit("displaystyle") || this.attributes.getDefault("displaystyle")), e = this.addInheritedAttributes(e, {
+			columnalign: this.attributes.get("columnalign"),
+			rowalign: "center",
+			"data-break-align": this.attributes.get("data-break-align")
+		});
+		let i = this.attributes.getExplicit("data-cramped"), a = o(this.attributes.get("rowalign"));
+		for (let r of this.childNodes) e.rowalign[1] = a.shift() || e.rowalign[1], r.setInheritedAttributes(e, t, n, !!i);
+	}
+	verifyChildren(e) {
+		let t = null, n = this.factory;
+		for (let r = 0; r < this.childNodes.length; r++) {
+			let i = this.childNodes[r];
+			if (i.isKind("mtr")) t = null;
+			else {
+				let a = i.isKind("mtd");
+				if (t ? (this.removeChild(i), r--) : t = this.replaceChild(n.create("mtr"), i), t.appendChild(a ? i : n.create("mtd", {}, [i])), !e.fixMtables) {
+					i.parent.removeChild(i), i.parent = this, a && t.appendChild(n.create("mtd"));
+					let r = i.mError("Children of " + this.kind + " must be mtr or mlabeledtr", e, a);
+					t.childNodes[t.childNodes.length - 1].appendChild(r);
+				}
+			}
+		}
+		super.verifyChildren(e);
+	}
+	setTeXclass(e) {
+		this.getPrevClass(e);
+		for (let e of this.childNodes) e.setTeXclass(null);
+		return this;
+	}
+};
+B.defaults = Object.assign(Object.assign({}, s.defaults), {
+	align: "axis",
+	rowalign: "baseline",
+	columnalign: "center",
+	groupalign: "{left}",
+	alignmentscope: !0,
+	columnwidth: "auto",
+	width: "auto",
+	rowspacing: "1ex",
+	columnspacing: ".8em",
+	rowlines: "none",
+	columnlines: "none",
+	frame: "none",
+	framespacing: "0.4em 0.5ex",
+	equalrows: !1,
+	equalcolumns: !1,
+	displaystyle: !1,
+	side: "right",
+	minlabelspacing: "0.8em",
+	"data-break-align": "top"
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mtr.js
+var V = class extends s {
+	get kind() {
+		return "mtr";
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	get linebreakAlign() {
+		return "";
+	}
+	setChildInheritedAttributes(e, t, n, r) {
+		for (let e of this.childNodes) e.isKind("mtd") || this.replaceChild(this.factory.create("mtd"), e).appendChild(e);
+		let i = o(this.attributes.get("columnalign")), a = o(this.attributes.get("data-break-align"));
+		this.arity === 1 && (i.unshift(this.parent.attributes.get("side")), a.unshift("top")), e = this.addInheritedAttributes(e, {
+			rowalign: this.attributes.get("rowalign"),
+			columnalign: "center",
+			"data-break-align": "top"
+		});
+		for (let o of this.childNodes) e.columnalign[1] = i.shift() || e.columnalign[1], e["data-vertical-align"] = [this.kind, a.shift() || e["data-break-align"][1]], o.setInheritedAttributes(e, t, n, r);
+	}
+	verifyChildren(e) {
+		if (this.parent && !this.parent.isKind("mtable")) {
+			this.mError(this.kind + " can only be a child of an mtable", e, !0);
+			return;
+		}
+		for (let t of this.childNodes) t.isKind("mtd") || (this.replaceChild(this.factory.create("mtd"), t).appendChild(t), e.fixMtables || t.mError("Children of " + this.kind + " must be mtd", e));
+		super.verifyChildren(e);
+	}
+	setTeXclass(e) {
+		this.getPrevClass(e);
+		for (let e of this.childNodes) e.setTeXclass(null);
+		return this;
+	}
+};
+V.defaults = Object.assign(Object.assign({}, s.defaults), {
+	rowalign: n,
+	columnalign: n,
+	groupalign: n,
+	"data-break-align": "top"
+});
+var H = class extends V {
+	get kind() {
+		return "mlabeledtr";
+	}
+	get arity() {
+		return 1;
+	}
+}, U = class extends l {
+	get kind() {
+		return "mtd";
+	}
+	get arity() {
+		return -1;
+	}
+	get linebreakContainer() {
+		return !0;
+	}
+	get linebreakAlign() {
+		return "columnalign";
+	}
+	verifyChildren(e) {
+		if (this.parent && !this.parent.isKind("mtr")) {
+			this.mError(this.kind + " can only be a child of an mtr or mlabeledtr", e, !0);
+			return;
+		}
+		super.verifyChildren(e);
+	}
+	setTeXclass(e) {
+		return this.getPrevClass(e), this.childNodes[0].setTeXclass(null), this;
+	}
+};
+U.defaults = Object.assign(Object.assign({}, l.defaults), {
+	rowspan: 1,
+	columnspan: 1,
+	rowalign: n,
+	columnalign: n,
+	groupalign: n,
+	"data-vertical-align": "top"
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/mglyph.js
+var W = class extends a {
+	constructor() {
+		super(...arguments), this.texclass = i.ORD;
+	}
+	get kind() {
+		return "mglyph";
+	}
+	verifyAttributes(e) {
+		let { src: t, fontfamily: n, index: r } = this.attributes.getList("src", "fontfamily", "index");
+		t === "" && (n === "" || r === "") ? this.mError("mglyph must have either src or fontfamily and index attributes", e, !0) : super.verifyAttributes(e);
+	}
+};
+W.defaults = Object.assign(Object.assign({}, a.defaults), {
+	alt: "",
+	src: "",
+	index: "",
+	width: "auto",
+	height: "auto",
+	valign: "0em"
+});
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/semantics.js
+var G = class extends l {
+	get kind() {
+		return "semantics";
+	}
+	get arity() {
+		return 1;
+	}
+	get notParent() {
+		return !0;
+	}
+};
+G.defaults = Object.assign(Object.assign({}, l.defaults), {
+	definitionUrl: null,
+	encoding: null
+});
+var K = class extends s {
+	get kind() {
+		return "annotation-xml";
+	}
+	setChildInheritedAttributes() {}
+};
+K.defaults = Object.assign(Object.assign({}, s.defaults), {
+	definitionUrl: null,
+	encoding: null,
+	cd: "mathmlkeys",
+	name: "",
+	src: null
+});
+var q = class extends K {
+	constructor() {
+		super(...arguments), this.properties = { isChars: !0 };
+	}
+	get kind() {
+		return "annotation";
+	}
+};
+q.defaults = Object.assign({}, K.defaults);
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/TeXAtom.js
+var J = class extends l {
+	get kind() {
+		return "TeXAtom";
+	}
+	get arity() {
+		return -1;
+	}
+	get notParent() {
+		return !0;
+	}
+	constructor(e, t, n) {
+		super(e, t, n), this.texclass = i.ORD, this.setProperty("texClass", this.texClass);
+	}
+	setTeXclass(e) {
+		return this.childNodes[0].setTeXclass(null), this.adjustTeXclass(e);
+	}
+	adjustTeXclass(e) {
+		return e;
+	}
+};
+J.defaults = Object.assign({}, l.defaults), J.prototype.adjustTeXclass = c.prototype.adjustTeXclass;
+//#endregion
+//#region node_modules/@mathjax/src/mjs/core/MmlTree/MmlNodes/HtmlNode.js
+var Y = class extends u {
+	get kind() {
+		return "html";
+	}
+	getHTML() {
+		return this.getXML();
+	}
+	setHTML(e, t = null) {
+		try {
+			t.getAttribute(e, "data-mjx-hdw");
+		} catch {
+			e = t.node("span", {}, [e]);
+		}
+		return this.setXML(e, t);
+	}
+	getSerializedHTML() {
+		return this.adaptor.outerHTML(this.xml);
+	}
+	textContent() {
+		return this.adaptor.textContent(this.xml);
+	}
+	toString() {
+		let e = this.adaptor.kind(this.xml);
+		return `HTML=<${e}>...</${e}>`;
+	}
+	verifyTree(e) {
+		if (this.parent && !this.parent.isToken) {
+			this.mError("HTML can only be a child of a token element", e, !0);
+			return;
+		}
+	}
+};
+//#endregion
+export { b as A, D as C, C as D, w as E, h as F, m as I, p as L, v as M, _ as N, S as O, g as P, O as S, T, M as _, G as a, A as b, H as c, L as d, R as f, P as g, F as h, K as i, y as j, x as k, V as l, I as m, J as n, W as o, z as p, q as r, U as s, Y as t, B as u, j as v, E as w, k as x, N as y };

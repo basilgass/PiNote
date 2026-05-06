@@ -8,12 +8,13 @@ import {ShapeFactory, ShapeStartConfig} from "@core/ShapeFactory"
 import {drawGrid, drawHex, drawRuled} from "@core/helper"
 import {SnapRenderer} from "../snap/visual/SnapRenderer"
 import type {IDrawingContext} from "./DrawingContext"
+import {TextShape} from "../shapes/TextShape"
 
 export class Engine {
     public bezier = false // toggle global
     private _title: string = ''
 
-    private static NO_SNAP_TOOLS = new Set<ToolType>(['pen', 'highlighter', 'eraser'])
+    private static NO_SNAP_TOOLS = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'text'])
 
     private container: HTMLDivElement
     private overlay!: Layer
@@ -42,6 +43,7 @@ export class Engine {
     private _snapGridEnabled = false
     private _snapGridSize = 80
     private _gridPreviewTimer: ReturnType<typeof setTimeout> | null = null
+    private _tempFadeTimer: ReturnType<typeof requestAnimationFrame> | null = null
 
     constructor(container: HTMLDivElement, defaultBackground?: BackgroundState) {
         this.container = container
@@ -65,6 +67,9 @@ export class Engine {
 
         this._resizeObserver = new ResizeObserver(() => this.resize())
         this._resizeObserver.observe(this.container)
+
+        // Injecte le callback de re-render pour les TextShapes async
+        TextShape.redrawCallback = () => this.draw()
 
         // Grid snap désactivé par défaut
         this._snapManager.setStrategyEnabled('grid', false)
@@ -108,6 +113,7 @@ export class Engine {
 
     // --- Shape creation ---
     startShape(config: ShapeStartConfig): Adaptable {
+        this._cancelTempFade()
         let startX = config.x
         let startY = config.y
 
@@ -199,23 +205,26 @@ export class Engine {
 
         shape.onDrawEnd?.()
 
+        if (shape.layer === null) {
+            this._startTempFade(shape)
+            return
+        }
+
         this._shapes.push(shape)
         this._undoStack = []
         this._markGeometryDirty()
 
-        if (shape.layer !== null) {
-            const layer = this.getLayer(shape.layer)
-            const ctx = layer.ctx
-            if (shape.layer !== 'BACKGROUND') {
-                const { x: tx, y: ty, scale } = this._viewTransform
-                ctx.save()
-                ctx.translate(tx, ty)
-                ctx.scale(scale, scale)
-                shape.draw(ctx)
-                ctx.restore()
-            } else {
-                shape.draw(ctx)
-            }
+        const layer = this.getLayer(shape.layer)
+        const ctx = layer.ctx
+        if (shape.layer !== 'BACKGROUND') {
+            const { x: tx, y: ty, scale } = this._viewTransform
+            ctx.save()
+            ctx.translate(tx, ty)
+            ctx.scale(scale, scale)
+            shape.draw(ctx)
+            ctx.restore()
+        } else {
+            shape.draw(ctx)
         }
 
         try {
@@ -223,6 +232,41 @@ export class Engine {
         } catch {
             this._shapes.pop()
             this.draw()
+        }
+    }
+
+    private _startTempFade(shape: Adaptable) {
+        this._cancelTempFade()
+        const { x: tx, y: ty, scale } = this._viewTransform
+        const ctx = this._tempLayer.ctx
+        ctx.save()
+        ctx.translate(tx, ty)
+        ctx.scale(scale, scale)
+        shape.draw(ctx)
+        ctx.restore()
+
+        const duration = 500
+        const startTime = performance.now()
+        const animate = (now: number) => {
+            const progress = Math.min((now - startTime) / duration, 1)
+            this._tempLayer.canvas.style.opacity = (1 - progress).toString()
+            if (progress < 1) {
+                this._tempFadeTimer = requestAnimationFrame(animate)
+            } else {
+                this._tempFadeTimer = null
+                this._tempLayer.clear()
+                this._tempLayer.canvas.style.opacity = '1'
+            }
+        }
+        this._tempFadeTimer = requestAnimationFrame(animate)
+    }
+
+    private _cancelTempFade() {
+        if (this._tempFadeTimer !== null) {
+            cancelAnimationFrame(this._tempFadeTimer)
+            this._tempFadeTimer = null
+            this._tempLayer.clear()
+            this._tempLayer.canvas.style.opacity = '1'
         }
     }
 
@@ -534,6 +578,7 @@ export class Engine {
     // A5: annule le dessin en cours sans le finaliser ni sauvegarder
     cancelShape() {
         if (!this._currentShape) return
+        this._cancelTempFade()
         this._currentShape = null
         this.overlay.clear()
         this._tempLayer.clear()
@@ -822,7 +867,7 @@ export class Engine {
         this._geometryDirty = true
     }
 
-    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'move', 'select'])
+    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'move', 'select', 'text'])
 
     hoverSnap(x: number, y: number, tool: ToolType): void {
         if (Engine.HOVER_SNAP_EXCLUDED.has(tool)) return
@@ -856,6 +901,7 @@ export class Engine {
 
     destroy() {
         if (this._gridPreviewTimer) clearTimeout(this._gridPreviewTimer)
+        this._cancelTempFade()
         this._resizeObserver.disconnect()
         this._snapWorkerClient.destroy()
     }

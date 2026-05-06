@@ -1,0 +1,45 @@
+import { C as e } from "./Configuration-D9a4xjiL.js";
+//#region node_modules/@mathjax/src/mjs/input/tex/NodeFactory.js
+var t = class t {
+	constructor() {
+		this.mmlFactory = null, this.factory = {
+			node: t.createNode,
+			token: t.createToken,
+			text: t.createText,
+			error: t.createError
+		};
+	}
+	static createNode(t, n, r = [], i = {}, a) {
+		let o = t.mmlFactory.create(n);
+		return o.setChildren(r), a && o.appendChild(a), e.setProperties(o, i), o;
+	}
+	static createToken(e, t, n = {}, r = "") {
+		let i = e.create("text", r);
+		return e.create("node", t, [], n, i);
+	}
+	static createText(e, t) {
+		return t == null ? null : e.mmlFactory.create("text").setText(t);
+	}
+	static createError(e, t) {
+		let n = e.create("text", t), r = e.create("node", "mtext", [], {}, n);
+		return e.create("node", "merror", [r], { "data-mjx-error": t });
+	}
+	setMmlFactory(e) {
+		this.mmlFactory = e;
+	}
+	set(e, t) {
+		this.factory[e] = t;
+	}
+	setCreators(e) {
+		for (let t in e) this.set(t, e[t]);
+	}
+	create(e, ...t) {
+		let n = (this.factory[e] || this.factory.node)(this, t[0], ...t.slice(1));
+		return e === "node" && this.configuration.addNode(t[0], n), n;
+	}
+	get(e) {
+		return this.factory[e];
+	}
+};
+//#endregion
+export { t };

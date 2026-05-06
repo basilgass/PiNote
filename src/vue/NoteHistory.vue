@@ -53,7 +53,7 @@ watch(() => props.shapes, (shapes) => {
 const TOOL_LABEL: Record<string, string> = {
   pen: 'Stylo', highlighter: 'Surligneur', eraser: 'Gomme', select: 'Sélection',
   line: 'Droite', segment: 'Segment', vector: 'Vecteur', circle: 'Cercle',
-  rectangle: 'Rectangle', polygon: 'Polygone', move: 'Dépl.',
+  rectangle: 'Rectangle', polygon: 'Polygone', arc: 'Arc', move: 'Dépl.', text: 'Texte',
 }
 </script>
 

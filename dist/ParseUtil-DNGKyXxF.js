@@ -1,0 +1,240 @@
+import { t as e } from "./Entities-IELpojcS.js";
+import { h as t } from "./mo-CHa-ZBtr.js";
+import { C as n, g as r, v as i, y as a } from "./Configuration-D9a4xjiL.js";
+//#region node_modules/@mathjax/src/mjs/input/tex/ParseUtil.js
+var o = class {
+	static oneof(...e) {
+		return new this("string", (t) => e.includes(t), (e) => e);
+	}
+	constructor(e, t, n) {
+		this.name = e, this.verify = t, this.convert = n;
+	}
+};
+new o("boolean", (e) => e === "true" || e === "false", (e) => e === "true"), new o("number", (e) => !!e.match(/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/), (e) => parseFloat(e)), new o("integer", (e) => !!e.match(/^[-+]?\d+$/), (e) => parseInt(e)), new o("string", (e) => !0, (e) => e), new o("dimen", (e) => a.matchDimen(e)[0] !== null, (e) => e);
+function s(e, t = !1) {
+	let n = {}, r = e, i, a, o, s = !0;
+	for (; r;) [a, i, r] = l(r, ["=", ","], t, s), s = !1, i === "=" ? ([o, i, r] = l(r, [","], t), o = o === "false" || o === "true" ? JSON.parse(o) : o, n[a] = o) : a && (n[a] = !0);
+	return n;
+}
+function c(e, t) {
+	if (t === 0) return e.replace(/^\s+/, "").replace(/([^\\\s]|^)((?:\\\\)*(?:\\\s)?)?\s+$/, "$1$2");
+	for (; t > 0;) e = e.trim().slice(1, -1), t--;
+	return e;
+}
+function l(e, t, n = !1, r = !1) {
+	let a = e.length, o = 0, s = "", l = 0, u = 0, d = !0;
+	for (; l < a;) {
+		let r = e[l++];
+		switch (r) {
+			case "\\":
+				s += r + (e[l++] || ""), d = !1;
+				continue;
+			case " ": break;
+			case "{":
+				d && u++, o++;
+				break;
+			case "}":
+				if (!o) throw new i("ExtraCloseMissingOpen", "Extra close brace or missing open brace");
+				o--, d = !1;
+				break;
+			default:
+				if (!o && t.includes(r)) return [
+					c(s, n ? Math.min(1, u) : u),
+					r,
+					e.slice(l)
+				];
+				u > o && (u = o), d = !1;
+		}
+		s += r;
+	}
+	if (o) throw new i("ExtraOpenMissingClose", "Extra open brace or missing close brace");
+	return r && u ? [
+		"",
+		"",
+		c(s, 1)
+	] : [
+		c(s, n ? Math.min(1, u) : u),
+		"",
+		e.slice(l)
+	];
+}
+var u = {
+	cols(...e) {
+		return e.map((e) => a.em(e)).join(" ");
+	},
+	fenced(e, i, a, o, s = "", c = "") {
+		let l = e.nodeFactory, u = l.create("node", "mrow", [], {
+			open: i,
+			close: o,
+			texClass: t.INNER
+		}), d;
+		if (s) d = new r("\\" + s + "l" + i, e.parser.stack.env, e).mml();
+		else {
+			let e = l.create("text", i);
+			d = l.create("node", "mo", [], {
+				fence: !0,
+				stretchy: !0,
+				symmetric: !0,
+				texClass: t.OPEN
+			}, e);
+		}
+		if (n.appendChildren(u, [d, a]), s) d = new r("\\" + s + "r" + o, e.parser.stack.env, e).mml();
+		else {
+			let e = l.create("text", o);
+			d = l.create("node", "mo", [], {
+				fence: !0,
+				stretchy: !0,
+				symmetric: !0,
+				texClass: t.CLOSE
+			}, e);
+		}
+		return c && d.attributes.set("mathcolor", c), n.appendChildren(u, [d]), u;
+	},
+	fixedFence(e, r, i, a) {
+		let o = e.nodeFactory.create("node", "mrow", [], {
+			open: r,
+			close: a,
+			texClass: t.ORD
+		});
+		return r && n.appendChildren(o, [u.mathPalette(e, r, "l")]), n.isType(i, "mrow") ? n.appendChildren(o, n.getChildren(i)) : n.appendChildren(o, [i]), a && n.appendChildren(o, [u.mathPalette(e, a, "r")]), o;
+	},
+	mathPalette(e, t, n) {
+		(t === "{" || t === "}") && (t = "\\" + t);
+		let i = "{\\bigg" + n + " " + t + "}", a = "{\\big" + n + " " + t + "}";
+		return new r("\\mathchoice" + i + a + a + a, {}, e).mml();
+	},
+	fixInitialMO(e, r) {
+		for (let i = 0, a = r.length; i < a; i++) {
+			let a = r[i];
+			if (a && !n.isType(a, "mspace") && (!n.isType(a, "TeXAtom") || n.getChildren(a)[0] && n.getChildren(n.getChildren(a)[0]).length)) {
+				if (n.isEmbellished(a) || n.isType(a, "TeXAtom") && n.getTexClass(a) === t.REL) {
+					let t = e.nodeFactory.create("node", "mi");
+					r.unshift(t);
+				}
+				break;
+			}
+		}
+	},
+	internalMath(e, t, n, a) {
+		if (t = t.replace(/ +/g, " "), e.configuration.options.internalMath) return e.configuration.options.internalMath(e, t, n, a);
+		let o = a || e.stack.env.font, s = o ? { mathvariant: o } : {}, c = [], l = 0, d = 0, f, p, m = "", h = 0;
+		if (t.match(/\\?[${}\\]|\\\(|\\(?:eq)?ref\s*\{|\\U/)) {
+			for (; l < t.length;) if (f = t.charAt(l++), f === "$") m === "$" && h === 0 ? (p = e.create("node", "TeXAtom", [new r(t.slice(d, l - 1), {}, e.configuration).mml()]), c.push(p), m = "", d = l) : m === "" && (d < l - 1 && c.push(u.internalText(e, t.slice(d, l - 1), s)), m = "$", d = l);
+			else if (f === "{" && m !== "") h++;
+			else if (f === "}") if (m === "}" && h === 0) {
+				let n = new r(t.slice(d, l), {}, e.configuration).mml();
+				p = e.create("node", "TeXAtom", [n], s), c.push(p), m = "", d = l;
+			} else m !== "" && h && h--;
+			else if (f === "\\") {
+				if (m === "" && t.substring(l).match(/^(eq)?ref\s*\{/)) {
+					let n = RegExp["$&"].length;
+					d < l - 1 && c.push(u.internalText(e, t.slice(d, l - 1), s)), m = "}", d = l - 1, l += n;
+				} else if (f = t.charAt(l++), f === "(" && m === "") d < l - 2 && c.push(u.internalText(e, t.slice(d, l - 2), s)), m = ")", d = l;
+				else if (f === ")" && m === ")" && h === 0) p = e.create("node", "TeXAtom", [new r(t.slice(d, l - 2), {}, e.configuration).mml()]), c.push(p), m = "", d = l;
+				else if (f.match(/[${}\\]/) && m === "") l--, t = t.substring(0, l - 1) + t.substring(l);
+				else if (f === "U") {
+					let e = t.substring(l).match(/^\s*(?:([0-9A-F])|\{\s*([0-9A-F]+)\s*\})/);
+					if (!e) throw new i("BadRawUnicode", "Argument to %1 must a hexadecimal number with 1 to 6 digits", "\\U");
+					let n = String.fromCodePoint(parseInt(e[1] || e[2], 16));
+					t = t.substring(0, l - 2) + n + t.substring(l + e[0].length), l = l - 2 + n.length;
+				}
+			}
+			if (m !== "") throw new i("MathNotTerminated", "Math mode is not properly terminated");
+		}
+		return d < t.length && c.push(u.internalText(e, t.slice(d), s)), n == null ? c.length > 1 && (c = [e.create("node", "mrow", c)]) : c = [e.create("node", "mstyle", c, {
+			displaystyle: !1,
+			scriptlevel: n
+		})], c;
+	},
+	internalText(t, n, r) {
+		n = n.replace(/\n+/g, " ").replace(/^ +/, e.nbsp).replace(/ +$/, e.nbsp);
+		let i = t.create("text", n);
+		return t.create("node", "mtext", [], r, i);
+	},
+	underOver(e, r, i, a, o) {
+		if (u.checkMovableLimits(r), n.isType(r, "munderover") && n.isEmbellished(r)) {
+			n.setProperties(n.getCoreMO(r), {
+				lspace: 0,
+				rspace: 0
+			});
+			let t = e.create("node", "mo", [], { rspace: 0 });
+			r = e.create("node", "mrow", [t, r]);
+		}
+		let s = e.create("node", "munderover", [r]);
+		n.setChild(s, a === "over" ? s.over : s.under, i);
+		let c = s;
+		return o && (c = e.create("node", "TeXAtom", [e.create("node", "mstyle", [s], {
+			displaystyle: !0,
+			scriptlevel: 0
+		})], {
+			texClass: t.OP,
+			movesupsub: !0
+		})), n.setProperty(c, "subsupOK", !0), c;
+	},
+	checkMovableLimits(e) {
+		let t = n.isType(e, "mo") ? n.getForm(e) : null;
+		(n.getProperty(e, "movablelimits") || t && t[3] && t[3].movablelimits) && n.setProperties(e, { movablelimits: !1 });
+	},
+	setArrayAlign(e, t, n) {
+		return n || (t = a.trimSpaces(t || "")), t === "t" ? e.arraydef.align = "baseline 1" : t === "b" ? e.arraydef.align = "baseline -1" : t === "c" ? e.arraydef.align = "axis" : t && (n ? (n.string = `[${t}]` + n.string.slice(n.i), n.i = 0) : e.arraydef.align = t), e;
+	},
+	substituteArgs(e, t, n) {
+		let r = "", a = "", o = 0;
+		for (; o < n.length;) {
+			let s = n.charAt(o++);
+			if (s === "\\") r += s + n.charAt(o++);
+			else if (s === "#") if (s = n.charAt(o++), s === "#") r += s;
+			else {
+				if (!s.match(/[1-9]/) || parseInt(s, 10) > t.length) throw new i("IllegalMacroParam", "Illegal macro parameter reference");
+				a = u.addArgs(e, u.addArgs(e, a, r), t[parseInt(s, 10) - 1]), r = "";
+			}
+			else r += s;
+		}
+		return u.addArgs(e, a, r);
+	},
+	addArgs(e, t, n) {
+		if (n.match(/^[a-z]/i) && t.match(/(^|[^\\])(\\\\)*\\[a-z]+$/i) && (t += " "), t.length + n.length > e.configuration.options.maxBuffer) throw new i("MaxBufferSize", "MathJax internal buffer size exceeded; is there a recursive macro call?");
+		return t + n;
+	},
+	checkMaxMacros(e, t = !0) {
+		if (!(++e.macroCount <= e.configuration.options.maxMacros)) throw t ? new i("MaxMacroSub1", "MathJax maximum macro substitution count exceeded; is here a recursive macro call?") : new i("MaxMacroSub2", "MathJax maximum substitution count exceeded; is there a recursive latex environment?");
+	},
+	checkEqnEnv(e, t = !0) {
+		let n = e.stack.Top(), r = n.First;
+		if (!(n.getProperty("nestable") && t && !r || n.getProperty("nestStart")) && (!n.isKind("start") || r)) throw new i("ErroneousNestingEq", "Erroneous nesting of equation structures");
+	},
+	copyNode(e, t) {
+		let n = e.copy(), r = t.configuration;
+		return n.walkTree((e) => {
+			r.addNode(e.kind, e);
+			let t = (e.getProperty("in-lists") || "").split(/,/);
+			for (let n of t) n && r.addNode(n, e);
+		}), n;
+	},
+	mmlFilterAttribute(e, t, n) {
+		return n;
+	},
+	getFontDef(e) {
+		let t = e.stack.env.font;
+		return t ? { mathvariant: t } : {};
+	},
+	keyvalOptions(e, t = null, n = !1, r = !1) {
+		let a = s(e, r);
+		if (t) for (let e of Object.keys(a)) if (Object.hasOwn(t, e)) {
+			if (t[e] instanceof o) {
+				let n = t[e], r = String(a[e]);
+				if (!n.verify(r)) throw new i("InvalidValue", "Value for key '%1' is not of the expected type", e);
+				a[e] = n.convert(r);
+			}
+		} else {
+			if (n) throw new i("InvalidOption", "Invalid option: %1", e);
+			delete a[e];
+		}
+		return a;
+	},
+	isLatinOrGreekChar(e) {
+		return !!e.normalize("NFD").match(/[a-zA-Z\u0370-\u03F0]/);
+	}
+};
+//#endregion
+export { u as t };

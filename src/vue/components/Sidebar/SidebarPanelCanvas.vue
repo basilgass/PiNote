@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import {computed, ref, watch, watchEffect} from 'vue'
-import type {BackgroundMode} from '../../types'
-import {useNoteStore} from '../../store/useNoteStore'
-import {usePdfStore} from '../../store/usePdfStore'
-import {getConfig} from '../../config/PiNoteConfig'
-import PiIcon from './PiIcon.vue'
-import PagesDialog from './PagesDialog.vue'
+import PagesDialog from '../PagesDialog.vue'
+import {usePdfStore} from "../../../store/usePdfStore"
+import {BackgroundMode} from "../../../types"
+import {getConfig} from "../../../config/PiNoteConfig"
+import {useNoteStore} from "../../../store/useNoteStore"
 
 const store = useNoteStore()
 const pdfStore = usePdfStore()
@@ -359,7 +358,10 @@ function patchBackground(patch: Record<string, unknown>, section: 'grid' | 'rule
 			class="canvas-field"
 		>
 			<span class="sec-label">Fichier</span>
-			<span class="opt-val" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+			<span
+				class="opt-val"
+				style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+			>
 				{{ pdfNames[currentPage.pdfId] ?? currentPage.pdfId }}
 				<template v-if="currentPage.pdfPageIndex !== undefined">
 					(p.&nbsp;{{ currentPage.pdfPageIndex + 1 }})

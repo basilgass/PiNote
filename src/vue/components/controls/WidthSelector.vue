@@ -18,12 +18,18 @@ const widths = computed<number[]>(() => {
       return [16, 24, 32]
     case 'eraser':
       return [10, 20, 30]
+    case 'text':
+      return [16, 24, 32]
     default:
       return [2, 4, 6]
   }
 })
 
-const maxWidth = computed(() => props.tool === 'eraser' ? 60 : 30)
+const maxWidth = computed(() => {
+  if (props.tool === 'eraser') return 60
+  if (props.tool === 'text')   return 72
+  return 30
+})
 const isEraser = computed(() => props.tool === 'eraser')
 
 function onInput(e: Event) {
