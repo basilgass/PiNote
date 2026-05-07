@@ -1,22 +1,88 @@
 import {Layer} from "@core/Layer"
 import {BackgroundMode, BackgroundState, LayerName, ToolType} from "../types"
-import {Adaptable, PointBasedShape, ShapePatch, isPointBased, isStrokeBased} from "../shapes/Adaptable"
+import {
+    Adaptable,
+    isPointBased,
+    isStrokeBased,
+    PointBasedShape,
+    ShapePatch,
+    StrokeBasedShape
+} from "../shapes/Adaptable"
 import {AbstractShape} from "../shapes/AbstractShape"
 import {AbstractWidgetShape} from "../shapes/AbstractWidgetShape"
 import {Point} from "../shapes/GeometryTypes"
 import {SnapManager} from "../snap/SnapManager"
-import {SnapWorkerClient, type SnapGeometry} from "../snap/SnapWorkerClient"
+import {type SnapGeometry, SnapWorkerClient} from "../snap/SnapWorkerClient"
 import {ShapeFactory, ShapeStartConfig} from "@core/ShapeFactory"
 import {drawGrid, drawHex, drawRuled} from "@core/helper"
 import {SnapRenderer} from "../snap/visual/SnapRenderer"
+import type {SnapResult} from "../snap/SnapResult"
 import type {IDrawingContext} from "./DrawingContext"
+import {HoldIndicatorRenderer} from "./HoldIndicatorRenderer"
 import {TextShape} from "../shapes/TextShape"
+
+interface PersistedState {
+    title?: string
+    background?: BackgroundState
+    shapes?: unknown[]
+}
+
+function isPersistedState(value: unknown): value is PersistedState {
+    if (value === null || typeof value !== 'object') return false
+    const v = value as Record<string, unknown>
+    if (v.title !== undefined && typeof v.title !== 'string') return false
+    if (v.shapes !== undefined && !Array.isArray(v.shapes)) return false
+    if (v.background !== undefined && !isBackgroundState(v.background)) return false
+    return true
+}
+
+function isBackgroundState(value: unknown): value is BackgroundState {
+    if (value === null || typeof value !== 'object') return false
+    const v = value as Record<string, unknown>
+    return typeof v.mode === 'string'
+        && (v.mode === 'none' || v.mode === 'grid' || v.mode === 'ruled' || v.mode === 'hex')
+}
+
+type HandleKind = 'move' | 'duplicate' | 'delete'
+type SnapResolution = { x: number; y: number; snapResult: SnapResult | null }
 
 export class Engine {
     public bezier = false // toggle global
-    private _title: string = ''
+    private _title = ''
 
     private static NO_SNAP_TOOLS = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'text'])
+    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>([...Engine.NO_SNAP_TOOLS, 'move', 'select'])
+
+    /** Délai max (ms) au-delà duquel un résultat de hover snap caché est considéré périmé. */
+    private static SNAP_FRESHNESS_MS = 200
+    /** Durée (ms) du fade-out du tempLayer après commit d'une shape sans layer, et du hold pending. */
+    private static HOLD_DEFAULT_MS = 500
+    private static TEMP_FADE_MS = 500
+
+    /** Tolérances et tailles (en pixels écran) utilisées pour le hit-test et les overlays. */
+    private static readonly HIT = {
+        POINT_TOLERANCE_PX: 14,    // 1er/dernier point d'une shape en cours
+        HANDLE_TOLERANCE_PX: 14,   // handles move/duplicate/delete
+        SHAPE_TOLERANCE_PX: 6,     // findShapeAt
+        SELECTION_PAD_PX: 8,       // padding bounding box sélection
+        HANDLE_RADIUS_PX: 7,       // rayon des cercles handles
+        HANDLE_GAP_PX: 20,         // espacement entre handles
+    } as const
+
+    /** Palette centralisée pour les overlays (sélection, indicateurs, points validés). */
+    private static readonly COLORS = {
+        SELECTION: '#3b82f6',          // bounding box + handles move/duplicate
+        SELECTION_DELETE: '#ef4444',          // handle delete
+        REFERENCE_BORDER: '#aaaaaa',          // bordure du PDF de référence
+        POINT_VALIDATED: '#888',             // points déjà commit
+        POINT_FIRST_RING: '#22c55e',          // anneau 1er point (closable)
+        POINT_LAST_RING: '#f97316',          // anneau dernier point (open path)
+        GRID_PREVIEW: '#00A8FF',          // overlay temporaire de la grille de snap
+        HOLD_PENDING: 'rgba(0, 120, 255, 0.85)',
+        HOLD_PENDING_BG: 'rgba(0, 120, 255, 0.20)',
+        HOLD_ADJUSTING: 'rgba(0, 180, 80, 0.95)',
+        EXPORT_BG: 'white',
+    } as const
 
     private container: HTMLDivElement
     private overlay!: Layer
@@ -30,19 +96,20 @@ export class Engine {
     private _strokeStartTime = 0
     private _background: BackgroundState = {
         mode: 'none',
-        grid:  { size: 80,  color: '#777777', lineWidth: 1 },
-        ruled: { spacing: 40, color: '#777777', lineWidth: 1 },
-        hex:   { size: 40,  color: '#777777', lineWidth: 1, orientation: 'pointy' },
+        grid: {size: 80, color: '#777777', lineWidth: 1},
+        ruled: {spacing: 40, color: '#777777', lineWidth: 1},
+        hex: {size: 40, color: '#777777', lineWidth: 1, orientation: 'pointy'},
     }
     private _pageId = 'default'
     private _onSaveCallback?: () => void
     private _snapManager: SnapManager = new SnapManager({snapRadius: 10})
     private _snapWorkerClient: SnapWorkerClient
     private _geometryDirty = true
-    private _cachedGeometry: SnapGeometry = { points: [], segments: [], circles: [] }
+    private _cachedGeometry: SnapGeometry = {points: [], segments: [], circles: []}
     private snapRenderer: SnapRenderer
+    private holdRenderer: HoldIndicatorRenderer
     private _resizeObserver: ResizeObserver
-    private _viewTransform = { x: 0, y: 0, scale: 1 }
+    private _viewTransform = {x: 0, y: 0, scale: 1}
     private _referenceBitmap: ImageBitmap | null = null
     private _undoStack: Adaptable[] = []
     private _selectedShapeId: string | null = null
@@ -51,22 +118,35 @@ export class Engine {
     private _gridPreviewTimer: ReturnType<typeof setTimeout> | null = null
     private _tempFadeTimer: ReturnType<typeof requestAnimationFrame> | null = null
 
+    // --- Hold indicator (long-press tactile sur 1er point) ---
+    private _holdState: 'idle' | 'pending' | 'adjusting' = 'idle'
+    private _holdAnchor: Point = {x: 0, y: 0}
+    private _holdStartTime = 0
+    private _holdDuration = Engine.HOLD_DEFAULT_MS
+    private _holdRafId: number | null = null
+    private _lastHoverSnap: { reqX: number; reqY: number; result: SnapResult | null; ts: number } | null = null
+
     constructor(container: HTMLDivElement, defaultBackground?: BackgroundState) {
         this.container = container
         this.container.style.position = 'relative'
 
         this._layers = {
-            BACKGROUND: new Layer(this.container, { name: 'BACKGROUND', zIndex: 1 }),
-            REFERENCE:  new Layer(this.container, { name: 'REFERENCE',  zIndex: 2 }),
-            OVERLAY:    new Layer(this.container, { name: 'OVERLAY',    zIndex: 3 }),
-            MAIN:       new Layer(this.container, { name: 'MAIN',       zIndex: 4 }),
-            LAYER:      new Layer(this.container, { name: 'LAYER',      zIndex: 5 }),
+            BACKGROUND: new Layer(this.container, {name: 'BACKGROUND', zIndex: 1}),
+            REFERENCE: new Layer(this.container, {name: 'REFERENCE', zIndex: 2}),
+            OVERLAY: new Layer(this.container, {name: 'OVERLAY', zIndex: 3}),
+            MAIN: new Layer(this.container, {name: 'MAIN', zIndex: 4}),
+            LAYER: new Layer(this.container, {name: 'LAYER', zIndex: 5}),
         }
 
-        this._tempLayer = new Layer(this.container, { name: 'TEMP', zIndex: 6 })
-        this.overlay    = new Layer(this.container, { name: 'overlay', zIndex: 99 })
+        this._tempLayer = new Layer(this.container, {name: 'TEMP', zIndex: 6})
+        this.overlay = new Layer(this.container, {name: 'overlay', zIndex: 99})
 
         this.snapRenderer = new SnapRenderer(this.overlay.ctx)
+        this.holdRenderer = new HoldIndicatorRenderer(this.overlay.ctx, {
+            pending: Engine.COLORS.HOLD_PENDING,
+            pendingBg: Engine.COLORS.HOLD_PENDING_BG,
+            adjusting: Engine.COLORS.HOLD_ADJUSTING,
+        })
         this._snapWorkerClient = new SnapWorkerClient()
 
         if (defaultBackground) this._applyBackground(defaultBackground)
@@ -81,13 +161,19 @@ export class Engine {
         this._snapManager.setStrategyEnabled('grid', false)
     }
 
-    get snapGridEnabled(): boolean { return this._snapGridEnabled }
+    get snapGridEnabled(): boolean {
+        return this._snapGridEnabled
+    }
+
     set snapGridEnabled(enabled: boolean) {
         this._snapGridEnabled = enabled
         this._snapManager.setStrategyEnabled('grid', enabled)
     }
 
-    get snapGridSize(): number { return this._snapGridSize }
+    get snapGridSize(): number {
+        return this._snapGridSize
+    }
+
     set snapGridSize(size: number) {
         this._snapGridSize = size
         this._snapManager.setGridSize(size)
@@ -97,25 +183,54 @@ export class Engine {
         return this._snapManager
     }
 
-    private get _storageKey(): string { return 'pi_note_draft_' + this._pageId }
-    setPageId(id: string) { this._pageId = id }
-    set onSave(cb: () => void) { this._onSaveCallback = cb }
+    private get _storageKey(): string {
+        return 'pi_note_draft_' + this._pageId
+    }
+
+    setPageId(id: string) {
+        this._pageId = id
+    }
+
+    set onSave(cb: () => void) {
+        this._onSaveCallback = cb
+    }
 
     setViewTransform(x: number, y: number, scale: number) {
-        this._viewTransform = { x, y, scale }
+        this._viewTransform = {x, y, scale}
     }
 
-    get shapes(): readonly Adaptable[] { return this._shapes }
-    get currentShape(): Adaptable | null { return this._currentShape }
-    get layers(): Layer[] { return Object.values(this._layers) }
-    get mode(): BackgroundMode { return this._background.mode }
-    set mode(value: BackgroundMode) { this._background.mode = value }
-    get title(): string { return this._title }
+    get shapes(): readonly Adaptable[] {
+        return this._shapes
+    }
+
+    get currentShape(): Adaptable | null {
+        return this._currentShape
+    }
+
+    get layers(): Layer[] {
+        return Object.values(this._layers)
+    }
+
+    get mode(): BackgroundMode {
+        return this._background.mode
+    }
+
+    set mode(value: BackgroundMode) {
+        this._background.mode = value
+    }
+
+    get title(): string {
+        return this._title
+    }
+
     set title(value: string) {
         this._title = value
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
-    get backgroundState(): BackgroundState { return { ...this._background } }
+
+    get backgroundState(): BackgroundState {
+        return {...this._background}
+    }
 
     // --- Shape creation (FSM unifiée, contrat point-based) ---
 
@@ -149,41 +264,53 @@ export class Engine {
         if (!shape) return 'noop'
 
         if (this._drawState === 'drawing-stroke' && isStrokeBased(shape)) {
-            shape.addPoint({ x, y, t: 0 })
-            return 'staged'
+            return this._pointerDownStroke(shape, x, y)
         }
-
         if (this._drawState === 'drawing-points' && isPointBased(shape)) {
-            if (shape.points.length >= shape.minPoints) {
-                if (this.isOverFirstPoint(x, y)) {
-                    shape.finalize(true)
-                    this._commitCurrentShape()
-                    return 'closed'
-                }
-                if (this.isOverLastPoint(x, y)) {
-                    shape.finalize(false)
-                    this._commitCurrentShape()
-                    return 'closed'
-                }
-            }
-            const snapped = this._maybeSnap(x, y, shape)
-            const p = { x: snapped.x, y: snapped.y }
+            return this._pointerDownPoints(shape, x, y)
+        }
+        return 'noop'
+    }
 
-            if (shape.points.length === 0) {
-                shape.commitPoint(p)
-                this._pendingPoint = null
-                if (shape.points.length >= shape.maxPoints) {
-                    return this._finalizePointShape(shape)
-                }
-            } else {
-                this._pendingPoint = p
-                shape.previewWith(shape.points, p)
+    /** pointerDown branche stroke : ajoute simplement un point au tracé. */
+    private _pointerDownStroke(shape: StrokeBasedShape, x: number, y: number): 'staged' {
+        shape.addPoint({x, y, t: Date.now() - this._strokeStartTime})
+        return 'staged'
+    }
+
+    /** pointerDown branche point-based : finalize si clic 1er/dernier point, sinon stage. */
+    private _pointerDownPoints(shape: PointBasedShape, x: number, y: number): 'staged' | 'closed' | 'finished' | 'dialog' {
+        // Hit-test sur les points validés (prime sur snap)
+        if (shape.points.length >= shape.minPoints) {
+            if (this.isOverFirstPoint(x, y)) {
+                shape.finalize(true)
+                this._commitCurrentShape()
+                return 'closed'
             }
-            this._drawPointPreview(snapped.snapResult)
-            return 'staged'
+            if (this.isOverLastPoint(x, y)) {
+                shape.finalize(false)
+                this._commitCurrentShape()
+                return 'closed'
+            }
         }
 
-        return 'noop'
+        const snapped = this._maybeSnap(x, y, shape)
+        const p = {x: snapped.x, y: snapped.y}
+
+        if (shape.points.length === 0) {
+            // 1er point : commit immédiat (flux drag tablette : down=p0, up=p1)
+            shape.commitPoint(p)
+            this._pendingPoint = null
+            if (shape.points.length >= shape.maxPoints) {
+                return this._finalizePointShape(shape)
+            }
+        } else {
+            // Points suivants : pending, commit au pointerup
+            this._pendingPoint = p
+            shape.previewWith(shape.points, p)
+        }
+        this._drawPointPreview(snapped.snapResult)
+        return 'staged'
     }
 
     /** pointermove pendant un dessin. Met à jour la preview (curseur, snap, indicateurs). */
@@ -193,12 +320,12 @@ export class Engine {
 
         if (this._drawState === 'drawing-stroke' && isStrokeBased(shape)) {
             const t = Date.now() - this._strokeStartTime
-            shape.addPoint({ x, y, t })
+            shape.addPoint({x, y, t, pressure: 0})
             this.overlay.clear()
             this._tempLayer.clear()
             const handled = shape.onMove?.(x, y, this._buildDrawingContext())
             if (handled) return
-            const { x: tx, y: ty, scale } = this._viewTransform
+            const {x: tx, y: ty, scale} = this._viewTransform
             const ctx = this._tempLayer.ctx
             ctx.save()
             ctx.translate(tx, ty)
@@ -210,7 +337,7 @@ export class Engine {
 
         if (this._drawState === 'drawing-points' && isPointBased(shape)) {
             const snapped = this._maybeSnap(x, y, shape)
-            this._pendingPoint = { x: snapped.x, y: snapped.y }
+            this._pendingPoint = {x: snapped.x, y: snapped.y}
             shape.previewWith(shape.points, this._pendingPoint)
             this._drawPointPreview(snapped.snapResult)
         }
@@ -278,29 +405,29 @@ export class Engine {
         this._commitCurrentShape()
     }
 
-    /** Hit-test sur le 1er point validé (tolérance 14px écran). */
+    /** Hit-test sur le 1er point validé. */
     isOverFirstPoint(x: number, y: number): boolean {
         const shape = this._currentShape
         if (!shape || !isPointBased(shape)) return false
         const pts = shape.points
         if (pts.length === 0) return false
-        const tol = 14 / this._viewTransform.scale
+        const tol = Engine.HIT.POINT_TOLERANCE_PX / this._viewTransform.scale
         return Math.hypot(x - pts[0].x, y - pts[0].y) <= tol
     }
 
-    /** Hit-test sur le dernier point validé (tolérance 14px écran). */
+    /** Hit-test sur le dernier point validé. */
     isOverLastPoint(x: number, y: number): boolean {
         const shape = this._currentShape
         if (!shape || !isPointBased(shape)) return false
         const pts = shape.points
         if (pts.length === 0) return false
         const last = pts[pts.length - 1]
-        const tol = 14 / this._viewTransform.scale
+        const tol = Engine.HIT.POINT_TOLERANCE_PX / this._viewTransform.scale
         return Math.hypot(x - last.x, y - last.y) <= tol
     }
 
-    private _maybeSnap(x: number, y: number, shape: Adaptable): { x: number; y: number; snapResult: ReturnType<SnapManager['snap']> } {
-        if (Engine.NO_SNAP_TOOLS.has(shape.tool)) return { x, y, snapResult: null }
+    private _maybeSnap(x: number, y: number, shape: Adaptable): SnapResolution {
+        if (Engine.NO_SNAP_TOOLS.has(shape.tool)) return {x, y, snapResult: null}
         const snapResult = this.snapManager.snap(x, y, this._shapes, shape.layer)
         return {
             x: snapResult?.x ?? x,
@@ -310,14 +437,14 @@ export class Engine {
     }
 
     /** Dessine la shape sur tempLayer + indicateurs (snap, points validés) sur overlay. */
-    private _drawPointPreview(snapResult: ReturnType<SnapManager['snap']>): void {
+    private _drawPointPreview(snapResult: SnapResult | null): void {
         const shape = this._currentShape
         if (!shape) return
 
         this.overlay.clear()
         this._tempLayer.clear()
 
-        const { x: tx, y: ty, scale } = this._viewTransform
+        const {x: tx, y: ty, scale} = this._viewTransform
 
         const tCtx = this._tempLayer.ctx
         tCtx.save()
@@ -340,7 +467,7 @@ export class Engine {
         const pts = shape.points
         if (pts.length === 0) return
         const r = 4 / scale
-        ctx.fillStyle = '#888'
+        ctx.fillStyle = Engine.COLORS.POINT_VALIDATED
         for (const p of pts) {
             ctx.beginPath()
             ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
@@ -350,12 +477,12 @@ export class Engine {
             ctx.lineWidth = 2 / scale
             ctx.beginPath()
             ctx.arc(pts[0].x, pts[0].y, r * 2, 0, Math.PI * 2)
-            ctx.strokeStyle = '#22c55e'
+            ctx.strokeStyle = Engine.COLORS.POINT_FIRST_RING
             ctx.stroke()
             if (pts.length > 1) {
                 ctx.beginPath()
                 ctx.arc(pts[pts.length - 1].x, pts[pts.length - 1].y, r * 2, 0, Math.PI * 2)
-                ctx.strokeStyle = '#f97316'
+                ctx.strokeStyle = Engine.COLORS.POINT_LAST_RING
                 ctx.stroke()
             }
         }
@@ -384,7 +511,7 @@ export class Engine {
         const layer = this.getLayer(shape.layer)
         const ctx = layer.ctx
         if (shape.layer !== 'BACKGROUND') {
-            const { x: tx, y: ty, scale } = this._viewTransform
+            const {x: tx, y: ty, scale} = this._viewTransform
             ctx.save()
             ctx.translate(tx, ty)
             ctx.scale(scale, scale)
@@ -404,7 +531,7 @@ export class Engine {
 
     private _startTempFade(shape: Adaptable) {
         this._cancelTempFade()
-        const { x: tx, y: ty, scale } = this._viewTransform
+        const {x: tx, y: ty, scale} = this._viewTransform
         const ctx = this._tempLayer.ctx
         ctx.save()
         ctx.translate(tx, ty)
@@ -412,10 +539,9 @@ export class Engine {
         shape.draw(ctx)
         ctx.restore()
 
-        const duration = 500
         const startTime = performance.now()
         const animate = (now: number) => {
-            const progress = Math.min((now - startTime) / duration, 1)
+            const progress = Math.min((now - startTime) / Engine.TEMP_FADE_MS, 1)
             this._tempLayer.canvas.style.opacity = (1 - progress).toString()
             if (progress < 1) {
                 this._tempFadeTimer = requestAnimationFrame(animate)
@@ -440,12 +566,20 @@ export class Engine {
     private _buildDrawingContext(): IDrawingContext {
         const self = this
         return {
-            get overlayCtx() { return self.overlay.ctx },
+            get overlayCtx() {
+                return self.overlay.ctx
+            },
             snap: (x, y, layer) => self._snapManager.snap(x, y, self._shapes, layer),
             getLayer: (name) => self.getLayer(name),
-            get viewTransform() { return self._viewTransform },
-            drawSnapIndicator: (result) => { self.snapRenderer.draw(result) },
-            get bezierEnabled() { return self.bezier },
+            get viewTransform() {
+                return self._viewTransform
+            },
+            drawSnapIndicator: (result) => {
+                self.snapRenderer.draw(result)
+            },
+            get bezierEnabled() {
+                return self.bezier
+            },
             getLayerSnapshot: (name) => {
                 const layer = self.getLayer(name)
                 return layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height)
@@ -457,18 +591,26 @@ export class Engine {
     }
 
     // --- Layer management ---
-    getLayer(name: LayerName): Layer { return this._layers[name] ?? this._layers['MAIN'] }
+    getLayer(name: LayerName): Layer {
+        return this._layers[name] ?? this._layers['MAIN']
+    }
+
     setLayerVisibility(name: LayerName, visible: boolean) {
         const layer = this.getLayer(name)
         layer.visible = visible
         layer.canvas.style.display = visible ? 'block' : 'none'
     }
+
     setLayerOpacity(name: LayerName, opacity: number) {
         const layer = this.getLayer(name)
         layer.opacity = opacity
         layer.canvas.style.opacity = opacity.toString()
     }
-    clearLayer(name: LayerName) { this.getLayer(name)?.clear() }
+
+    clearLayer(name: LayerName) {
+        this.getLayer(name)?.clear()
+    }
+
     clearAll() {
         for (const layer of Object.values(this._layers)) {
             if (layer.visible && !layer.locked
@@ -479,7 +621,9 @@ export class Engine {
         this._tempLayer.clear()
     }
 
-    get referenceBitmap(): ImageBitmap | null { return this._referenceBitmap }
+    get referenceBitmap(): ImageBitmap | null {
+        return this._referenceBitmap
+    }
 
     setReferenceBitmap(bitmap: ImageBitmap | null) {
         this._referenceBitmap = bitmap
@@ -490,13 +634,13 @@ export class Engine {
         const layer = this._layers['REFERENCE']
         layer.clear()
         if (!this._referenceBitmap) return
-        const { x: tx, y: ty, scale } = this._viewTransform
+        const {x: tx, y: ty, scale} = this._viewTransform
         const ctx = layer.ctx
         ctx.save()
         ctx.translate(tx, ty)
         ctx.scale(scale, scale)
         ctx.drawImage(this._referenceBitmap, 0, 0)
-        ctx.strokeStyle = '#aaaaaa'
+        ctx.strokeStyle = Engine.COLORS.REFERENCE_BORDER
         ctx.lineWidth = 1
         ctx.strokeRect(0, 0, this._referenceBitmap.width, this._referenceBitmap.height)
         ctx.restore()
@@ -516,7 +660,7 @@ export class Engine {
             if (arr) arr.push(shape)
             else byLayer.set(shape.layer, [shape])
         }
-        const { x: tx, y: ty, scale } = this._viewTransform
+        const {x: tx, y: ty, scale} = this._viewTransform
         for (const [name, shapes] of byLayer) {
             const ctx = this.getLayer(name).ctx
             if (name !== 'BACKGROUND') {
@@ -539,6 +683,7 @@ export class Engine {
         }
         // A4: ctx overlay mis à jour après resize (défensif)
         this.snapRenderer.updateCtx(this.overlay.ctx)
+        this.holdRenderer.updateCtx(this.overlay.ctx)
         // P3/P4: renderBackground ne call plus draw(), appelé explicitement ici
         this.renderBackground(this._background)
         this.draw()
@@ -547,20 +692,21 @@ export class Engine {
     // --- Background ---
     setBackground(state: BackgroundState) {
         this._applyBackground(state)
-        if (state.mode === 'grid' && state.grid?.size) {
-            this._snapGridSize = state.grid.size
-            this._snapManager.setGridSize(state.grid.size)
-        }
         this.draw()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
     private _applyBackground(state: BackgroundState) {
         this._background = {
-            mode:  state.mode,
-            grid:  state.grid  ?? this._background.grid,
+            mode: state.mode,
+            grid: state.grid ?? this._background.grid,
             ruled: state.ruled ?? this._background.ruled,
-            hex:   state.hex   ?? this._background.hex,
+            hex: state.hex ?? this._background.hex,
+        }
+        // Synchronise la taille du grid snap avec le fond (nécessaire aussi via loadFromJSONData)
+        if (state.mode === 'grid' && state.grid?.size) {
+            this._snapGridSize = state.grid.size
+            this._snapManager.setGridSize(state.grid.size)
         }
         this.renderBackground(this._background)
     }
@@ -573,9 +719,15 @@ export class Engine {
         ctx.clearRect(0, 0, w, h)
 
         switch (state.mode) {
-            case 'grid': drawGrid(ctx, w, h, state.grid!); break
-            case 'ruled': drawRuled(ctx, w, h, state.ruled!); break
-            case 'hex': drawHex(ctx, w, h, state.hex!); break
+            case 'grid':
+                drawGrid(ctx, w, h, state.grid!)
+                break
+            case 'ruled':
+                drawRuled(ctx, w, h, state.ruled!)
+                break
+            case 'hex':
+                drawHex(ctx, w, h, state.hex!)
+                break
         }
     }
 
@@ -590,7 +742,7 @@ export class Engine {
         Object.assign(shape, patch)
         this.draw()
         this._drawSelectionOverlay()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
     resetState() {
@@ -601,17 +753,17 @@ export class Engine {
         this._markGeometryDirty()
         this.overlay.clear()
         this.clearAll()
-        this._applyBackground({ mode: 'none' })
+        this._applyBackground({mode: 'none'})
         this.setReferenceBitmap(null)
     }
 
     resetAll() {
         this.resetState()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
-    toJSONData(): object {
-        return { title: this._title, background: this._background, shapes: this._shapes.map(s => s.toJSON()) }
+    toJSONData(): PersistedState {
+        return {title: this._title, background: {...this._background}, shapes: this._shapes.map(s => s.toJSON())}
     }
 
     saveLocal() {
@@ -619,16 +771,36 @@ export class Engine {
         this._onSaveCallback?.()
     }
 
-    loadFromJSONData(parsed: any): void {
+    /** Tente de persister localStorage en avalant les exceptions (quota, mode privé, etc.). */
+    private _safeSave(): void {
+        try { this.saveLocal() } catch { /* ignore */ }
+    }
+
+    loadFromJSONData(parsed: unknown): void {
         // rétrocompatibilité : ancien format = tableau direct
-        const shapesData: any[] = Array.isArray(parsed) ? parsed : (parsed.shapes ?? [])
-        this._title = Array.isArray(parsed) ? '' : (parsed.title ?? '')
-        if (!Array.isArray(parsed) && parsed.background) {
-            this._applyBackground(parsed.background)
+        let shapesData: unknown[]
+        let title = ''
+        let background: BackgroundState | null = null
+
+        if (Array.isArray(parsed)) {
+            shapesData = parsed
+        } else if (isPersistedState(parsed)) {
+            shapesData = parsed.shapes ?? []
+            title = typeof parsed.title === 'string' ? parsed.title : ''
+            if (parsed.background && isBackgroundState(parsed.background)) {
+                background = parsed.background
+            }
+        } else {
+            console.warn('[PiNote] loadFromJSONData: format JSON invalide, état réinitialisé')
+            this.resetState()
+            return
         }
 
+        this._title = title
+        if (background) this._applyBackground(background)
+
         let skipped = 0
-        this._shapes = shapesData.map((s: any) => {
+        this._shapes = shapesData.map((s) => {
             const shape = ShapeFactory.fromJSON(s)
             if (!shape) skipped++
             return shape
@@ -642,14 +814,14 @@ export class Engine {
         this._selectedShapeId = null
         this._markGeometryDirty()
         this.draw()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
     loadLocal() {
         const raw = localStorage.getItem(this._storageKey)
         if (!raw) return
 
-        let parsed: any
+        let parsed: unknown
         try {
             parsed = JSON.parse(raw)
         } catch {
@@ -666,9 +838,11 @@ export class Engine {
         offscreen.width = ref.width
         offscreen.height = ref.height
         const ctx = offscreen.getContext('2d')!
-        ctx.fillStyle = 'white'
+        ctx.fillStyle = Engine.COLORS.EXPORT_BG
         ctx.fillRect(0, 0, offscreen.width, offscreen.height)
-        for (const name of ['REFERENCE', 'OVERLAY', 'MAIN', 'LAYER'] as LayerName[]) {
+        // Composite des layers dans l'ordre d'affichage écran (z-index croissant) :
+        // BACKGROUND (z1) → REFERENCE (z2) → OVERLAY (z3, fond grid/ruled) → MAIN (z4) → LAYER (z5)
+        for (const name of ['BACKGROUND', 'REFERENCE', 'OVERLAY', 'MAIN', 'LAYER'] as LayerName[]) {
             if (this._layers[name].visible) ctx.drawImage(this._layers[name].canvas, 0, 0)
         }
         return offscreen.toDataURL('image/png')
@@ -715,22 +889,32 @@ export class Engine {
         offscreen.height = canvasH
         const ctx = offscreen.getContext('2d')!
 
-        ctx.fillStyle = 'white'
+        ctx.fillStyle = Engine.COLORS.EXPORT_BG
         ctx.fillRect(0, 0, canvasW, canvasH)
 
         // Fond décoratif sur toute la page A4
         if (this._background.mode !== 'none') {
             switch (this._background.mode) {
-                case 'grid':  drawGrid(ctx, canvasW, canvasH, this._background.grid!); break
-                case 'ruled': drawRuled(ctx, canvasW, canvasH, this._background.ruled!); break
-                case 'hex':   drawHex(ctx, canvasW, canvasH, this._background.hex!); break
+                case 'grid':
+                    drawGrid(ctx, canvasW, canvasH, this._background.grid!)
+                    break
+                case 'ruled':
+                    drawRuled(ctx, canvasW, canvasH, this._background.ruled!)
+                    break
+                case 'hex':
+                    drawHex(ctx, canvasW, canvasH, this._background.hex!)
+                    break
             }
         }
 
-        // Shapes
+        // PDF de référence (sous les shapes), recadré comme les shapes
         ctx.save()
         ctx.translate(tx, ty)
         ctx.scale(scale, scale)
+        if (this._referenceBitmap && this._layers.REFERENCE.visible) {
+            ctx.drawImage(this._referenceBitmap, 0, 0)
+        }
+        // Shapes
         for (const layerName of ['BACKGROUND', 'MAIN', 'LAYER'] as LayerName[]) {
             if (!this._layers[layerName].visible) continue
             for (const shape of this._shapes) {
@@ -743,8 +927,13 @@ export class Engine {
     }
 
     // --- Undo / Redo ---
-    get canUndo(): boolean { return this._shapes.length > 0 }
-    get canRedo(): boolean { return this._undoStack.length > 0 }
+    get canUndo(): boolean {
+        return this._shapes.length > 0
+    }
+
+    get canRedo(): boolean {
+        return this._undoStack.length > 0
+    }
 
     undo() {
         if (!this.canUndo) return
@@ -753,7 +942,7 @@ export class Engine {
         this._markGeometryDirty()
         if (this._selectedShapeId === removed.id) this._selectedShapeId = null
         this.draw()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
     redo() {
@@ -761,7 +950,7 @@ export class Engine {
         this._shapes.push(this._undoStack.pop()!)
         this._markGeometryDirty()
         this.draw()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
     // --- Highlight & sélection ---
@@ -782,42 +971,44 @@ export class Engine {
         if (!shape) return
         const bounds = shape.getBounds()
         if (!bounds) return
-        const { x: tx, y: ty, scale } = this._viewTransform
+        const {x: tx, y: ty, scale} = this._viewTransform
         const ctx = this.overlay.ctx
         ctx.save()
         ctx.translate(tx, ty)
         ctx.scale(scale, scale)
-        const pad = 8 / scale
+        const pad = Engine.HIT.SELECTION_PAD_PX / scale
         const x = bounds.minX - pad
         const y = bounds.minY - pad
         const w = bounds.maxX - bounds.minX + pad * 2
         const h = bounds.maxY - bounds.minY + pad * 2
 
         // Bounding box
-        ctx.strokeStyle = '#3b82f6'
+        ctx.strokeStyle = Engine.COLORS.SELECTION
         ctx.lineWidth = 1.5 / scale
         ctx.setLineDash([5 / scale, 4 / scale])
         ctx.strokeRect(x, y, w, h)
         ctx.setLineDash([])
 
-        const hr = 7 / scale
-        const gap = 20 / scale  // espace entre les deux handles
+        const hr = Engine.HIT.HANDLE_RADIUS_PX / scale
+        const gap = Engine.HIT.HANDLE_GAP_PX / scale  // espace entre les deux handles
 
         // Handle de déplacement (coin haut-gauche) — croix ✛
-        ctx.fillStyle = '#3b82f6'
+        ctx.fillStyle = Engine.COLORS.SELECTION
         ctx.beginPath()
         ctx.arc(x, y, hr, 0, Math.PI * 2)
         ctx.fill()
         ctx.strokeStyle = 'white'
         ctx.lineWidth = 1.5 / scale
         ctx.beginPath()
-        ctx.moveTo(x - 3.5 / scale, y); ctx.lineTo(x + 3.5 / scale, y)
-        ctx.moveTo(x, y - 3.5 / scale); ctx.lineTo(x, y + 3.5 / scale)
+        ctx.moveTo(x - 3.5 / scale, y)
+        ctx.lineTo(x + 3.5 / scale, y)
+        ctx.moveTo(x, y - 3.5 / scale)
+        ctx.lineTo(x, y + 3.5 / scale)
         ctx.stroke()
 
         // Handle de duplication (à droite du précédent) — deux carrés ⧉
         const dx2 = x + gap
-        ctx.fillStyle = '#3b82f6'
+        ctx.fillStyle = Engine.COLORS.SELECTION
         ctx.beginPath()
         ctx.arc(dx2, y, hr, 0, Math.PI * 2)
         ctx.fill()
@@ -830,7 +1021,7 @@ export class Engine {
 
         // Handle de suppression (à droite du précédent) — croix ✕ rouge
         const dx3 = x + gap * 2
-        ctx.fillStyle = '#ef4444'
+        ctx.fillStyle = Engine.COLORS.SELECTION_DELETE
         ctx.beginPath()
         ctx.arc(dx3, y, hr, 0, Math.PI * 2)
         ctx.fill()
@@ -838,58 +1029,46 @@ export class Engine {
         ctx.lineWidth = 1.5 / scale
         const cx = 3.5 / scale
         ctx.beginPath()
-        ctx.moveTo(dx3 - cx, y - cx); ctx.lineTo(dx3 + cx, y + cx)
-        ctx.moveTo(dx3 + cx, y - cx); ctx.lineTo(dx3 - cx, y + cx)
+        ctx.moveTo(dx3 - cx, y - cx)
+        ctx.lineTo(dx3 + cx, y + cx)
+        ctx.moveTo(dx3 + cx, y - cx)
+        ctx.lineTo(dx3 - cx, y + cx)
         ctx.stroke()
 
         ctx.restore()
     }
 
-    get selectedShapeId(): string | null { return this._selectedShapeId }
+    get selectedShapeId(): string | null {
+        return this._selectedShapeId
+    }
 
     private _handlePositions(bounds: ReturnType<AbstractShape['getBounds']>) {
         if (!bounds) return null
-        const { scale } = this._viewTransform
-        const pad = 8 / scale
+        const {scale} = this._viewTransform
+        const pad = Engine.HIT.SELECTION_PAD_PX / scale
         const hx = bounds.minX - pad
         const hy = bounds.minY - pad
-        const gap = 20 / scale
+        const gap = Engine.HIT.HANDLE_GAP_PX / scale
         return {
-            move: { x: hx, y: hy },
-            duplicate: { x: hx + gap, y: hy },
-            delete: { x: hx + gap * 2, y: hy },
+            move: {x: hx, y: hy},
+            duplicate: {x: hx + gap, y: hy},
+            delete: {x: hx + gap * 2, y: hy},
         }
     }
 
-    // Retourne true si (x,y) monde est sur le handle de déplacement
-    isOverMoveHandle(x: number, y: number): boolean {
+    private _isOverHandle(kind: HandleKind, x: number, y: number): boolean {
         if (!this._selectedShapeId) return false
         const shape = this._shapes.find(s => s.id === this._selectedShapeId) as AbstractShape | undefined
         if (!shape) return false
         const pos = this._handlePositions(shape.getBounds())
         if (!pos) return false
-        return Math.hypot(x - pos.move.x, y - pos.move.y) * this._viewTransform.scale <= 14
+        const target = pos[kind]
+        return Math.hypot(x - target.x, y - target.y) * this._viewTransform.scale <= Engine.HIT.HANDLE_TOLERANCE_PX
     }
 
-    // Retourne true si (x,y) monde est sur le handle de duplication
-    isOverDuplicateHandle(x: number, y: number): boolean {
-        if (!this._selectedShapeId) return false
-        const shape = this._shapes.find(s => s.id === this._selectedShapeId) as AbstractShape | undefined
-        if (!shape) return false
-        const pos = this._handlePositions(shape.getBounds())
-        if (!pos) return false
-        return Math.hypot(x - pos.duplicate.x, y - pos.duplicate.y) * this._viewTransform.scale <= 14
-    }
-
-    // Retourne true si (x,y) monde est sur le handle de suppression
-    isOverDeleteHandle(x: number, y: number): boolean {
-        if (!this._selectedShapeId) return false
-        const shape = this._shapes.find(s => s.id === this._selectedShapeId) as AbstractShape | undefined
-        if (!shape) return false
-        const pos = this._handlePositions(shape.getBounds())
-        if (!pos) return false
-        return Math.hypot(x - pos.delete.x, y - pos.delete.y) * this._viewTransform.scale <= 14
-    }
+    isOverMoveHandle(x: number, y: number): boolean      { return this._isOverHandle('move', x, y) }
+    isOverDuplicateHandle(x: number, y: number): boolean { return this._isOverHandle('duplicate', x, y) }
+    isOverDeleteHandle(x: number, y: number): boolean    { return this._isOverHandle('delete', x, y) }
 
     // --- Duplication ---
     duplicateShape(id: string): string | null {
@@ -897,7 +1076,7 @@ export class Engine {
         if (!shape) return null
         // JSON.parse/stringify garantit une copie profonde (pas de références partagées)
         const json = JSON.parse(JSON.stringify(shape.toJSON()))
-        json.options.id = undefined   // force new ID
+        delete json.options.id   // force new ID
         json.options.hidden = false
         const clone = ShapeFactory.fromJSON(json)
         if (!clone) return null
@@ -907,13 +1086,13 @@ export class Engine {
         this._markGeometryDirty()
         this._selectedShapeId = clone.id
         this.draw()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
         return clone.id
     }
 
     // Retourne l'id du shape sous (x,y), du plus récent au plus ancien
     findShapeAt(x: number, y: number): string | null {
-        const tolerance = 6 / this._viewTransform.scale
+        const tolerance = Engine.HIT.SHAPE_TOLERANCE_PX / this._viewTransform.scale
         for (let i = this._shapes.length - 1; i >= 0; i--) {
             const shape = this._shapes[i]
             if (shape.hidden) continue
@@ -928,7 +1107,7 @@ export class Engine {
         if (!shape) return
         shape.hidden = !shape.hidden
         this.draw()
-        try { this.saveLocal() } catch { /* ignore */ }
+        this._safeSave()
     }
 
     // --- Déplacement ---
@@ -973,14 +1152,14 @@ export class Engine {
         const ctx = this.overlay.ctx
         const w = this.overlay.canvas.width
         const h = this.overlay.canvas.height
-        const { x: tx, y: ty, scale } = this._viewTransform
+        const {x: tx, y: ty, scale} = this._viewTransform
         const size = this._snapGridSize * scale
         if (size <= 0) return
         const offsetX = ((tx % size) + size) % size
         const offsetY = ((ty % size) + size) % size
 
         ctx.save()
-        ctx.strokeStyle = '#00A8FF'
+        ctx.strokeStyle = Engine.COLORS.GRID_PREVIEW
         ctx.globalAlpha = 0.35
         ctx.lineWidth = 1
         ctx.setLineDash([2, 4])
@@ -1005,7 +1184,7 @@ export class Engine {
     async syncRemote(url: string): Promise<void> {
         const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(this.toJSONData()),
         })
         if (!res.ok) throw new Error(`[PiNote] syncRemote: ${res.status} ${res.statusText}`)
@@ -1025,13 +1204,12 @@ export class Engine {
         this._geometryDirty = true
     }
 
-    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'move', 'select', 'text'])
-
     hoverSnap(x: number, y: number, tool: ToolType): void {
         if (Engine.HOVER_SNAP_EXCLUDED.has(tool)) return
         if (this._currentShape) return
 
         const geometry = this._getGeometry()
+        const reqX = x, reqY = y
         this._snapWorkerClient.request(x, y, geometry, {
             snapRadius: this._snapManager.snapRadius,
             gridEnabled: this._snapGridEnabled,
@@ -1039,9 +1217,17 @@ export class Engine {
             activeLayer: null,
         }, (result) => {
             if (this._currentShape) return
+            this._lastHoverSnap = {reqX, reqY, result, ts: performance.now()}
+
+            // Si le hold indicator est actif, son RAF possède l'overlay : on déclenche un redraw.
+            if (this._holdState !== 'idle') {
+                this._scheduleHoldFrame()
+                return
+            }
+
             this.overlay.clear()
             if (!result) return
-            const { x: tx, y: ty, scale } = this._viewTransform
+            const {x: tx, y: ty, scale} = this._viewTransform
             const ctx = this.overlay.ctx
             ctx.save()
             ctx.translate(tx, ty)
@@ -1053,12 +1239,122 @@ export class Engine {
 
     clearHoverSnap(): void {
         if (this._currentShape) return
+        if (this._holdState !== 'idle') return
         this.overlay.clear()
         this._drawSelectionOverlay()
     }
 
+    // --- Hold indicator (long-press tactile) ---
+
+    /** Démarre l'indicateur d'anneau qui se remplit pendant durationMs. */
+    startHoldIndicator(x: number, y: number, durationMs: number): void {
+        this._holdState = 'pending'
+        this._holdAnchor = {x, y}
+        this._holdStartTime = performance.now()
+        this._holdDuration = durationMs
+        this._lastHoverSnap = null
+        if (this._holdRafId !== null) {
+            cancelAnimationFrame(this._holdRafId)
+            this._holdRafId = null
+        }
+        this._scheduleHoldFrame()
+    }
+
+    /** Met à jour la position de l'ancre (utilisé pendant la phase 'adjusting'). */
+    updateHoldIndicator(x: number, y: number): void {
+        if (this._holdState === 'idle') return
+        this._holdAnchor = {x, y}
+        if (this._holdState === 'adjusting') this._scheduleHoldFrame()
+    }
+
+    /** Bascule en phase 'adjusting' : anneau plein, suit le doigt. */
+    completeHoldIndicator(): void {
+        if (this._holdState === 'idle') return
+        this._holdState = 'adjusting'
+        this._scheduleHoldFrame()
+    }
+
+    /** Arrête l'indicateur, libère l'overlay. Conserve le cache snap pour resolveSnap. */
+    clearHoldIndicator(): void {
+        if (this._holdState === 'idle') return
+        this._holdState = 'idle'
+        if (this._holdRafId !== null) {
+            cancelAnimationFrame(this._holdRafId)
+            this._holdRafId = null
+        }
+        this.overlay.clear()
+        // Si le dernier snap est encore frais, le redessine pour ne pas faire « clignoter »
+        // l'indicateur entre la fin du hold et le prochain pointermove.
+        const cached = this._lastHoverSnap
+        if (cached?.result && performance.now() - cached.ts <= Engine.SNAP_FRESHNESS_MS) {
+            const {x: tx, y: ty, scale} = this._viewTransform
+            const ctx = this.overlay.ctx
+            ctx.save()
+            ctx.translate(tx, ty)
+            ctx.scale(scale, scale)
+            this.snapRenderer.draw(cached.result)
+            ctx.restore()
+        } else {
+            this._drawSelectionOverlay()
+        }
+    }
+
+    /** Retourne la position snappée si le dernier résultat hover correspond aux coords demandées. */
+    resolveSnap(x: number, y: number, tool: ToolType): { x: number; y: number } | null {
+        if (Engine.HOVER_SNAP_EXCLUDED.has(tool)) return null
+        const cached = this._lastHoverSnap
+        if (!cached || !cached.result) return null
+        if (performance.now() - cached.ts > Engine.SNAP_FRESHNESS_MS) return null
+        if (Math.abs(cached.reqX - x) < 0.5 && Math.abs(cached.reqY - y) < 0.5) {
+            return {x: cached.result.x, y: cached.result.y}
+        }
+        return null
+    }
+
+    /** Programme un (unique) frame de redraw du hold indicator. Idempotent. */
+    private _scheduleHoldFrame(): void {
+        if (this._holdState === 'idle') return
+        if (this._holdRafId !== null) return
+        this._holdRafId = requestAnimationFrame((now) => this._renderHoldFrame(now))
+    }
+
+    private _renderHoldFrame(now: number): void {
+        this._holdRafId = null
+        if (this._holdState === 'idle') return
+
+        this.overlay.clear()
+        const view = this._viewTransform
+        const ctx = this.overlay.ctx
+
+        // En mode 'adjusting', dessine d'abord le snap (sous l'anneau)
+        if (this._holdState === 'adjusting' && this._lastHoverSnap?.result) {
+            ctx.save()
+            ctx.translate(view.x, view.y)
+            ctx.scale(view.scale, view.scale)
+            this.snapRenderer.draw(this._lastHoverSnap.result)
+            ctx.restore()
+        }
+
+        const progress = this._holdState === 'adjusting'
+            ? 1
+            : Math.min(1, (now - this._holdStartTime) / this._holdDuration)
+
+        this.holdRenderer.draw({
+            phase: this._holdState,
+            anchor: this._holdAnchor,
+            progress,
+        }, view)
+
+        // En 'pending', l'arc se remplit en continu → ré-arme un RAF.
+        // En 'adjusting', le rendu ne change qu'à updateHoldIndicator ou nouveau snap → on s'arrête.
+        if (this._holdState === 'pending') {
+            this._holdRafId = requestAnimationFrame((t) => this._renderHoldFrame(t))
+        }
+    }
+
     destroy() {
         if (this._gridPreviewTimer) clearTimeout(this._gridPreviewTimer)
+        if (this._holdRafId !== null) cancelAnimationFrame(this._holdRafId)
         this._cancelTempFade()
         this._resizeObserver.disconnect()
         this._snapWorkerClient.destroy()

@@ -51,3 +51,5 @@
 - [ ] **V. Unifier `_handlePositions` et le rendu** — `_drawSelectionOverlay` recalcule `gap` localement alors que `_handlePositions` le fait déjà — dédupliquer
 - [ ] **W. Tests unitaires shapes** — Vitest sur `hitTest`, `getBounds`, `getSnapPoints` pour chaque shape (actuellement non couverts)
 - [ ] **X. Composable `useToolMemory`** — Extraire la logique de mémoire par outil de `NoteTools.vue` vers un composable dédié
+- [ ] **Y. Helper `_withWorldTransform` dans Engine** — Factoriser le pattern `ctx.save(); translate(tx,ty); scale(s,s); …; ctx.restore()` dupliqué ~10 fois (`_drawPointPreview`, `hoverSnap`, `clearHoldIndicator`, `_renderHoldFrame`, `_drawReference`, `_drawSelectionOverlay`, `_startTempFade`, `_commitCurrentShape`). Attention : `exportA4` utilise un transform local, **pas** `_viewTransform`
+- [ ] **Z. Découper `Engine.ts`** — Le fichier dépasse 1280 lignes ; extraire `SelectionOverlayController` (bounding box + handles + hit-tests), `HoldIndicatorController` (FSM `pending/adjusting` + RAF) et `EnginePersistence` (load/save/export PNG+A4+JSON). Garder `Engine` comme orchestrateur

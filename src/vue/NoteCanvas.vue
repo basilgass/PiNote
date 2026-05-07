@@ -63,6 +63,53 @@ let movePrevPos = {x: 0, y: 0}
 let isPanning = false
 let panStart = {x: 0, y: 0}
 
+// ── Long-press tactile sur le 1er point ─────────────────────────────────────
+const HOLD_DELAY_MS = 500          // durée de remplissage de l'anneau
+const HOLD_VISUAL_DELAY_MS = 200   // délai avant d'afficher l'anneau (évite le flash sur tap court)
+const HOLD_TOTAL_MS = HOLD_VISUAL_DELAY_MS + HOLD_DELAY_MS  // 700ms total avant 'adjusting'
+const HOLD_TOLERANCE_PX = 6
+const HOLD_EXCLUDED_TOOLS = new Set<ToolType>([
+  'pen', 'highlighter', 'eraser', 'move', 'select', 'text',
+])
+
+type HoldPhase = 'idle' | 'pending' | 'adjusting'
+let holdPhase: HoldPhase = 'idle'
+let holdTimer: ReturnType<typeof setTimeout> | null = null
+let holdVisualTimer: ReturnType<typeof setTimeout> | null = null
+let holdStartClient = { x: 0, y: 0 }
+let holdStartCanvas = { x: 0, y: 0 }
+
+function isHoldEligible(tool: ToolType): boolean {
+  return !HOLD_EXCLUDED_TOOLS.has(tool)
+}
+
+function cancelHold() {
+  if (holdTimer !== null) {
+    clearTimeout(holdTimer)
+    holdTimer = null
+  }
+  if (holdVisualTimer !== null) {
+    clearTimeout(holdVisualTimer)
+    holdVisualTimer = null
+  }
+  holdPhase = 'idle'
+  engine.value?.clearHoldIndicator()
+}
+
+function startNewShape() {
+  if (!engine.value) return
+  engine.value.beginDraw({
+    layer: store.tool.layer,
+    color: store.tool.color ?? 'black',
+    width: store.tool.width ?? 2,
+    tool: store.tool.tool,
+    createdAt: Date.now(),
+    x: 0,
+    y: 0,
+    toolMode: store.tool.toolModes[store.tool.tool],
+  })
+}
+
 // Widget dialog générique
 const WIDGET_DIALOGS: Partial<Record<ToolType, Component>> = {
   text:  TextEditDialog,
@@ -133,18 +180,32 @@ function onPointerDown(event: PointerEvent) {
     return
   }
 
-  // Premier pointerdown d'un dessin : crée la shape
+  // Premier pointerdown d'un dessin : long-press tactile sur le 1er point
+  if (!engine.value.currentShape && isHoldEligible(store.tool.tool)) {
+    holdPhase = 'pending'
+    holdStartClient = { x: event.clientX, y: event.clientY }
+    holdStartCanvas = pos
+    // L'indicateur visuel n'apparaît qu'après HOLD_VISUAL_DELAY_MS sans bouger,
+    // pour éviter le flash sur tap court. Sa durée d'animation est réduite pour
+    // qu'il atteigne 100% au même instant que la transition vers 'adjusting'.
+    holdVisualTimer = setTimeout(() => {
+      holdVisualTimer = null
+      if (holdPhase !== 'pending') return
+      engine.value!.startHoldIndicator(holdStartCanvas.x, holdStartCanvas.y, HOLD_DELAY_MS)
+    }, HOLD_VISUAL_DELAY_MS)
+    holdTimer = setTimeout(() => {
+      holdTimer = null
+      if (holdPhase !== 'pending') return
+      holdPhase = 'adjusting'
+      engine.value!.completeHoldIndicator()
+      engine.value!.hoverSnap(holdStartCanvas.x, holdStartCanvas.y, store.tool.tool)
+    }, HOLD_TOTAL_MS)
+    return
+  }
+
+  // Premier pointerdown d'un dessin (outils exclus du long-press) : crée la shape
   if (!engine.value.currentShape) {
-    engine.value.beginDraw({
-      layer: store.tool.layer,
-      color: store.tool.color ?? 'black',
-      width: store.tool.width ?? 2,
-      tool: store.tool.tool,
-      createdAt: Date.now(),
-      x: 0,
-      y: 0,
-      toolMode: store.tool.toolModes[store.tool.tool],
-    })
+    startNewShape()
   }
 
   const result = engine.value.pointerDown(pos.x, pos.y)
@@ -185,6 +246,30 @@ function onPointerMove(event: PointerEvent) {
     const pos = toCanvasCoords(event)
     engine.value?.moveShape(store.selectedShapeId, pos.x - movePrevPos.x, pos.y - movePrevPos.y)
     movePrevPos = pos
+    return
+  }
+
+  // Long-press : phase 'pending' (timer en cours)
+  if (holdPhase === 'pending') {
+    const dx = event.clientX - holdStartClient.x
+    const dy = event.clientY - holdStartClient.y
+    if (dx * dx + dy * dy > HOLD_TOLERANCE_PX * HOLD_TOLERANCE_PX) {
+      // L'utilisateur a directement entamé un drag : annule le long-press,
+      // démarre la shape au point initial et tombe dans le flux pointerMove normal.
+      cancelHold()
+      startNewShape()
+      engine.value!.pointerDown(holdStartCanvas.x, holdStartCanvas.y)
+      // Tombe dans le pointerMove normal ci-dessous
+    } else {
+      return
+    }
+  }
+
+  // Long-press : phase 'adjusting' (drag pour chercher un snap)
+  if (holdPhase === 'adjusting') {
+    const pos = toCanvasCoords(event)
+    engine.value!.updateHoldIndicator(pos.x, pos.y)
+    engine.value!.hoverSnap(pos.x, pos.y, store.tool.tool)
     return
   }
 
@@ -243,6 +328,31 @@ function onPointerUp(event: PointerEvent) {
     return
   }
 
+  // Long-press : tap court (relâché avant 500ms sans bouger)
+  if (holdPhase === 'pending') {
+    cancelHold()
+    const pos = toCanvasCoords(event)
+    startNewShape()
+    engine.value!.pointerDown(pos.x, pos.y)
+    const status = engine.value!.pointerUp(pos.x, pos.y)
+    if (status === 'finished') store.syncFromEngine()
+    else if (status === 'dialog') openWidgetDialog()
+    return
+  }
+
+  // Long-press : commit du 1er point à la position snappée (ou brute)
+  if (holdPhase === 'adjusting') {
+    const pos = toCanvasCoords(event)
+    const snapped = engine.value!.resolveSnap(pos.x, pos.y, store.tool.tool) ?? pos
+    cancelHold()
+    startNewShape()
+    engine.value!.pointerDown(snapped.x, snapped.y)
+    const status = engine.value!.pointerUp(snapped.x, snapped.y)
+    if (status === 'finished') store.syncFromEngine()
+    else if (status === 'dialog') openWidgetDialog()
+    return
+  }
+
   if (!engine.value?.currentShape) {
     engine.value?.clearHoverSnap()
     return
@@ -282,8 +392,9 @@ function cancelWidget() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && engine.value?.currentShape) {
-    engine.value.cancelDraw()
+  if (e.key === 'Escape') {
+    if (holdPhase !== 'idle') cancelHold()
+    if (engine.value?.currentShape) engine.value.cancelDraw()
   }
 }
 
@@ -317,6 +428,7 @@ watch(() => store.tool.toolModes, () => {
 }, { deep: true })
 
 watch(() => store.tool.tool, (newTool) => {
+  if (holdPhase !== 'idle') cancelHold()
   if (engine.value?.currentShape) engine.value.cancelDraw()
   if (newTool !== 'select' && store.selectedShapeId) {
     store.highlightShape(null)
@@ -351,8 +463,9 @@ onMounted(() => {
 
   // Annule tout dessin en cours si un 2e doigt arrive (pinch → zoom)
   canvasEl.value.addEventListener('touchstart', (e) => {
-    if (e.touches.length >= 2 && engine.value?.currentShape) {
-      engine.value.cancelDraw()
+    if (e.touches.length >= 2) {
+      if (holdPhase !== 'idle') cancelHold()
+      if (engine.value?.currentShape) engine.value.cancelDraw()
     }
   }, {passive: true})
 
