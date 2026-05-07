@@ -1154,11 +1154,8 @@ var Fe = class {
 	finalize(e) {
 		super.finalize(e), this.closed = e;
 	}
-	get _validatedPoints() {
-		return this._isPreview ? this._points.slice(0, -1) : this._points;
-	}
 	hitTest(e, t, n) {
-		let r = this._validatedPoints;
+		let r = this._points;
 		if (r.length < 2) return !1;
 		let i = this.width / 2 + n;
 		for (let n = 0; n < r.length - 1; n++) {
@@ -1176,15 +1173,15 @@ var Fe = class {
 		this._cursorPos && (this._cursorPos.x += e, this._cursorPos.y += t);
 	}
 	isEmpty() {
-		return this._validatedPoints.length < 2;
+		return this._points.length < 2;
 	}
 	draw(e) {
-		let t = this._validatedPoints;
+		let t = this._points;
 		if (t.length < 1) return;
 		let n = e.getTransform(), r = Math.abs(n.a) || 1;
 		e.save(), e.strokeStyle = this.color, e.lineWidth = this.width, e.lineCap = "round", e.lineJoin = "round", e.beginPath(), e.moveTo(t[0].x, t[0].y);
 		for (let n = 1; n < t.length; n++) e.lineTo(t[n].x, t[n].y);
-		if (this.closed && e.closePath(), this.fill && this.closed && (e.globalAlpha = this.fillOpacity, e.fillStyle = this.color, e.fill(), e.globalAlpha = 1), Ee.applyLineStyle(e, this.lineStyle, this.width, r), e.stroke(), e.setLineDash([]), !this.closed && this._cursorPos && t.length >= 1) {
+		if (this.closed && e.closePath(), this.fill && this.closed && (e.globalAlpha = this.fillOpacity, e.fillStyle = this.color, e.fill(), e.globalAlpha = 1), Ee.applyLineStyle(e, this.lineStyle, this.width, r), e.stroke(), e.setLineDash([]), this._isPreview && !this.closed && this._cursorPos && t.length >= 1) {
 			let n = Math.max(this.width * 2, 5) / r;
 			e.setLineDash([n, n]), e.beginPath(), e.moveTo(t[t.length - 1].x, t[t.length - 1].y), e.lineTo(this._cursorPos.x, this._cursorPos.y), t.length >= 2 && e.lineTo(t[0].x, t[0].y), e.stroke(), e.setLineDash([]);
 		}
@@ -1193,7 +1190,7 @@ var Fe = class {
 	toJSON() {
 		return {
 			config: {
-				points: this._validatedPoints.map((e) => ({
+				points: this._points.map((e) => ({
 					x: e.x,
 					y: e.y
 				})),
@@ -1203,7 +1200,7 @@ var Fe = class {
 		};
 	}
 	getSnapPoints() {
-		let e = this._validatedPoints, t = [];
+		let e = this._points, t = [];
 		for (let n of e) t.push({
 			x: n.x,
 			y: n.y,
@@ -1231,7 +1228,7 @@ var Fe = class {
 		return t;
 	}
 	getSegments() {
-		let e = this._validatedPoints;
+		let e = this._points;
 		if (e.length < 2) return [];
 		let t = [];
 		for (let n = 0; n < e.length - 1; n++) t.push({
@@ -1249,7 +1246,7 @@ var Fe = class {
 		return [];
 	}
 	getBounds() {
-		let e = this._validatedPoints;
+		let e = this._points;
 		if (!e.length) return null;
 		let t = Infinity, n = Infinity, r = -Infinity, i = -Infinity;
 		for (let a of e) a.x < t && (t = a.x), a.y < n && (n = a.y), a.x > r && (r = a.x), a.y > i && (i = a.y);

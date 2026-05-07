@@ -53,14 +53,8 @@ export class Polygon extends AbstractPointShape {
         this.closed = closed
     }
 
-    /** Pendant la preview, _points contient le curseur en dernière position;
-     *  on l'exclut pour exposer uniquement les sommets validés. */
-    private get _validatedPoints(): Point[] {
-        return this._isPreview ? this._points.slice(0, -1) : this._points
-    }
-
     hitTest(x: number, y: number, tolerance: number): boolean {
-        const pts = this._validatedPoints
+        const pts = this._points
         if (pts.length < 2) return false
         const thresh = this.width / 2 + tolerance
         for (let i = 0; i < pts.length - 1; i++) {
@@ -80,11 +74,11 @@ export class Polygon extends AbstractPointShape {
     }
 
     isEmpty() {
-        return this._validatedPoints.length < 2
+        return this._points.length < 2
     }
 
     draw(ctx: CanvasRenderingContext2D) {
-        const pts = this._validatedPoints
+        const pts = this._points
         if (pts.length < 1) return
 
         const m = ctx.getTransform()
@@ -114,7 +108,7 @@ export class Polygon extends AbstractPointShape {
         ctx.setLineDash([])
 
         // Segments de preview (pointillés) : dernier validé → curseur → premier sommet
-        if (!this.closed && this._cursorPos && pts.length >= 1) {
+        if (this._isPreview && !this.closed && this._cursorPos && pts.length >= 1) {
             const dash = Math.max(this.width * 2, 5) / scale
             ctx.setLineDash([dash, dash])
             ctx.beginPath()
@@ -132,13 +126,13 @@ export class Polygon extends AbstractPointShape {
 
     toJSON() {
         return {
-            config: { points: this._validatedPoints.map(p => ({x: p.x, y: p.y})), closed: this.closed },
+            config: { points: this._points.map(p => ({x: p.x, y: p.y})), closed: this.closed },
             options: super.toJSON()
         }
     }
 
     getSnapPoints(): SnapCandidate[] {
-        const pts = this._validatedPoints
+        const pts = this._points
         const candidates: SnapCandidate[] = []
         for (const p of pts) {
             candidates.push({ x: p.x, y: p.y, type: 'corner', shapeId: this.id, layer: this.layer })
@@ -163,7 +157,7 @@ export class Polygon extends AbstractPointShape {
     }
 
     getSegments(): Segment[] {
-        const pts = this._validatedPoints
+        const pts = this._points
         if (pts.length < 2) return []
         const segments: Segment[] = []
         for (let i = 0; i < pts.length - 1; i++) {
@@ -178,7 +172,7 @@ export class Polygon extends AbstractPointShape {
     getCircles(): CircleGeom[] { return [] }
 
     getBounds(): Bounds | null {
-        const pts = this._validatedPoints
+        const pts = this._points
         if (!pts.length) return null
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
         for (const p of pts) {

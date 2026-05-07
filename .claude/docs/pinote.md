@@ -23,12 +23,12 @@ Bibliothèque Vue 3 de dessin canvas pour notes mathématiques. Construite en mo
 
 ```
 ToolType   = 'pen' | 'highlighter' | 'eraser' | 'select' | 'move' | 'vector'
-           | 'line' | 'segment' | 'circle' | 'rectangle' | 'polygon'
+           | 'text' | 'graph' | GeomType
 LayerName  = 'BACKGROUND' | 'REFERENCE' | 'OVERLAY' | 'MAIN' | 'LAYER'
 BackgroundMode = 'grid' | 'ruled' | 'hex' | 'none'
 ArrowStyle = 'filled' | 'open'
 LineStyle  = 'solid' | 'dashed' | 'dotted'
-GeomType   = 'line' | 'segment' | 'rectangle' | 'circle' | 'polygon'
+GeomType   = 'line' | 'segment' | 'rectangle' | 'circle' | 'polygon' | 'arc'
 ```
 
 **Interfaces clés :**
@@ -40,7 +40,7 @@ GeomType   = 'line' | 'segment' | 'rectangle' | 'circle' | 'polygon'
 - `GridOptions` — `{size, color?, lineWidth?, majorEvery?, majorColor?, majorWidth?}`
 - `RuledOptions` — `{spacing, color?, lineWidth?, marginTop?}`
 - `HexOptions` — `{size, orientation?: 'pointy'|'flat', color?, lineWidth?}`
-- `ShapeStartConfig` — paramètres passés à `Engine.startShape()`
+- `ShapeStartConfig` — paramètres passés à `Engine.beginDraw()` (champs `x, y` non utilisés pour la géométrie en mode dessin — populés via `commitPoint`)
 
 ---
 
@@ -82,22 +82,34 @@ Le BACKGROUND ne subit pas le `translate/scale` — il est rendu en coordonnées
 - `_layers` — map name → Layer
 - `_shapes: Adaptable[]` — toutes les shapes persistées
 - `_currentShape` — shape en cours de dessin
+- `_drawState: 'idle' | 'drawing-points' | 'drawing-stroke'` — état FSM
+- `_pendingPoint: Point | null` — point en preview (commit au pointerup)
+- `_strokeStartTime` — t0 du tracé Stroke (pour `addPoint.t`)
 - `_selectedShapeId` — sélection courante (handles UI)
 - `_undoStack` — shapes supprimées (pour redo)
 - `_viewTransform` — `{x, y, scale}`
 - `bezier` — lissage Catmull-Rom pour Stroke
 
-**Méthodes publiques importantes :**
+**Méthodes publiques — FSM de dessin :**
 
 ```
-startShape(config)           → crée + snap du point de départ
-updateShape(x, y)            → met à jour + snap + redessine sur _tempLayer
-endShape()                   → finalise, push dans _shapes, saveLocal
-cancelShape()                → annule sans sauvegarder
+beginDraw(config)            → crée la shape, met l'état à drawing-points/stroke
+pointerDown(x, y)            → 1er point ou hit-test 1er/dernier (close/finish)
+                                retourne 'staged' | 'closed' | 'finished' | 'dialog' | 'noop'
+pointerMove(x, y)            → met à jour _pendingPoint + redessine la preview
+pointerUp(x, y)              → commit _pendingPoint si présent ; finalize si maxPoints atteint
+                                retourne 'continue' | 'finished' | 'dialog'
+cancelDraw()                 → annule sans sauvegarder (Esc, changement d'outil)
+finalizeWidget()             → finalise un widget après confirmation du dialog
+isOverFirstPoint(x, y)       → hit-test 1er point validé (tolérance 14px écran)
+isOverLastPoint(x, y)        → hit-test dernier point validé (tolérance 14px écran)
+```
 
-phaseTransition(x, y)        → transition phase 1 → phase 2 (ex: rectangle)
-handleDrawClick(x, y)        → multi-click (polygone), retourne 'continue'|'done'
+Voir `.claude/docs/migration-fsm.md` pour le détail du contrat point-based unifié.
 
+**Méthodes publiques — sélection / handles :**
+
+```
 highlightShape(id)           → dessine overlay de sélection
 clearHighlight()             → efface overlay
 isOverMoveHandle(x, y)       → hit-test handle déplacement
@@ -133,7 +145,7 @@ exportPNG() / exportA4()     → export PNG écran ou format A4
 - Delete ✕ rouge — `(hx + 40/scale, hy)`
 - Hit radius : 14px écran
 
-**LocalStorage :** sauvegarde automatique à chaque `endShape`, `moveShape`, `duplicateShape`, `destroyById`. Rollback silencieux si erreur.
+**LocalStorage :** sauvegarde automatique à chaque finalisation de shape (via `_commitCurrentShape`), `moveShape`, `duplicateShape`, `destroyById`. Rollback silencieux si erreur.
 
 **Undo/Redo :** pile simple — undo retire le dernier shape vers `_undoStack`, redo le remet. Toute nouvelle shape invalide `_undoStack`.
 
@@ -158,7 +170,9 @@ Factory statique. Génère les IDs `shape-N` (compteur statique).
 | circle | `Circle` | mode via `config.toolMode ?? 'center-radius'` |
 | rectangle | `Rectangle` | mode via `config.toolMode ?? '2pts'` |
 | polygon | `Polygon` | |
-| text | `TextShape` | |
+| arc | `Arc` | 3 points (centre + 2 sur la circonférence) |
+| text | `TextShape` | widget bounding-box |
+| graph | `GraphShape` | widget bounding-box (graphique de fonctions) |
 
 `fromJSON(data)` — désérialisation pour `loadLocal()`.
 
@@ -170,11 +184,10 @@ Factory statique. Génère les IDs `shape-N` (compteur statique).
 
 ### Interface `Adaptable`
 
-Tout shape implémente :
+Contrat commun à toutes les shapes :
 ```typescript
-id, tool, layer, color, hidden, isIncremental?
+id, tool, layer, color, hidden
 draw(ctx)
-update?(x, y)
 translate(dx, dy)
 hitTest(x, y, tolerance): boolean
 getSnapPoints(): SnapCandidate[]
@@ -184,9 +197,41 @@ getBounds(): Bounds | null
 toJSON(): any
 ```
 
-### `AbstractShape` — base
+### Contrat point-based unifié
 
-Contient les champs communs (`id`, `createdAt`, `tool`, `layer`, `color`, `width`, `hidden`) et la méthode statique `distToSegment()`.
+Toutes les shapes (sauf Stroke) implémentent `PointBasedShape extends Adaptable` :
+```typescript
+readonly minPoints: number
+readonly maxPoints: number     // Infinity pour Polygon
+readonly points: ReadonlyArray<Point>
+commitPoint(p: Point): void
+previewWith(points: ReadonlyArray<Point>, cursor: Point): void
+finalize(closed: boolean): void
+```
+
+Stroke (pen, highlighter, eraser) implémente `StrokeBasedShape extends Adaptable` :
+```typescript
+addPoint(p: StrokePoint): void
+onStart?(ctx: IDrawingContext): void
+onMove?(x, y, ctx): boolean
+onEnd?(): void
+```
+
+Type guards : `isPointBased(shape)`, `isStrokeBased(shape)` — utilisés par l'Engine pour aiguiller la FSM.
+
+### `AbstractShape` — base commune
+
+Contient les champs partagés (`id`, `createdAt`, `tool`, `layer`, `color`, `width`, `hidden`, `arrowStart`, `arrowEnd`, `arrowStyle`, `lineStyle`, `fill`, `fillOpacity`) et la méthode statique `distToSegment()`.
+
+### `AbstractPointShape extends AbstractShape` — base point-based
+
+Implémente `PointBasedShape`. Gère un tableau interne `_points: Point[]` et un flag `_isPreview: boolean` (true entre `previewWith()` et le prochain `commitPoint`/`finalize`). Les sous-classes déclarent `minPoints`/`maxPoints` et implémentent `_syncFromPoints()` qui met à jour les champs cache (`x1, y1, cx, cy, p1, p2, ...`) à partir de `this._points`.
+
+`previewWith()` utilise un pattern save/restore : remplace temporairement `this._points` par `[...validated, cursor]`, appelle `_syncFromPoints()` pour rafraîchir la cache, puis restaure `this._points` au set validé. La cache reflète donc l'état preview, mais `this._points` reste authoritative.
+
+### `AbstractWidgetShape extends AbstractPointShape` — widgets
+
+Base pour les widgets à dialog (`TextShape`, `GraphShape`). `minPoints = maxPoints = 2` (bounding box). Ajoute `needsDialog: true`, `getDialogProps()`, `applyConfig(config)`, `hasSufficientSize()`.
 
 ### Capacités des shapes
 
@@ -201,53 +246,71 @@ Ces propriétés sont des **champs propres** (`readonly` sur l'instance), pas de
 | `Circle` | — | `true` |
 | `Rectangle` | — | `true` |
 | `Polygon` | — | `true` |
+| `Arc` | `true` | `true` |
 | `TextShape` | `false` | `false` |
+| `GraphShape` | `false` | `false` |
 
 ### Shapes concrètes
 
-**`Stroke`** (pen, highlighter, eraser)
-- `points: StrokePoint[]`, `isIncremental: true`
+**`Stroke`** (pen, highlighter, eraser) — `StrokeBasedShape`
+- `points: StrokePoint[]`. Hooks `onStart(ctx)`, `onMove(x,y,ctx)`, `onEnd()` ; ajout via `addPoint(p)`
 - Filtre de distance min 1.2px + lissage moyenne mobile (fenêtre 3) — **cache invalidé** à chaque `addPoint`/`translate`
 - Rendu Bézier : Catmull-Rom avec points fantômes aux extrémités
 - Eraser : `destination-out`; Highlighter : alpha 0.2
 - Snap points : premier + dernier point; Segments : toutes les 5 paires
 
-**`Line`** — droite infinie
+**`Line`** — droite infinie. `minPoints = maxPoints = 2`
 - Rendu coupé aux bords canvas (intersection ray-canvas)
+- Cache : `x1, y1, x2, y2`
 - Snap points : `x1,y1` et `x2,y2`
 
-**`Segment`** — segment fini
+**`Segment`** — segment fini. `minPoints = maxPoints = 2`
+- Cache : `x1, y1, x2, y2`
 - Snap points : endpoints + midpoint
 
 **`Circle`** — deux modes
-- `cx, cy, radius` (format de stockage commun aux deux modes)
-- Mode `'center-radius'` (défaut) : `drawingMode = 'drag'`, `update()` met à jour le rayon
-- Mode `'3pts'` : `drawingMode = 'multi-click'`, 3 clics (P1→P2→P3), preview segment pointillé puis cercle pointillé, circumcercle calculé par `_circumcircle()`
+- Cache : `cx, cy, radius` (format commun aux deux modes)
+- Mode `'center-radius'` (défaut) : `minPoints = maxPoints = 2` — p0=centre, p1=rayon
+- Mode `'3pts'` : `minPoints = maxPoints = 3` — circumcercle des 3 points (`_circumcircle()`). Phase 1 (1 validé + curseur) affiche un segment pointillé p0→p1 via la cache `_segEnd`
 - `static modes: ToolMode[]` = `[{id:'center-radius', icon:'circle'}, {id:'3pts', icon:'circle-3pts'}]`
 - Snap points : centre + 4 cardinaux (N/S/E/W)
 
 **`Rectangle`** — parallélogramme aligné sur une arête, deux modes
-- `p1, p2` (arête), `w` (largeur perpendiculaire signée)
-- Mode `'2pts'` (défaut) : `drawingMode = 'drag'`, un seul drag
-- Mode `'3pts'` : `drawingMode = 'two-phase'`, phase 1 = arête, phase 2 = largeur
+- Cache : `p1, p2` (arête), `w` (largeur perpendiculaire signée)
+- Mode `'2pts'` (défaut) : `minPoints = maxPoints = 2` — rectangle axis-aligned (p2.y forcé à p1.y, w = pts[1].y - p1.y signé)
+- Mode `'3pts'` : `minPoints = maxPoints = 3` — phase 1 (segment p1→p2) puis 3e point pour la largeur. Discriminateur de phase dans `draw` : `Math.abs(this.w) < 0.01`
 - `static modes: ToolMode[]` = `[{id:'2pts', icon:'tool-rect-2pts'}, {id:'3pts', icon:'tool-rect-3pts'}]`
 - `getCorners()` retourne 4 coins
 
-**`TextShape`** — zone de texte avec rendu LaTeX/MathJax
-- `x, y, source, fontSize, fontFamily, maxWidth`
+**`Arc`** — arc de cercle (3 points). `minPoints = maxPoints = 3`
+- Cache : `cx, cy, radius, startAngle, endAngle, sector`
+- p0=centre, p1 fixe `startAngle`, p2 fixe `endAngle` et `radius` (= distance centre↔p2)
+- Phase 1 (centre + curseur) affiche un segment pointillé via `_segEnd`
+- Supporte `arrowStart`/`arrowEnd` (tangentes) et `sector` (côtés du secteur)
+- Snap points : centre + 2 endpoints + midpoint d'arc
+
+**`Polygon`** — ligne brisée fermée ou ouverte. `minPoints = 3`, `maxPoints = Infinity`
+- Cache : `closed: boolean`, `_cursorPos: Point | null` (curseur de preview)
+- `finalize(closed)` pose `this.closed`. Le clic sur le 1er point validé (≥ minPoints) ferme via `Engine.pointerDown` → `finalize(true)` ; clic sur le dernier point → `finalize(false)`
+- Pointillés de preview rendus uniquement si `_isPreview` (effacés après finalisation)
+- Snap points : tous les sommets (corner) + midpoints des arêtes
+
+**`TextShape`** — widget zone de texte avec rendu LaTeX/MathJax. `minPoints = maxPoints = 2`
+- Cache : `x, y, source, fontSize, fontFamily, maxWidth`
 - `source` : texte brut + LaTeX inline (`$...$`) et display (`$$...$$`)
 - `scheduleRender()` : rendu async via `parseContent` → `renderParagraphs` → cache `_renderedLines`
-- `update(x, y)` : redimensionne `maxWidth` lors du drag initial
-- Pendant le drag : rectangle en pointillés (placeholder) ; après : texte rendu
-- Édition : `TextEditDialog.vue` s'ouvre via double-clic sur la shape
+- `_syncFromPoints()` : `x, y = pts[0]` ; `maxWidth = |pts[1].x - pts[0].x|`
+- Pendant le drag : rectangle en pointillés (placeholder) ; après confirmation du dialog : texte rendu
+- Édition : `TextEditDialog.vue` s'ouvre via double-clic sur la shape (existante) ou au pointerup final lors de la création (engine retourne `'dialog'`)
 - Snap points : 4 coins + centre de la bounding box
 - `isEmpty()` : `source.trim() === ''`
 - `static redrawCallback` : injecté par l'Engine/NoteCanvas pour déclencher un re-rendu après le rendu async
 
-**`Polygon`**
-- `points[]`, `closed`, `cursorPos?`
-- Auto-fermeture si distance ≤ 15px écran du 1er sommet
-- Snap points : tous les sommets (corner) + midpoints des arêtes
+**`GraphShape`** — widget graphique de fonctions. `minPoints = maxPoints = 2`
+- Cache : `_cfg: GraphConfig` (x, y, width, height, xMin/xMax/yMin/yMax, orthonormal, showGrid, labelMode, functions)
+- `_syncFromPoints()` : x, y au coin haut-gauche, width/height depuis le 2e point (avec inversion si drag vers haut-gauche)
+- Édition via `GraphEditDialog.vue`
+- Rendu : grille + axes + labels + tracé des fonctions (`mathjs`)
 
 ### Système de modes d'outils
 
@@ -260,7 +323,7 @@ static readonly modes: ToolMode[] = [
   { id: 'mode-b', icon: 'icon-key-b' },
 ]
 ```
-Le constructeur accepte un paramètre `mode` et initialise `drawingMode` en conséquence.
+Le constructeur accepte un paramètre `mode` qui détermine `minPoints`/`maxPoints` et la logique de `_syncFromPoints`.
 
 **Côté factory** — `ShapeFactory.getModes(tool)` retourne `Shape.modes` ou `[]`.
 
@@ -268,7 +331,7 @@ Le constructeur accepte un paramètre `mode` et initialise `drawingMode` en cons
 
 **Côté UI** — `ToolSelector.vue` appelle `ShapeFactory.getModes(tool)` pour choisir l'icône à afficher (icône du mode courant).
 
-**Côté NoteCanvas** — `startShape()` reçoit `toolMode: store.tool.toolModes[tool]` ; un watch sur `toolModes` annule tout dessin en cours lors d'un changement de mode.
+**Côté NoteCanvas** — `beginDraw()` reçoit `toolMode: store.tool.toolModes[tool]` ; un watch sur `toolModes` appelle `engine.cancelDraw()` lors d'un changement de mode.
 
 **Pour ajouter un mode à un outil existant :**
 1. Ajouter `{ id, icon }` dans `static modes` de la shape
@@ -326,7 +389,7 @@ export const ICONS: Record<string, IconDef> = { ... }
 
 Le `content` est le SVG path brut copié depuis FontAwesome (pas de dépendance npm). **Pour ajouter une icône** : copier le SVG FontAwesome (viewBox + `<path d="..."/>`) et l'ajouter dans ce fichier.
 
-**Clés disponibles :** `arrow-pointer`, `pen-nib`, `highlighter`, `eraser`, `arrows-up-down-left-right`, `draw-polygon`, `rotate-left`, `rotate-right`, `chevron-right/left/up/down`, `xmark`, `magnifying-glass-plus/minus`, `expand`, `compress`, `arrow-left/right`, `play`, `angle-right`, `eye`, `eye-slash`, `trash-can`, `circle`, `circle-3pts`, `square`, `file-arrow-down`, `tool-text`, `tool-line`, `tool-segment`, `tool-vector`, `tool-rect-2pts`, `tool-rect-3pts`.
+**Clés disponibles :** `arrow-pointer`, `pen-nib`, `highlighter`, `eraser`, `arrows-up-down-left-right`, `draw-polygon`, `arc`, `rotate-left`, `rotate-right`, `chevron-right/left/up/down`, `xmark`, `magnifying-glass-plus/minus`, `expand`, `compress`, `arrow-left/right`, `play`, `angle-right`, `eye`, `eye-slash`, `trash-can`, `circle`, `circle-3pts`, `square`, `file-arrow-down`, `tool-text`, `tool-graph`, `tool-line`, `tool-segment`, `tool-vector`, `tool-rect-2pts`, `tool-rect-3pts`.
 
 ### `src/vue/components/PiIcon.vue`
 
@@ -470,13 +533,21 @@ pointerup   → onPointerUp
 pointerleave/cancel → onPointerUp
 ```
 
-**Cas spéciaux :**
-- Rectangle 3pts : 2 phases (clic P1 → clic P2 → drag largeur) via `two-phase`
-- Circle 3pts : 3 clics (P1, P2, P3) via `multi-click`, preview segment puis cercle en pointillés
-- Polygon : clic par clic, double-clic ou auto-close
-- Text : pointerdown pose l'origine, drag fixe `maxWidth`, double-clic sur shape existante ouvre `TextEditDialog`
+**FSM unifiée** (toutes les shapes sauf Stroke) :
+- 1er `pointerdown` sur canvas vide d'outil → `engine.beginDraw(...)` puis `engine.pointerDown(x, y)` qui commit le 1er point
+- `pointerdown` suivants → set un pending point (preview)
+- `pointermove` → met à jour le pending + preview
+- `pointerup` → commit le pending si présent ; finalize si `maxPoints` atteint
+- Hit-test sur 1er/dernier point validé (≥ minPoints) au pointerdown → `finalize(closed=true|false)` (utilisé par Polygon ; sans effet visible pour les shapes à `minPoints == maxPoints`)
+- Tablette : 1 drag = 2 points (down=p0, up=p1). Souris : N clics = N points
+- Stroke (pen, highlighter, eraser) : flux continu inchangé (pointerdown=onStart+addPoint, pointermove=addPoint+onMove, pointerup=onEnd)
+- Widget (text, graph) : `pointerUp` retourne `'dialog'` à la fin → `openWidgetDialog()` ouvre le composant approprié, puis `commitWidget()` appelle `engine.finalizeWidget()`
+- `Esc` (window keydown) → `engine.cancelDraw()`
+- Watch `store.tool.tool` / `store.tool.toolModes` → `engine.cancelDraw()` à tout changement
+- `touchstart` ≥ 2 doigts → `engine.cancelDraw()` (laisse passer le pinch-zoom)
+- Curseur réactif : `pointer` sur 1er/dernier point validé pendant un dessin
+- Édition d'un widget existant : double-clic sur la shape ouvre son dialog
 - Select : gestion des 3 handles (move/duplicate/delete) via store
-- `touchstart` ≥ 2 doigts → annule le dessin en cours
 
 **Composable :** `useCanvasTransform` — zoom/pan souris + touch (pinch)
 
