@@ -3,7 +3,6 @@ import type {Component} from 'vue'
 import {computed, onMounted, onUnmounted, ref, shallowRef, watch} from 'vue'
 import {createPinia, getActivePinia, setActivePinia} from 'pinia'
 import {Engine} from '@core/Engine'
-import type {Adaptable} from '../shapes/Adaptable'
 import type {BackgroundState, ToolConfig, ToolType} from '../types'
 import NoteTools from '@pi-vue/NoteTools.vue'
 import NoteSidebar from '@pi-vue/components/Sidebar/NoteSidebar.vue'
@@ -54,17 +53,6 @@ const {transform, zoomIn, zoomOut, resetView, fitView} = useCanvasTransform(canv
 // ── État de dessin (local — ne concerne pas l'UI des panels) ─────────────────
 
 const engine = shallowRef<Engine | undefined>(undefined)
-let currentShape: Adaptable | null = null
-let isDrawing = false
-let startTime = 0
-
-// Mode multi-click (ex: polygone) : clics successifs pour ajouter des sommets
-let isMultiClickDrawing = false
-let lastClickTime = 0
-
-// Mode two-phase (ex: rectangle 3pts) : deux drags successifs
-let isPhase1Dragging = false   // premier drag en cours (on trace l'arête)
-let isPhase2Ready = false       // entre les deux drags (en attente du 2e pointerdown)
 
 // Déplacement / duplication de shape sélectionnée
 let isMovingShape = false
@@ -145,64 +133,41 @@ function onPointerDown(event: PointerEvent) {
     return
   }
 
-  // Phase 2 : deuxième drag (rectangle 3pts)
-  if (isPhase2Ready && currentShape) {
-    isPhase2Ready = false
-    isDrawing = true
-    startTime = Date.now()
+  // Premier pointerdown d'un dessin : crée la shape
+  if (!engine.value.currentShape) {
+    engine.value.beginDraw({
+      layer: store.tool.layer,
+      color: store.tool.color ?? 'black',
+      width: store.tool.width ?? 2,
+      tool: store.tool.tool,
+      createdAt: Date.now(),
+      x: 0,
+      y: 0,
+      toolMode: store.tool.toolModes[store.tool.tool],
+    })
+  }
+
+  const result = engine.value.pointerDown(pos.x, pos.y)
+  if (result === 'closed' || result === 'finished') {
+    store.syncFromEngine()
+  } else if (result === 'dialog') {
+    openWidgetDialog()
+  }
+}
+
+function openWidgetDialog() {
+  if (!engine.value) return
+  const shape = engine.value.currentShape
+  if (!(shape instanceof AbstractWidgetShape)) return
+  const dialogComp = WIDGET_DIALOGS[shape.tool]
+  if (!dialogComp) {
+    engine.value.cancelDraw()
     return
   }
-
-  // Continuation d'un dessin multi-click (ex: polygone)
-  if (isMultiClickDrawing && currentShape) {
-    const now = Date.now()
-    const isDoubleClick = (currentShape.doubleClickTimeout !== undefined)
-        && (now - lastClickTime < currentShape.doubleClickTimeout)
-    lastClickTime = now
-
-    if (isDoubleClick) {
-      engine.value.endShape()
-      isMultiClickDrawing = false
-      currentShape = null
-      store.syncFromEngine()
-    } else {
-      const result = engine.value.handleDrawClick(pos.x, pos.y)
-      if (result === 'done') {
-        engine.value.endShape()
-        isMultiClickDrawing = false
-        currentShape = null
-        store.syncFromEngine()
-      } else {
-        engine.value.updateShape(pos.x, pos.y)
-      }
-    }
-    return
-  }
-
-  // Démarrage d'un nouveau dessin
-  startTime = Date.now()
-  currentShape = engine.value.startShape({
-    layer: store.tool.layer,
-    color: store.tool.color ?? 'black',
-    width: store.tool.width ?? 2,
-    tool: store.tool.tool,
-    createdAt: startTime,
-    x: pos.x,
-    y: pos.y,
-    toolMode: store.tool.toolModes[store.tool.tool],
-  })
-
-  const mode = currentShape.drawingMode ?? 'drag'
-  if (mode === 'two-phase') {
-    isPhase1Dragging = true
-  } else if (mode === 'multi-click') {
-    isMultiClickDrawing = true
-    lastClickTime = Date.now()
-  } else {
-    isDrawing = true
-  }
-
-  currentShape.onDrawPoint?.(pos.x, pos.y, 0)
+  _activeWidget.value = shape
+  _activeWidgetIsNew = true
+  activeWidgetDialogComponent.value = dialogComp
+  isWidgetEditing.value = true
 }
 
 function onPointerMove(event: PointerEvent) {
@@ -223,10 +188,15 @@ function onPointerMove(event: PointerEvent) {
     return
   }
 
-  // Curseur selon la proximité des handles ou de l'outil select
+  const pos = toCanvasCoords(event)
+
+  // Curseur selon la proximité des handles, premier/dernier point, ou outil select
   if (canvasEl.value) {
-    const pos = toCanvasCoords(event)
-    if (store.selectedShapeId && engine.value?.isOverMoveHandle(pos.x, pos.y)) {
+    if (engine.value?.currentShape && engine.value.isOverFirstPoint(pos.x, pos.y)) {
+      canvasEl.value.style.cursor = 'pointer'
+    } else if (engine.value?.currentShape && engine.value.isOverLastPoint(pos.x, pos.y)) {
+      canvasEl.value.style.cursor = 'pointer'
+    } else if (store.selectedShapeId && engine.value?.isOverMoveHandle(pos.x, pos.y)) {
       canvasEl.value.style.cursor = 'grab'
     } else if (store.selectedShapeId && engine.value?.isOverDeleteHandle(pos.x, pos.y)) {
       canvasEl.value.style.cursor = 'not-allowed'
@@ -239,20 +209,12 @@ function onPointerMove(event: PointerEvent) {
     }
   }
 
-  if (isPhase1Dragging || isPhase2Ready || isMultiClickDrawing) {
-    engine.value?.updateShape(toCanvasCoords(event).x, toCanvasCoords(event).y)
+  if (engine.value?.currentShape) {
+    engine.value.pointerMove(pos.x, pos.y)
     return
   }
 
-  if (!isDrawing || !currentShape) {
-    const pos = toCanvasCoords(event)
-    engine.value?.hoverSnap(pos.x, pos.y, store.tool.tool)
-    return
-  }
-
-  const pos = toCanvasCoords(event)
-  currentShape.onDrawPoint?.(pos.x, pos.y, Date.now() - startTime)
-  engine.value?.updateShape(pos.x, pos.y)
+  engine.value?.hoverSnap(pos.x, pos.y, store.tool.tool)
 }
 
 function onPointerUp(event: PointerEvent) {
@@ -281,47 +243,26 @@ function onPointerUp(event: PointerEvent) {
     return
   }
 
-  // Fin du premier drag (two-phase) : verrouille l'arête, attend le 2e drag
-  if (isPhase1Dragging && currentShape) {
-    const pos = toCanvasCoords(event)
-    isPhase1Dragging = false
-    engine.value?.phaseTransition(pos.x, pos.y)
-    isPhase2Ready = true
-    return
-  }
-
-  if (!isDrawing) {
+  if (!engine.value?.currentShape) {
     engine.value?.clearHoverSnap()
     return
   }
-  isDrawing = false
-  if (currentShape) {
-    // Widget : on n'appelle pas endShape() tout de suite — on ouvre le dialog
-    const dialogComp = WIDGET_DIALOGS[currentShape.tool]
-    if (dialogComp && currentShape instanceof AbstractWidgetShape) {
-      if (!currentShape.hasSufficientSize()) {
-        engine.value?.cancelShape()
-        currentShape = null
-        return
-      }
-      _activeWidget.value = currentShape
-      _activeWidgetIsNew = true
-      activeWidgetDialogComponent.value = dialogComp
-      isWidgetEditing.value = true
-      currentShape = null
-      return
-    }
-    engine.value?.endShape()
+
+  const pos = toCanvasCoords(event)
+  const status = engine.value.pointerUp(pos.x, pos.y)
+  if (status === 'finished') {
     store.syncFromEngine()
-    currentShape = null
+  } else if (status === 'dialog') {
+    openWidgetDialog()
   }
+  // 'continue' : la FSM attend d'autres clics (polygone, multi-points)
 }
 
 function commitWidget(config: unknown) {
   if (!_activeWidget.value || !engine.value) return
   _activeWidget.value.applyConfig(config)
   if (_activeWidgetIsNew) {
-    engine.value.endShape()
+    engine.value.finalizeWidget()
     store.syncFromEngine()
   } else {
     engine.value.draw()
@@ -334,10 +275,16 @@ function commitWidget(config: unknown) {
 
 function cancelWidget() {
   if (!engine.value) return
-  if (_activeWidgetIsNew) engine.value.cancelShape()
+  if (_activeWidgetIsNew) engine.value.cancelDraw()
   _activeWidget.value = null
   activeWidgetDialogComponent.value = null
   isWidgetEditing.value = false
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && engine.value?.currentShape) {
+    engine.value.cancelDraw()
+  }
 }
 
 function onDblClick(event: MouseEvent) {
@@ -366,24 +313,11 @@ watch(() => store.tool.bezier, (val) => {
 
 // Annule un dessin en cours si l'utilisateur change de mode
 watch(() => store.tool.toolModes, () => {
-  if (isPhase1Dragging || isPhase2Ready || isMultiClickDrawing) {
-    engine.value?.cancelShape()
-    isPhase1Dragging = false
-    isPhase2Ready = false
-    isMultiClickDrawing = false
-    isDrawing = false
-    currentShape = null
-  }
+  if (engine.value?.currentShape) engine.value.cancelDraw()
 }, { deep: true })
 
 watch(() => store.tool.tool, (newTool) => {
-  if (isMultiClickDrawing || isPhase1Dragging || isPhase2Ready) {
-    engine.value?.cancelShape()
-    isMultiClickDrawing = false
-    isPhase1Dragging = false
-    isPhase2Ready = false
-    currentShape = null
-  }
+  if (engine.value?.currentShape) engine.value.cancelDraw()
   if (newTool !== 'select' && store.selectedShapeId) {
     store.highlightShape(null)
   }
@@ -417,17 +351,12 @@ onMounted(() => {
 
   // Annule tout dessin en cours si un 2e doigt arrive (pinch → zoom)
   canvasEl.value.addEventListener('touchstart', (e) => {
-    if (e.touches.length >= 2) {
-      if (isDrawing || isMultiClickDrawing || isPhase1Dragging || isPhase2Ready) {
-        engine.value?.cancelShape()
-        isDrawing = false
-        isMultiClickDrawing = false
-        isPhase1Dragging = false
-        isPhase2Ready = false
-        currentShape = null
-      }
+    if (e.touches.length >= 2 && engine.value?.currentShape) {
+      engine.value.cancelDraw()
     }
   }, {passive: true})
+
+  window.addEventListener('keydown', onKeyDown)
 
   // Initialise l'engine avec les props
   engine.value = new Engine(canvasEl.value, props.background)
@@ -465,6 +394,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown)
   engine.value?.destroy()
 })
 

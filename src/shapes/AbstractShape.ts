@@ -14,7 +14,6 @@ export abstract class AbstractShape implements Adaptable {
     color: string
     width: number
     hidden: boolean
-    isIncremental?: boolean = false
     createdAt: number
     arrowStart: boolean
     arrowEnd: boolean
@@ -124,8 +123,6 @@ export abstract class AbstractShape implements Adaptable {
     abstract getCircles(): CircleGeom[]
 
     abstract getBounds(): Bounds | null
-
-    update?(x: number, y: number): void
 
     isEmpty(): boolean { return false }
 }

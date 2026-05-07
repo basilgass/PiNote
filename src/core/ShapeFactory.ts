@@ -40,7 +40,11 @@ export class ShapeFactory {
     }
 
     static create(config: ShapeStartConfig, values?: LineConfig | SegmentConfig | StrokeConfig | RectangleConfig | CircleConfig | PolygonConfig | TextConfig | ArcConfig | GraphConfig): Adaptable {
-        const {x, y, color, width, layer, id, createdAt, tool} = config
+        const {color, width, layer, id, createdAt, tool} = config
+        // x, y ne sont utilisés que par fromJSON via `values`. Pour le drawing,
+        // les shapes point-based reçoivent leurs points via commitPoint() — la
+        // config initiale est volontairement degenerate.
+        const x = 0, y = 0
 
         const finalLayer = layer ?? null
         const finalColor = color ?? "#000"

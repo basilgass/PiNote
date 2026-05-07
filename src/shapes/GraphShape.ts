@@ -40,6 +40,31 @@ export class GraphShape extends AbstractWidgetShape {
     constructor(config: GraphConfig, options: Partial<ShapeOptions> = {}) {
         super({ ...options, tool: 'graph' })
         this._cfg = { ...config }
+
+        // Si la config est non triviale (fromJSON), reconstruit _points
+        if (this._cfg.width > 0.01 || this._cfg.height > 0.01) {
+            this._points = [
+                { x: this._cfg.x, y: this._cfg.y },
+                { x: this._cfg.x + this._cfg.width, y: this._cfg.y + this._cfg.height },
+            ]
+        }
+    }
+
+    protected _syncFromPoints(): void {
+        const pts = this._points
+        if (pts.length < 1) return
+        this._cfg.x = pts[0].x
+        this._cfg.y = pts[0].y
+        if (pts.length >= 2) {
+            this._cfg.width  = Math.max(0, Math.abs(pts[1].x - pts[0].x))
+            this._cfg.height = Math.max(0, Math.abs(pts[1].y - pts[0].y))
+            // Si l'utilisateur dessine vers le haut-gauche, place le coin en haut-gauche
+            if (pts[1].x < pts[0].x) this._cfg.x = pts[1].x
+            if (pts[1].y < pts[0].y) this._cfg.y = pts[1].y
+        } else {
+            this._cfg.width = 0
+            this._cfg.height = 0
+        }
     }
 
     // ── AbstractWidgetShape ───────────────────────────────────────────────────
@@ -54,11 +79,6 @@ export class GraphShape extends AbstractWidgetShape {
 
     // ── Interaction ───────────────────────────────────────────────────────────
 
-    update(x: number, y: number): void {
-        this._cfg.width  = Math.max(0, x - this._cfg.x)
-        this._cfg.height = Math.max(0, y - this._cfg.y)
-    }
-
     hasSufficientSize(): boolean {
         return this._cfg.width >= 20 && this._cfg.height >= 20
     }
@@ -72,6 +92,7 @@ export class GraphShape extends AbstractWidgetShape {
     translate(dx: number, dy: number): void {
         this._cfg.x += dx
         this._cfg.y += dy
+        for (const p of this._points) { p.x += dx; p.y += dy }
     }
 
     hitTest(x: number, y: number, _tolerance: number): boolean {

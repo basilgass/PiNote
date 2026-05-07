@@ -1,7 +1,7 @@
 import {AbstractShape} from "./AbstractShape"
-import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
-import {DrawingMode, ShapeOptions} from "./Adaptable"
-import type {IDrawingContext} from "../core/DrawingContext"
+import {AbstractPointShape} from "./AbstractPointShape"
+import {Bounds, CircleGeom, Point, Segment, SnapCandidate} from "./GeometryTypes"
+import {ShapeOptions} from "./Adaptable"
 
 interface Pt { x: number; y: number }
 
@@ -14,20 +14,21 @@ export interface ArcConfig {
     sector: boolean
 }
 
-export class Arc extends AbstractShape {
-    public cx: number
-    public cy: number
-    public radius: number
-    public startAngle: number
-    public endAngle: number
+export class Arc extends AbstractPointShape {
+    public cx: number = 0
+    public cy: number = 0
+    public radius: number = 0
+    public startAngle: number = 0
+    public endAngle: number = 0
     public sector: boolean
 
-    readonly drawingMode: DrawingMode = 'multi-click'
+    /** Phase 1 du dessin (centre + p1) : segment pointillé centre → p1. */
+    private _segEnd: Point | null = null
+
+    readonly minPoints = 3
+    readonly maxPoints = 3
     override readonly canBeFilled = true
     override readonly canHaveArrows = true
-
-    private _p2: Pt | null = null
-    private _cursor: Pt | null = null
 
     constructor(config: ArcConfig, options: Partial<ShapeOptions> = {}) {
         super(options)
@@ -37,55 +38,38 @@ export class Arc extends AbstractShape {
         this.startAngle = config.startAngle
         this.endAngle = config.endAngle
         this.sector = config.sector ?? false
-    }
 
-    onDrawStart(x: number, y: number, _ctx: IDrawingContext): void {
-        this.cx = x
-        this.cy = y
-        this._cursor = { x, y }
-    }
-
-    onDrawMove(x: number, y: number, ctx: IDrawingContext): boolean {
-        const snapResult = ctx.snap(x, y, this.layer)
-        const fx = snapResult?.x ?? x
-        const fy = snapResult?.y ?? y
-        this._cursor = { x: fx, y: fy }
-
-        if (this._p2 !== null) {
-            this.radius = Math.hypot(fx - this.cx, fy - this.cy)
-            this.endAngle = Math.atan2(fy - this.cy, fx - this.cx)
+        if (this.radius > 0.01) {
+            this._points = [
+                { x: this.cx, y: this.cy },
+                { x: this.cx + this.radius * Math.cos(this.startAngle), y: this.cy + this.radius * Math.sin(this.startAngle) },
+                { x: this.cx + this.radius * Math.cos(this.endAngle), y: this.cy + this.radius * Math.sin(this.endAngle) },
+            ]
         }
-
-        const { x: tx, y: ty, scale } = ctx.viewTransform
-        const oCtx = ctx.overlayCtx
-        oCtx.save()
-        oCtx.translate(tx, ty)
-        oCtx.scale(scale, scale)
-        this.draw(oCtx)
-        if (snapResult) ctx.drawSnapIndicator(snapResult)
-        oCtx.restore()
-        return true
     }
 
-    onDrawClick(x: number, y: number, ctx: IDrawingContext): 'continue' | 'done' {
-        const snapResult = ctx.snap(x, y, this.layer)
-        const fx = snapResult?.x ?? x
-        const fy = snapResult?.y ?? y
+    protected _syncFromPoints(): void {
+        const pts = this._points
+        this._segEnd = null
 
-        if (this._p2 === null) {
-            this._p2 = { x: fx, y: fy }
-            this.startAngle = Math.atan2(fy - this.cy, fx - this.cx)
-            return 'continue'
+        if (pts.length === 0) {
+            this.radius = 0
+            return
         }
+        this.cx = pts[0].x
+        this.cy = pts[0].y
 
-        this.radius = Math.hypot(fx - this.cx, fy - this.cy)
-        this.endAngle = Math.atan2(fy - this.cy, fx - this.cx)
-        return 'done'
-    }
-
-    onDrawEnd(): void {
-        this._cursor = null
-        this._p2 = null
+        if (pts.length === 1) {
+            this.radius = 0
+        } else if (pts.length === 2) {
+            this.radius = 0
+            this.startAngle = Math.atan2(pts[1].y - this.cy, pts[1].x - this.cx)
+            this._segEnd = { x: pts[1].x, y: pts[1].y }
+        } else {
+            this.startAngle = Math.atan2(pts[1].y - this.cy, pts[1].x - this.cx)
+            this.endAngle = Math.atan2(pts[2].y - this.cy, pts[2].x - this.cx)
+            this.radius = Math.hypot(pts[2].x - this.cx, pts[2].y - this.cy)
+        }
     }
 
     // Sweep angle going counterclockwise from startAngle to endAngle (0 to 2π)
@@ -93,7 +77,6 @@ export class Arc extends AbstractShape {
         return ((this.startAngle - this.endAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
     }
 
-    // Returns true if the given angle is within the counterclockwise arc range
     private _inArcRange(angle: number): boolean {
         const sweep = this._sweep()
         if (sweep < 1e-6) return false
@@ -103,35 +86,31 @@ export class Arc extends AbstractShape {
 
     draw(ctx: CanvasRenderingContext2D) {
         const scale = Math.abs(ctx.getTransform().a) || 1
-        const isPreview = this._cursor !== null
 
         ctx.save()
         ctx.strokeStyle = this.color
         ctx.lineWidth = this.width
         ctx.lineCap = 'round'
 
-        // Phase 1 : segment pointillé centre → curseur (direction du premier côté)
-        if (this._p2 === null && this._cursor !== null) {
+        // Phase 1 : segment pointillé centre → p1
+        if (this._segEnd !== null) {
             const dash = Math.max(this.width * 2, 5) / scale
             ctx.setLineDash([dash, dash])
             ctx.beginPath()
             ctx.moveTo(this.cx, this.cy)
-            ctx.lineTo(this._cursor.x, this._cursor.y)
+            ctx.lineTo(this._segEnd.x, this._segEnd.y)
             ctx.stroke()
             ctx.setLineDash([])
             ctx.restore()
             return
         }
 
-        if (this.radius < 0.5) {
-            ctx.restore()
-            return
-        }
+        if (this.radius < 0.5) { ctx.restore(); return }
 
+        const isPreview = this._isPreview
         const arrowSize = Math.max(this.width * 5, 14)
         const angleDelta = this.radius > 0 ? arrowSize * 0.8 / this.radius : 0
 
-        // Angles effectifs de l'arc (raccourcis sous les têtes de flèche)
         const effStart = (!isPreview && this.arrowStart) ? this.startAngle - angleDelta : this.startAngle
         const effEnd   = (!isPreview && this.arrowEnd)   ? this.endAngle   + angleDelta : this.endAngle
 
@@ -147,7 +126,6 @@ export class Arc extends AbstractShape {
             AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
         }
 
-        // Remplissage du secteur (seulement en mode final)
         if (this.fill && !isPreview) {
             ctx.beginPath()
             ctx.moveTo(this.cx, this.cy)
@@ -159,12 +137,10 @@ export class Arc extends AbstractShape {
             ctx.globalAlpha = 1
         }
 
-        // Arc (avec raccourcissement si flèches)
         ctx.beginPath()
         ctx.arc(this.cx, this.cy, this.radius, effStart, effEnd, true)
         ctx.stroke()
 
-        // Côtés du secteur
         if (this.sector) {
             ctx.beginPath()
             ctx.moveTo(this.cx, this.cy)
@@ -176,7 +152,6 @@ export class Arc extends AbstractShape {
 
         ctx.setLineDash([])
 
-        // Flèches tangentes à l'arc (sens trigonométrique : tangente = (sin t, -cos t))
         if (!isPreview) {
             if (this.arrowEnd)
                 AbstractShape.drawArrowHead(ctx, endPtX, endPtY,
@@ -184,10 +159,7 @@ export class Arc extends AbstractShape {
             if (this.arrowStart)
                 AbstractShape.drawArrowHead(ctx, startPtX, startPtY,
                     this.startAngle + Math.PI / 2, arrowSize, this.arrowStyle, this.color, this.width)
-        }
 
-        // Point central (mode final uniquement)
-        if (!isPreview) {
             const dotRadius = Math.max(2, this.width * 1.5) / scale
             ctx.beginPath()
             ctx.arc(this.cx, this.cy, dotRadius, 0, Math.PI * 2)
@@ -222,9 +194,11 @@ export class Arc extends AbstractShape {
     translate(dx: number, dy: number) {
         this.cx += dx
         this.cy += dy
+        for (const p of this._points) { p.x += dx; p.y += dy }
     }
 
     isEmpty(): boolean {
+        if (this._points.length < this.minPoints) return true
         return this.radius < 1
     }
 

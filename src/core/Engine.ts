@@ -1,7 +1,9 @@
 import {Layer} from "@core/Layer"
 import {BackgroundMode, BackgroundState, LayerName, ToolType} from "../types"
-import {Adaptable, ShapePatch} from "../shapes/Adaptable"
+import {Adaptable, PointBasedShape, ShapePatch, isPointBased, isStrokeBased} from "../shapes/Adaptable"
 import {AbstractShape} from "../shapes/AbstractShape"
+import {AbstractWidgetShape} from "../shapes/AbstractWidgetShape"
+import {Point} from "../shapes/GeometryTypes"
 import {SnapManager} from "../snap/SnapManager"
 import {SnapWorkerClient, type SnapGeometry} from "../snap/SnapWorkerClient"
 import {ShapeFactory, ShapeStartConfig} from "@core/ShapeFactory"
@@ -22,6 +24,10 @@ export class Engine {
     private _layers: Record<LayerName, Layer>
     private _shapes: Adaptable[] = []
     private _currentShape: Adaptable | null = null
+    private _drawState: 'idle' | 'drawing-points' | 'drawing-stroke' = 'idle'
+    /** Point en cours de preview (curseur entre 2 commits). Commit au pointerup. */
+    private _pendingPoint: Point | null = null
+    private _strokeStartTime = 0
     private _background: BackgroundState = {
         mode: 'none',
         grid:  { size: 80,  color: '#777777', lineWidth: 1 },
@@ -111,99 +117,260 @@ export class Engine {
     }
     get backgroundState(): BackgroundState { return { ...this._background } }
 
-    // --- Shape creation ---
-    startShape(config: ShapeStartConfig): Adaptable {
+    // --- Shape creation (FSM unifiée, contrat point-based) ---
+
+    /** Crée la shape courante et met l'engine en état de dessin. Ne stage aucun point. */
+    beginDraw(config: ShapeStartConfig): Adaptable {
         this._cancelTempFade()
-        let startX = config.x
-        let startY = config.y
-
-        if (!Engine.NO_SNAP_TOOLS.has(config.tool)) {
-            const snapResult = this.snapManager.snap(config.x, config.y, this._shapes, config.layer)
-            this.overlay.clear()
-            const { x: tx, y: ty, scale } = this._viewTransform
-            const ctx = this.overlay.ctx
-            ctx.save()
-            ctx.translate(tx, ty)
-            ctx.scale(scale, scale)
-            this.snapRenderer.draw(snapResult)
-            ctx.restore()
-            startX = snapResult?.x ?? config.x
-            startY = snapResult?.y ?? config.y
-        }
-
-        const shape = ShapeFactory.create({ ...config, x: startX, y: startY })
-        shape.onDrawStart?.(startX, startY, this._buildDrawingContext())
+        const shape = ShapeFactory.create(config)
         this._currentShape = shape
+        this._pendingPoint = null
+
+        if (isStrokeBased(shape)) {
+            this._drawState = 'drawing-stroke'
+            this._strokeStartTime = Date.now()
+            shape.onStart?.(this._buildDrawingContext())
+        } else {
+            this._drawState = 'drawing-points'
+        }
         return shape
     }
 
-    /** Mode two-phase : transition phase 1 → phase 2 (2e clic). */
-    phaseTransition(x: number, y: number) {
-        if (!this._currentShape?.onPhaseTransition) return
-        this.overlay.clear()
-        this._currentShape.onPhaseTransition(x, y, this._buildDrawingContext())
+    /**
+     * pointerdown sur le canvas pendant un dessin.
+     * - Stroke : ajoute le point initial.
+     * - Point-based : si clic sur 1er/dernier point validé (≥ minPoints), finalize.
+     *   Sinon : si c'est le 1er point de la shape, commit immédiatement (cas du drag
+     *   tablette : down=p0, up=p1). Pour les points suivants, alimente le pending
+     *   point ; il sera commit au pointerup.
+     */
+    pointerDown(x: number, y: number): 'staged' | 'closed' | 'finished' | 'dialog' | 'noop' {
+        const shape = this._currentShape
+        if (!shape) return 'noop'
+
+        if (this._drawState === 'drawing-stroke' && isStrokeBased(shape)) {
+            shape.addPoint({ x, y, t: 0 })
+            return 'staged'
+        }
+
+        if (this._drawState === 'drawing-points' && isPointBased(shape)) {
+            if (shape.points.length >= shape.minPoints) {
+                if (this.isOverFirstPoint(x, y)) {
+                    shape.finalize(true)
+                    this._commitCurrentShape()
+                    return 'closed'
+                }
+                if (this.isOverLastPoint(x, y)) {
+                    shape.finalize(false)
+                    this._commitCurrentShape()
+                    return 'closed'
+                }
+            }
+            const snapped = this._maybeSnap(x, y, shape)
+            const p = { x: snapped.x, y: snapped.y }
+
+            if (shape.points.length === 0) {
+                shape.commitPoint(p)
+                this._pendingPoint = null
+                if (shape.points.length >= shape.maxPoints) {
+                    return this._finalizePointShape(shape)
+                }
+            } else {
+                this._pendingPoint = p
+                shape.previewWith(shape.points, p)
+            }
+            this._drawPointPreview(snapped.snapResult)
+            return 'staged'
+        }
+
+        return 'noop'
     }
 
-    /** Mode multi-click : traite un clic suivant. Retourne 'done' si la shape est terminée. */
-    handleDrawClick(x: number, y: number): 'continue' | 'done' {
-        if (!this._currentShape?.onDrawClick) return 'continue'
-        return this._currentShape.onDrawClick(x, y, this._buildDrawingContext())
+    /** pointermove pendant un dessin. Met à jour la preview (curseur, snap, indicateurs). */
+    pointerMove(x: number, y: number): void {
+        const shape = this._currentShape
+        if (!shape) return
+
+        if (this._drawState === 'drawing-stroke' && isStrokeBased(shape)) {
+            const t = Date.now() - this._strokeStartTime
+            shape.addPoint({ x, y, t })
+            this.overlay.clear()
+            this._tempLayer.clear()
+            const handled = shape.onMove?.(x, y, this._buildDrawingContext())
+            if (handled) return
+            const { x: tx, y: ty, scale } = this._viewTransform
+            const ctx = this._tempLayer.ctx
+            ctx.save()
+            ctx.translate(tx, ty)
+            ctx.scale(scale, scale)
+            shape.draw(ctx)
+            ctx.restore()
+            return
+        }
+
+        if (this._drawState === 'drawing-points' && isPointBased(shape)) {
+            const snapped = this._maybeSnap(x, y, shape)
+            this._pendingPoint = { x: snapped.x, y: snapped.y }
+            shape.previewWith(shape.points, this._pendingPoint)
+            this._drawPointPreview(snapped.snapResult)
+        }
     }
 
-    updateShape(x: number, y: number) {
+    /**
+     * pointerup pendant un dessin.
+     * - Stroke : finalize le tracé.
+     * - Point-based : si un pending point existe, le commit. Si maxPoints est
+     *   atteint, finalize. Pour les widgets, retourne 'dialog'.
+     */
+    pointerUp(_x: number, _y: number): 'continue' | 'finished' | 'dialog' {
+        const shape = this._currentShape
+        if (!shape) return 'finished'
+
+        if (this._drawState === 'drawing-stroke' && isStrokeBased(shape)) {
+            shape.onEnd?.()
+            this._commitCurrentShape()
+            return 'finished'
+        }
+
+        if (this._drawState === 'drawing-points' && isPointBased(shape)) {
+            if (this._pendingPoint && shape.points.length < shape.maxPoints) {
+                shape.commitPoint(this._pendingPoint)
+                this._pendingPoint = null
+                if (shape.points.length >= shape.maxPoints) {
+                    return this._finalizePointShape(shape)
+                }
+            }
+            this._drawPointPreview(null)
+            return 'continue'
+        }
+
+        return 'finished'
+    }
+
+    /** Finalise une shape point-based qui vient d'atteindre maxPoints. */
+    private _finalizePointShape(shape: PointBasedShape): 'finished' | 'dialog' {
+        shape.finalize(false)
+        if (shape instanceof AbstractWidgetShape) {
+            if (!shape.hasSufficientSize()) {
+                this.cancelDraw()
+                return 'finished'
+            }
+            return 'dialog'
+        }
+        this._commitCurrentShape()
+        return 'finished'
+    }
+
+    /** Annule le dessin en cours sans finaliser ni sauvegarder. */
+    cancelDraw(): void {
         if (!this._currentShape) return
+        this._cancelTempFade()
+        this._currentShape = null
+        this._pendingPoint = null
+        this._drawState = 'idle'
+        this.overlay.clear()
+        this._tempLayer.clear()
+    }
+
+    /** Finalise un widget après confirmation du dialog. */
+    finalizeWidget(): void {
+        if (!this._currentShape) return
+        this._commitCurrentShape()
+    }
+
+    /** Hit-test sur le 1er point validé (tolérance 14px écran). */
+    isOverFirstPoint(x: number, y: number): boolean {
+        const shape = this._currentShape
+        if (!shape || !isPointBased(shape)) return false
+        const pts = shape.points
+        if (pts.length === 0) return false
+        const tol = 14 / this._viewTransform.scale
+        return Math.hypot(x - pts[0].x, y - pts[0].y) <= tol
+    }
+
+    /** Hit-test sur le dernier point validé (tolérance 14px écran). */
+    isOverLastPoint(x: number, y: number): boolean {
+        const shape = this._currentShape
+        if (!shape || !isPointBased(shape)) return false
+        const pts = shape.points
+        if (pts.length === 0) return false
+        const last = pts[pts.length - 1]
+        const tol = 14 / this._viewTransform.scale
+        return Math.hypot(x - last.x, y - last.y) <= tol
+    }
+
+    private _maybeSnap(x: number, y: number, shape: Adaptable): { x: number; y: number; snapResult: ReturnType<SnapManager['snap']> } {
+        if (Engine.NO_SNAP_TOOLS.has(shape.tool)) return { x, y, snapResult: null }
+        const snapResult = this.snapManager.snap(x, y, this._shapes, shape.layer)
+        return {
+            x: snapResult?.x ?? x,
+            y: snapResult?.y ?? y,
+            snapResult,
+        }
+    }
+
+    /** Dessine la shape sur tempLayer + indicateurs (snap, points validés) sur overlay. */
+    private _drawPointPreview(snapResult: ReturnType<SnapManager['snap']>): void {
+        const shape = this._currentShape
+        if (!shape) return
 
         this.overlay.clear()
         this._tempLayer.clear()
 
-        const handled = this._currentShape.onDrawMove?.(x, y, this._buildDrawingContext())
-        if (handled) return
-
-        // Comportement générique : snap sur overlay, forme sur _tempLayer
-        let newX = x
-        let newY = y
-        const isSnapTool = !Engine.NO_SNAP_TOOLS.has(this._currentShape.tool)
-        const snapResult = isSnapTool
-            ? this.snapManager.snap(x, y, this._shapes, this._currentShape.layer)
-            : null
-
-        if (isSnapTool && snapResult) {
-            newX = snapResult.x
-            newY = snapResult.y
-        }
-
-        this._currentShape.update?.(newX, newY)
-
         const { x: tx, y: ty, scale } = this._viewTransform
 
-        if (isSnapTool) {
-            const octx = this.overlay.ctx
-            octx.save()
-            octx.translate(tx, ty)
-            octx.scale(scale, scale)
-            this.snapRenderer.draw(snapResult)
-            octx.restore()
-        }
+        const tCtx = this._tempLayer.ctx
+        tCtx.save()
+        tCtx.translate(tx, ty)
+        tCtx.scale(scale, scale)
+        shape.draw(tCtx)
+        tCtx.restore()
 
-        const ctx = this._tempLayer.ctx
-        ctx.save()
-        ctx.translate(tx, ty)
-        ctx.scale(scale, scale)
-        this._currentShape.draw(ctx)
-        ctx.restore()
+        const oCtx = this.overlay.ctx
+        oCtx.save()
+        oCtx.translate(tx, ty)
+        oCtx.scale(scale, scale)
+        if (snapResult) this.snapRenderer.draw(snapResult)
+        if (isPointBased(shape)) this._drawPointsOverlay(oCtx, shape, scale)
+        oCtx.restore()
     }
 
-    endShape() {
-        if (!this._currentShape) return
+    /** Dessine les points validés (cercles gris) + anneaux 1er/dernier point si fermable. */
+    private _drawPointsOverlay(ctx: CanvasRenderingContext2D, shape: PointBasedShape, scale: number): void {
+        const pts = shape.points
+        if (pts.length === 0) return
+        const r = 4 / scale
+        ctx.fillStyle = '#888'
+        for (const p of pts) {
+            ctx.beginPath()
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+            ctx.fill()
+        }
+        if (pts.length >= shape.minPoints) {
+            ctx.lineWidth = 2 / scale
+            ctx.beginPath()
+            ctx.arc(pts[0].x, pts[0].y, r * 2, 0, Math.PI * 2)
+            ctx.strokeStyle = '#22c55e'
+            ctx.stroke()
+            if (pts.length > 1) {
+                ctx.beginPath()
+                ctx.arc(pts[pts.length - 1].x, pts[pts.length - 1].y, r * 2, 0, Math.PI * 2)
+                ctx.strokeStyle = '#f97316'
+                ctx.stroke()
+            }
+        }
+    }
 
+    private _commitCurrentShape() {
         const shape = this._currentShape
+        if (!shape) return
         this._currentShape = null
+        this._pendingPoint = null
+        this._drawState = 'idle'
         this.overlay.clear()
         this._tempLayer.clear()
 
         if ((shape as AbstractShape).isEmpty()) return
-
-        shape.onDrawEnd?.()
 
         if (shape.layer === null) {
             this._startTempFade(shape)
@@ -573,15 +740,6 @@ export class Engine {
         ctx.restore()
 
         return offscreen.toDataURL('image/png')
-    }
-
-    // A5: annule le dessin en cours sans le finaliser ni sauvegarder
-    cancelShape() {
-        if (!this._currentShape) return
-        this._cancelTempFade()
-        this._currentShape = null
-        this.overlay.clear()
-        this._tempLayer.clear()
     }
 
     // --- Undo / Redo ---

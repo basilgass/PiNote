@@ -18,6 +18,12 @@ export interface Segment {
     layer: LayerName | null
 }
 
+// Point 2D minimal — utilisé par le contrat de création point-based des shapes
+export interface Point {
+    x: number
+    y: number
+}
+
 // Bounding box axis-aligned d'une shape
 export interface Bounds {
     minX: number

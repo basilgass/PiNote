@@ -37,6 +37,26 @@ export class TextShape extends AbstractWidgetShape {
         this.fontSize   = config.fontSize
         this.fontFamily = config.fontFamily
         this.maxWidth   = config.maxWidth
+
+        // Si la config est non triviale (fromJSON), reconstruit _points
+        if (this.maxWidth > 0.01) {
+            this._points = [
+                { x: this.x, y: this.y },
+                { x: this.x + this.maxWidth, y: this.y + (this.fontSize * 1.5) },
+            ]
+        }
+    }
+
+    protected _syncFromPoints(): void {
+        const pts = this._points
+        if (pts.length < 1) return
+        this.x = pts[0].x
+        this.y = pts[0].y
+        if (pts.length >= 2) {
+            this.maxWidth = Math.max(10, Math.abs(pts[1].x - pts[0].x))
+        } else {
+            this.maxWidth = 0
+        }
     }
 
     private _currentRenderKey(): string {
@@ -89,11 +109,6 @@ export class TextShape extends AbstractWidgetShape {
         ctx.restore()
     }
 
-    /** Pendant le drag : met à jour la largeur de la boîte. */
-    update(x: number, y: number): void {
-        this.maxWidth = Math.max(10, x - this.x)
-    }
-
     hitTest(x: number, y: number, _tolerance: number): boolean {
         const h = this._totalHeight || this.fontSize * 1.5
         const w = this.maxWidth || 120
@@ -103,6 +118,7 @@ export class TextShape extends AbstractWidgetShape {
     translate(dx: number, dy: number): void {
         this.x += dx
         this.y += dy
+        for (const p of this._points) { p.x += dx; p.y += dy }
     }
 
     isEmpty(): boolean {

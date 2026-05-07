@@ -1,4 +1,5 @@
 import {AbstractShape} from "./AbstractShape"
+import {AbstractPointShape} from "./AbstractPointShape"
 import {Bounds, CircleGeom, Segment as SegmentGeom, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions} from "./Adaptable"
 
@@ -9,11 +10,14 @@ export interface LineConfig {
     y2: number
 }
 
-export class Line extends AbstractShape {
-    public x1: number
-    public y1: number
-    public x2: number
-    public y2: number
+export class Line extends AbstractPointShape {
+    public x1: number = 0
+    public y1: number = 0
+    public x2: number = 0
+    public y2: number = 0
+
+    readonly minPoints = 2
+    readonly maxPoints = 2
 
     override readonly canHaveArrows = false
 
@@ -27,6 +31,24 @@ export class Line extends AbstractShape {
         this.y1 = y1
         this.x2 = x2
         this.y2 = y2
+        // Si la config est non triviale (fromJSON), reconstruit _points
+        if (Math.hypot(x2 - x1, y2 - y1) > 0.01) {
+            this._points = [{x: x1, y: y1}, {x: x2, y: y2}]
+        }
+    }
+
+    protected _syncFromPoints(): void {
+        if (this._points.length >= 1) {
+            this.x1 = this._points[0].x
+            this.y1 = this._points[0].y
+        }
+        if (this._points.length >= 2) {
+            this.x2 = this._points[1].x
+            this.y2 = this._points[1].y
+        } else {
+            this.x2 = this.x1
+            this.y2 = this.y1
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -35,7 +57,6 @@ export class Line extends AbstractShape {
         if (Math.abs(dx) < 1e-10 && Math.abs(dy) < 1e-10) return
 
         // Convertir les bords canvas (pixels écran) en coordonnées monde
-        // en tenant compte du transform courant (appliqué par l'Engine)
         const m = ctx.getTransform()
         const scale = m.a
         if (Math.abs(scale) < 1e-10) return
@@ -46,7 +67,6 @@ export class Line extends AbstractShape {
         const yMin = (0 - m.f) / scale
         const yMax = (h - m.f) / scale
 
-        // Valeurs de t pour chaque bord visible (droite paramétrique P = P1 + t*(P2-P1))
         const ts: number[] = []
         if (Math.abs(dx) > 1e-10) {
             ts.push((xMin - this.x1) / dx)
@@ -57,7 +77,6 @@ export class Line extends AbstractShape {
             ts.push((yMax - this.y1) / dy)
         }
 
-        // Garder les t dont le point est dans les bornes monde visibles
         const EPS = 0.5 / scale
         const valid = ts.filter(t => {
             const x = this.x1 + t * dx
@@ -86,18 +105,12 @@ export class Line extends AbstractShape {
         ctx.stroke()
         ctx.setLineDash([])
 
-        // Flèches aux points de définition (P1 = départ, P2 = arrivée)
         if (this.arrowEnd)
             AbstractShape.drawArrowHead(ctx, this.x2, this.y2, angle, arrowSize, this.arrowStyle, this.color, this.width)
         if (this.arrowStart)
             AbstractShape.drawArrowHead(ctx, this.x1, this.y1, angle + Math.PI, arrowSize, this.arrowStyle, this.color, this.width)
 
         ctx.restore()
-    }
-
-    update(x: number, y: number) {
-        this.x2 = x
-        this.y2 = y
     }
 
     hitTest(x: number, y: number, tolerance: number): boolean {
@@ -111,9 +124,11 @@ export class Line extends AbstractShape {
     translate(dx: number, dy: number) {
         this.x1 += dx; this.y1 += dy
         this.x2 += dx; this.y2 += dy
+        for (const p of this._points) { p.x += dx; p.y += dy }
     }
 
     isEmpty() {
+        if (this._points.length < this.minPoints) return true
         return Math.hypot(this.x2 - this.x1, this.y2 - this.y1) < 1
     }
 
@@ -139,7 +154,6 @@ export class Line extends AbstractShape {
         return []
     }
 
-    // Bounds définis par les deux points créés (pas infini)
     getBounds(): Bounds {
         return {
             minX: Math.min(this.x1, this.x2),

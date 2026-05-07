@@ -1,7 +1,7 @@
 import {StrokePoint, ToolType} from "../types"
 import {AbstractShape} from "./AbstractShape"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
-import {ShapeOptions} from "./Adaptable"
+import {ShapeOptions, StrokeBasedShape} from "./Adaptable"
 import type {IDrawingContext} from "../core/DrawingContext"
 
 export interface StrokeConfig {
@@ -10,13 +10,11 @@ export interface StrokeConfig {
     points?: StrokePoint[]
 }
 
-export class Stroke extends AbstractShape {
+export class Stroke extends AbstractShape implements StrokeBasedShape {
     points: StrokePoint[] = []
     bezier = true
-    isIncremental = true
 
     override readonly canHaveArrows = false
-    readonly drawingMode = 'drag' as const
 
     private _cachedPts: StrokePoint[] | null = null
     private _eraserSnapshot: ImageData | null = null
@@ -40,11 +38,7 @@ export class Stroke extends AbstractShape {
         this._cachedPts = null  // P1/A1: invalide le cache
     }
 
-    update(x: number, y: number) {
-        this.addPoint({x, y, t: performance.now(), pressure: 1})
-    }
-
-    onDrawStart(_x: number, _y: number, ctx: IDrawingContext): void {
+    onStart(ctx: IDrawingContext): void {
         if (this.tool === 'eraser' && this.layer) {
             this._eraserSnapshot = ctx.getLayerSnapshot(this.layer)
         } else {
@@ -52,11 +46,7 @@ export class Stroke extends AbstractShape {
         }
     }
 
-    onDrawPoint(x: number, y: number, t: number): void {
-        this.addPoint({ x, y, t, pressure: 1 })
-    }
-
-    onDrawMove(x: number, y: number, ctx: IDrawingContext): boolean {
+    onMove(x: number, y: number, ctx: IDrawingContext): boolean {
         if (this.tool !== 'eraser') return false
 
         if (this._eraserSnapshot && this.layer) {
@@ -89,7 +79,7 @@ export class Stroke extends AbstractShape {
         return true
     }
 
-    onDrawEnd(): void {
+    onEnd(): void {
         this._eraserSnapshot = null
     }
 
