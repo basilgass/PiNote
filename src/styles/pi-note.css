@@ -1374,6 +1374,14 @@
   line-height: 1;
 }
 
+.pointer-status-total {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--pn-text-faint);
+  margin-left: 1px;
+}
+
 .pointer-status-dims {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;

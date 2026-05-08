@@ -37966,9 +37966,12 @@ var mI = /* @__PURE__ */ d({
 	key: 0,
 	class: "pointer-status-count"
 }, xR = {
+	key: 1,
+	class: "pointer-status-total"
+}, SR = {
 	key: 0,
 	class: "pointer-status-dims"
-}, SR = /* @__PURE__ */ d({
+}, CR = /* @__PURE__ */ d({
 	__name: "PointerStatus",
 	setup(e) {
 		let t = OF(), n = {
@@ -37977,43 +37980,54 @@ var mI = /* @__PURE__ */ d({
 			palm: "hand",
 			mouse: "arrow-pointer",
 			unknown: "arrow-pointer"
-		}, r = {
-			pen: "Stylet",
-			finger: "Doigt",
-			palm: "Paume",
-			mouse: "Souris",
-			unknown: "Inactif"
-		}, a = i(() => t.pointerSnapshot.primaryKind), l = i(() => t.pointerSnapshot.activeCount), d = i(() => t.palmDetectionEnabled), f = i(() => {
+		}, r = i(() => t.pointerSnapshot.primaryKind), a = i(() => t.pointerSnapshot.activeCount), l = i(() => t.palmDetectionEnabled), d = i(() => {
+			let e = {
+				pen: 0,
+				finger: 0,
+				palm: 0,
+				mouse: 0,
+				unknown: 0
+			};
+			for (let n of t.pointerSnapshot.pointers.values()) e[n.kind]++;
+			return e;
+		}), f = i(() => d.value[r.value]), p = i(() => {
+			let e = [], t = d.value;
+			return t.pen && e.push(`${t.pen} stylet${t.pen > 1 ? "s" : ""}`), t.finger && e.push(`${t.finger} doigt${t.finger > 1 ? "s" : ""}`), t.palm && e.push(`${t.palm} paume${t.palm > 1 ? "s" : ""}`), t.mouse && e.push(`${t.mouse} souris`), t.unknown && e.push(`${t.unknown} inconnu`), e.length ? e.join(" + ") : "Aucun pointer actif";
+		}), m = i(() => {
 			let e = t.pointerSnapshot;
 			for (let t of e.pointers.values()) if (t.kind === e.primaryKind) return t;
 			return null;
-		}), p = i(() => {
-			let e = f.value;
+		}), h = i(() => {
+			let e = m.value;
 			if (!e) return "";
 			let t = e.width * e.height;
 			return `${Math.round(t)} px²`;
-		}), m = i(() => ({
+		}), g = i(() => ({
 			"pointer-status-indicator": !0,
-			"is-active": l.value > 0,
-			[`kind-${a.value}`]: !0
+			"is-active": a.value > 0,
+			[`kind-${r.value}`]: !0
 		}));
-		function h() {
-			t.setPalmDetectionEnabled(!d.value);
+		function _() {
+			t.setPalmDetectionEnabled(!l.value);
 		}
 		return (e, t) => (k(), s("div", _R, [
 			c("button", {
-				class: C(["pointer-status-toggle", { "is-on": d.value }]),
-				title: d.value ? "Détection paume activée — cliquer pour désactiver" : "Détection paume désactivée — cliquer pour activer",
-				onClick: h
+				class: C(["pointer-status-toggle", { "is-on": l.value }]),
+				title: l.value ? "Détection paume activée — cliquer pour désactiver" : "Détection paume désactivée — cliquer pour activer",
+				onClick: _
 			}, [u(qP, { icon: "hand" })], 10, vR),
 			c("div", {
-				class: C(m.value),
-				title: `${r[a.value]} — ${l.value} pointer(s) actif(s)`
-			}, [u(qP, { icon: n[a.value] }, null, 8, ["icon"]), l.value > 1 ? (k(), s("span", bR, F(l.value), 1)) : o("", !0)], 10, yR),
-			f.value ? (k(), s("span", xR, F(p.value), 1)) : o("", !0)
+				class: C(g.value),
+				title: p.value
+			}, [
+				u(qP, { icon: n[r.value] }, null, 8, ["icon"]),
+				f.value > 1 ? (k(), s("span", bR, F(f.value), 1)) : o("", !0),
+				a.value > f.value ? (k(), s("span", xR, "+" + F(a.value - f.value), 1)) : o("", !0)
+			], 10, yR),
+			m.value ? (k(), s("span", SR, F(h.value), 1)) : o("", !0)
 		]));
 	}
-}), CR = { class: "pn-wd-body" }, wR = { class: "pn-wd-footer" }, TR = { class: "pn-wd-hint" }, ER = { class: "pn-wd-footer-actions" }, DR = /* @__PURE__ */ d({
+}), wR = { class: "pn-wd-body" }, TR = { class: "pn-wd-footer" }, ER = { class: "pn-wd-hint" }, DR = { class: "pn-wd-footer-actions" }, OR = /* @__PURE__ */ d({
 	__name: "WidgetDialog",
 	props: {
 		open: { type: Boolean },
@@ -38042,7 +38056,7 @@ var mI = /* @__PURE__ */ d({
 		}, [c("div", {
 			class: "pn-wd-container",
 			onClick: r[2] ||= ue(() => {}, ["stop"])
-		}, [c("div", CR, [N(t.$slots, "default")]), c("div", wR, [c("span", TR, F(e.hint ?? "Ctrl+Entrée pour valider · Échap pour annuler"), 1), c("div", ER, [c("button", {
+		}, [c("div", wR, [N(t.$slots, "default")]), c("div", TR, [c("span", ER, F(e.hint ?? "Ctrl+Entrée pour valider · Échap pour annuler"), 1), c("div", DR, [c("button", {
 			class: "btn btn-ghost",
 			type: "button",
 			onClick: r[0] ||= (e) => i("cancel")
@@ -38052,7 +38066,7 @@ var mI = /* @__PURE__ */ d({
 			onClick: r[1] ||= (e) => i("confirm")
 		}, " Valider ")])])])], 544)]));
 	}
-}), OR = ["title"], kR = { class: "pn-ted-input" }, AR = ["innerHTML"], jR = /* @__PURE__ */ d({
+}), kR = ["title"], AR = { class: "pn-ted-input" }, jR = ["innerHTML"], MR = /* @__PURE__ */ d({
 	__name: "TextEditDialog",
 	props: {
 		open: { type: Boolean },
@@ -38096,7 +38110,7 @@ var mI = /* @__PURE__ */ d({
 		function C(e) {
 			e.key === "Escape" && (e.preventDefault(), i("cancel")), e.key === "Enter" && (e.ctrlKey || e.metaKey) && (e.preventDefault(), b());
 		}
-		return (e, n) => (k(), a(DR, {
+		return (e, n) => (k(), a(OR, {
 			open: t.open,
 			onConfirm: b,
 			onCancel: x
@@ -38107,8 +38121,8 @@ var mI = /* @__PURE__ */ d({
 					type: "button",
 					title: p.value === "html" ? "Passer en aperçu canvas" : "Passer en aperçu HTML",
 					onClick: y
-				}, [u(qP, { icon: p.value === "html" ? "eye" : "eye-slash" }, null, 8, ["icon"]), c("span", null, F(p.value === "html" ? "Canvas" : "HTML"), 1)], 8, OR),
-				c("div", kR, [z(c("textarea", {
+				}, [u(qP, { icon: p.value === "html" ? "eye" : "eye-slash" }, null, 8, ["icon"]), c("span", null, F(p.value === "html" ? "Canvas" : "HTML"), 1)], 8, kR),
+				c("div", AR, [z(c("textarea", {
 					ref_key: "textareaEl",
 					ref: o,
 					"onUpdate:modelValue": n[0] ||= (e) => d.value = e,
@@ -38129,7 +38143,7 @@ var mI = /* @__PURE__ */ d({
 						fontSize: t.fontSize + "px"
 					}),
 					innerHTML: f.value || "\xA0"
-				}, null, 12, AR)) : (k(), s("canvas", {
+				}, null, 12, jR)) : (k(), s("canvas", {
 					key: 1,
 					ref_key: "canvasEl",
 					ref: l,
@@ -38139,14 +38153,14 @@ var mI = /* @__PURE__ */ d({
 			_: 1
 		}, 8, ["open"]));
 	}
-}), MR = { class: "pn-gp-panel" }, NR = { class: "pn-gp-section" }, PR = { class: "pn-gp-row" }, FR = ["value"], IR = ["value"], LR = { class: "pn-gp-section" }, RR = { class: "pn-gp-checkbox-row" }, zR = ["checked"], BR = ["disabled", "value"], VR = ["disabled", "value"], HR = { class: "pn-gp-section" }, UR = { class: "pn-gp-checkbox-row" }, WR = ["checked"], GR = { class: "pn-gp-label-mode" }, KR = [
+}), NR = { class: "pn-gp-panel" }, PR = { class: "pn-gp-section" }, FR = { class: "pn-gp-row" }, IR = ["value"], LR = ["value"], RR = { class: "pn-gp-section" }, zR = { class: "pn-gp-checkbox-row" }, BR = ["checked"], VR = ["disabled", "value"], HR = ["disabled", "value"], UR = { class: "pn-gp-section" }, WR = { class: "pn-gp-checkbox-row" }, GR = ["checked"], KR = { class: "pn-gp-label-mode" }, qR = [
 	"value",
 	"checked",
 	"onChange"
-], qR = { class: "pn-gp-section pn-gp-functions" }, JR = { class: "pn-gp-functions-header" }, YR = ["value", "onInput"], XR = ["value", "onInput"], ZR = ["onClick"], QR = {
+], JR = { class: "pn-gp-section pn-gp-functions" }, YR = { class: "pn-gp-functions-header" }, XR = ["value", "onInput"], ZR = ["value", "onInput"], QR = ["onClick"], $R = {
 	key: 0,
 	class: "pn-gp-empty"
-}, $R = /* @__PURE__ */ d({
+}, ez = /* @__PURE__ */ d({
 	__name: "GraphPanel",
 	props: { modelValue: {} },
 	emits: ["update:modelValue"],
@@ -38180,30 +38194,30 @@ var mI = /* @__PURE__ */ d({
 		function p(e) {
 			a({ functions: r.modelValue.functions.filter((t, n) => n !== e) });
 		}
-		return (n, r) => (k(), s("div", MR, [
-			c("section", NR, [r[8] ||= c("h3", { class: "pn-gp-title" }, " Axe X ", -1), c("div", PR, [
+		return (n, r) => (k(), s("div", NR, [
+			c("section", PR, [r[8] ||= c("h3", { class: "pn-gp-title" }, " Axe X ", -1), c("div", FR, [
 				r[6] ||= c("label", { class: "pn-gp-label" }, "Min", -1),
 				c("input", {
 					type: "number",
 					class: "pn-gp-input",
 					value: e.modelValue.xMin,
 					onChange: r[0] ||= (e) => a({ xMin: +e.target.value })
-				}, null, 40, FR),
+				}, null, 40, IR),
 				r[7] ||= c("label", { class: "pn-gp-label" }, "Max", -1),
 				c("input", {
 					type: "number",
 					class: "pn-gp-input",
 					value: e.modelValue.xMax,
 					onChange: r[1] ||= (e) => a({ xMax: +e.target.value })
-				}, null, 40, IR)
+				}, null, 40, LR)
 			])]),
-			c("section", LR, [
+			c("section", RR, [
 				r[12] ||= c("h3", { class: "pn-gp-title" }, " Axe Y ", -1),
-				c("label", RR, [c("input", {
+				c("label", zR, [c("input", {
 					type: "checkbox",
 					checked: e.modelValue.orthonormal,
 					onChange: r[2] ||= (e) => a({ orthonormal: e.target.checked })
-				}, null, 40, zR), r[9] ||= c("span", null, "Orthonormé", -1)]),
+				}, null, 40, BR), r[9] ||= c("span", null, "Orthonormé", -1)]),
 				c("div", { class: C(["pn-gp-row", { "pn-gp-disabled": e.modelValue.orthonormal }]) }, [
 					r[10] ||= c("label", { class: "pn-gp-label" }, "Min", -1),
 					c("input", {
@@ -38212,7 +38226,7 @@ var mI = /* @__PURE__ */ d({
 						disabled: e.modelValue.orthonormal,
 						value: e.modelValue.yMin,
 						onChange: r[3] ||= (e) => a({ yMin: +e.target.value })
-					}, null, 40, BR),
+					}, null, 40, VR),
 					r[11] ||= c("label", { class: "pn-gp-label" }, "Max", -1),
 					c("input", {
 						type: "number",
@@ -38220,17 +38234,17 @@ var mI = /* @__PURE__ */ d({
 						disabled: e.modelValue.orthonormal,
 						value: e.modelValue.yMax,
 						onChange: r[4] ||= (e) => a({ yMax: +e.target.value })
-					}, null, 40, VR)
+					}, null, 40, HR)
 				], 2)
 			]),
-			c("section", HR, [
+			c("section", UR, [
 				r[15] ||= c("h3", { class: "pn-gp-title" }, " Affichage ", -1),
-				c("label", UR, [c("input", {
+				c("label", WR, [c("input", {
 					type: "checkbox",
 					checked: e.modelValue.showGrid,
 					onChange: r[5] ||= (e) => a({ showGrid: e.target.checked })
-				}, null, 40, WR), r[13] ||= c("span", null, "Grille", -1)]),
-				c("div", GR, [r[14] ||= c("span", { class: "pn-gp-label" }, "Labels", -1), (k(), s(t, null, M([
+				}, null, 40, GR), r[13] ||= c("span", null, "Grille", -1)]),
+				c("div", KR, [r[14] ||= c("span", { class: "pn-gp-label" }, "Labels", -1), (k(), s(t, null, M([
 					{
 						id: "all",
 						label: "Tous"
@@ -38252,10 +38266,10 @@ var mI = /* @__PURE__ */ d({
 					value: t.id,
 					checked: e.modelValue.labelMode === t.id,
 					onChange: (e) => a({ labelMode: t.id })
-				}, null, 40, KR), c("span", null, F(t.label), 1)])), 64))])
+				}, null, 40, qR), c("span", null, F(t.label), 1)])), 64))])
 			]),
-			c("section", qR, [
-				c("div", JR, [r[17] ||= c("h3", { class: "pn-gp-title" }, " Fonctions ", -1), c("button", {
+			c("section", JR, [
+				c("div", YR, [r[17] ||= c("h3", { class: "pn-gp-title" }, " Fonctions ", -1), c("button", {
 					class: "btn btn-ghost pn-gp-add-btn",
 					type: "button",
 					onClick: f
@@ -38271,24 +38285,24 @@ var mI = /* @__PURE__ */ d({
 						placeholder: "ex: sin(x)",
 						value: e.expr,
 						onInput: (e) => d(t, { expr: e.target.value })
-					}, null, 40, YR),
+					}, null, 40, XR),
 					c("input", {
 						type: "color",
 						class: "pn-gp-color",
 						value: e.color,
 						onInput: (e) => d(t, { color: e.target.value })
-					}, null, 40, XR),
+					}, null, 40, ZR),
 					c("button", {
 						class: "btn btn-ghost pn-gp-remove-btn",
 						type: "button",
 						onClick: (e) => p(t)
-					}, [u(qP, { icon: "xmark" })], 8, ZR)
+					}, [u(qP, { icon: "xmark" })], 8, QR)
 				]))), 128)),
-				e.modelValue.functions.length === 0 ? (k(), s("p", QR, " Aucune fonction — cliquez sur Ajouter. ")) : o("", !0)
+				e.modelValue.functions.length === 0 ? (k(), s("p", $R, " Aucune fonction — cliquez sur Ajouter. ")) : o("", !0)
 			])
 		]));
 	}
-}), ez = { class: "pn-ged-left" }, tz = { class: "pn-ged-right" }, nz = { class: "pn-ged-preview-wrap" }, rz = /* @__PURE__ */ d({
+}), tz = { class: "pn-ged-left" }, nz = { class: "pn-ged-right" }, rz = { class: "pn-ged-preview-wrap" }, iz = /* @__PURE__ */ d({
 	__name: "GraphEditDialog",
 	props: {
 		open: { type: Boolean },
@@ -38321,15 +38335,15 @@ var mI = /* @__PURE__ */ d({
 		function d() {
 			r("cancel");
 		}
-		return (t, n) => (k(), a(DR, {
+		return (t, n) => (k(), a(OR, {
 			open: e.open,
 			onConfirm: l,
 			onCancel: d
 		}, {
-			default: le(() => [c("div", ez, [u($R, {
+			default: le(() => [c("div", tz, [u(ez, {
 				modelValue: i.value,
 				"onUpdate:modelValue": n[0] ||= (e) => i.value = e
-			}, null, 8, ["modelValue"])]), c("div", tz, [n[1] ||= c("div", { class: "pn-ged-preview-label" }, " Aperçu ", -1), c("div", nz, [c("canvas", {
+			}, null, 8, ["modelValue"])]), c("div", nz, [n[1] ||= c("div", { class: "pn-ged-preview-label" }, " Aperçu ", -1), c("div", rz, [c("canvas", {
 				ref_key: "canvasEl",
 				ref: o,
 				class: "pn-ged-canvas"
@@ -38340,7 +38354,7 @@ var mI = /* @__PURE__ */ d({
 });
 //#endregion
 //#region src/composables/useCanvasTransform.ts
-function iz(e, t = {}) {
+function az(e, t = {}) {
 	let { panButton: n = 0, onTransformChange: r, canPan: a } = t, o = .1, s = .15, c = P({
 		x: 0,
 		y: 0,
@@ -38446,10 +38460,10 @@ function iz(e, t = {}) {
 }
 //#endregion
 //#region src/vue/NoteCanvas.vue?vue&type=script&setup=true&lang.ts
-var az = { class: "note-canvas-wrapper" }, oz = {
+var oz = { class: "note-canvas-wrapper" }, sz = {
 	key: 0,
 	class: "mini-panel"
-}, sz = { class: "mini-panel-row" }, cz = ["disabled"], lz = ["disabled"], uz = 500, dz = 200, fz = 6, pz = /* @__PURE__ */ d({
+}, cz = { class: "mini-panel-row" }, lz = ["disabled"], uz = ["disabled"], dz = 500, fz = 200, pz = 6, mz = /* @__PURE__ */ d({
 	__name: "NoteCanvas",
 	props: {
 		background: { default: () => ({
@@ -38474,7 +38488,7 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 	emits: ["tool-change"],
 	setup(e, { expose: t, emit: n }) {
 		RN() || LN(kP());
-		let l = OF(), d = n, f = e, p = j(null), { transform: m, zoomIn: h, zoomOut: g, resetView: _, fitView: v } = iz(p, {
+		let l = OF(), d = n, f = e, p = j(null), { transform: m, zoomIn: h, zoomOut: g, resetView: _, fitView: v } = az(p, {
 			panButton: 2,
 			onTransformChange: () => {
 				l.engine?.setViewTransform(m.x, m.y, m.scale), l.engine?.draw();
@@ -38486,7 +38500,7 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 		}, T = !1, D = {
 			x: 0,
 			y: 0
-		}, A = dz + uz, M = new Set([
+		}, A = fz + dz, M = new Set([
 			"pen",
 			"highlighter",
 			"eraser",
@@ -38519,8 +38533,8 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 			});
 		}
 		let R = {
-			text: jR,
-			graph: rz
+			text: MR,
+			graph: iz
 		}, oe = j(!1), ce = te(null), z = te(null), de = i(() => z.value?.getDialogProps() ?? {}), fe = !0;
 		function pe(e) {
 			if (!p.value) return {
@@ -38567,8 +38581,8 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 					x: e.clientX,
 					y: e.clientY
 				}, I = t, F = setTimeout(() => {
-					F = null, N === "pending" && y.value.startHoldIndicator(I.x, I.y, uz);
-				}, dz), P = setTimeout(() => {
+					F = null, N === "pending" && y.value.startHoldIndicator(I.x, I.y, dz);
+				}, fz), P = setTimeout(() => {
 					P = null, N === "pending" && (N = "adjusting", y.value.completeHoldIndicator(), y.value.hoverSnap(I.x, I.y, l.tool.tool));
 				}, A);
 				return;
@@ -38601,7 +38615,7 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 			}
 			if (N === "pending") {
 				let t = e.clientX - ne.x, n = e.clientY - ne.y;
-				if (t * t + n * n > fz * fz) ie(), ae(), y.value.pointerDown(I.x, I.y);
+				if (t * t + n * n > pz * pz) ie(), ae(), y.value.pointerDown(I.x, I.y);
 				else return;
 			}
 			if (N === "adjusting") {
@@ -38715,7 +38729,7 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 			}));
 		}), O(() => {
 			window.removeEventListener("keydown", be), y.value?.destroy();
-		}), t({ engine: y }), (e, t) => (k(), s("div", az, [
+		}), t({ engine: y }), (e, t) => (k(), s("div", oz, [
 			c("div", {
 				ref_key: "canvasEl",
 				ref: p,
@@ -38739,20 +38753,20 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 				onCancel: ye
 			}), null, 16, ["open"])) : o("", !0),
 			u(gR),
-			u(SR),
+			u(CR),
 			u(QF),
 			u(r, { name: "mini" }, {
-				default: le(() => [L(l).sidebarOpen ? o("", !0) : (k(), s("div", oz, [c("div", sz, [c("button", {
+				default: le(() => [L(l).sidebarOpen ? o("", !0) : (k(), s("div", sz, [c("div", cz, [c("button", {
 					class: "btn",
 					disabled: !L(l).canUndo,
 					title: "Annuler",
 					onClick: t[1] ||= (e) => L(l).undo()
-				}, [u(qP, { icon: "rotate-left" })], 8, cz), c("button", {
+				}, [u(qP, { icon: "rotate-left" })], 8, lz), c("button", {
 					class: "btn",
 					disabled: !L(l).canRedo,
 					title: "Rétablir",
 					onClick: t[2] ||= (e) => L(l).redo()
-				}, [u(qP, { icon: "rotate-right" })], 8, lz)]), c("button", {
+				}, [u(qP, { icon: "rotate-right" })], 8, uz)]), c("button", {
 					class: "btn mini-open",
 					title: "Ouvrir le panneau",
 					onClick: t[3] ||= (e) => L(l).sidebarOpen = !0
@@ -38764,4 +38778,4 @@ var az = { class: "note-canvas-wrapper" }, oz = {
 	}
 });
 //#endregion
-export { wk as Engine, Se as Layer, pz as NoteCanvas, qP as PiIcon, hF as initPdfWorker, ye as t };
+export { wk as Engine, Se as Layer, mz as NoteCanvas, qP as PiIcon, hF as initPdfWorker, ye as t };

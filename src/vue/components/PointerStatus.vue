@@ -26,6 +26,32 @@ const primaryKind = computed(() => store.pointerSnapshot.primaryKind)
 const activeCount = computed(() => store.pointerSnapshot.activeCount)
 const palmEnabled = computed(() => store.palmDetectionEnabled)
 
+/** Décompte par kind (pen, finger, palm, mouse, unknown) */
+const kindCounts = computed(() => {
+    const counts: Record<PointerKind, number> = {
+        pen: 0, finger: 0, palm: 0, mouse: 0, unknown: 0,
+    }
+    for (const info of store.pointerSnapshot.pointers.values()) {
+        counts[info.kind]++
+    }
+    return counts
+})
+
+/** Nombre de pointers du même type que le primary (ce qu'affiche le badge) */
+const primaryKindCount = computed(() => kindCounts.value[primaryKind.value])
+
+/** Tooltip détaillé : ex. "1 stylet + 3 doigts" */
+const breakdownLabel = computed(() => {
+    const parts: string[] = []
+    const c = kindCounts.value
+    if (c.pen)     parts.push(`${c.pen} stylet${c.pen > 1 ? 's' : ''}`)
+    if (c.finger)  parts.push(`${c.finger} doigt${c.finger > 1 ? 's' : ''}`)
+    if (c.palm)    parts.push(`${c.palm} paume${c.palm > 1 ? 's' : ''}`)
+    if (c.mouse)   parts.push(`${c.mouse} souris`)
+    if (c.unknown) parts.push(`${c.unknown} inconnu`)
+    return parts.length ? parts.join(' + ') : 'Aucun pointer actif'
+})
+
 /** Pointer correspondant au primaryKind — celui dont on affiche la taille */
 const primaryPointer = computed(() => {
     const snap = store.pointerSnapshot
@@ -63,9 +89,10 @@ function togglePalmDetection() {
         >
             <PiIcon icon="hand" />
         </button>
-        <div :class="indicatorClass" :title="`${KIND_LABEL[primaryKind]} — ${activeCount} pointer(s) actif(s)`">
+        <div :class="indicatorClass" :title="breakdownLabel">
             <PiIcon :icon="KIND_ICON[primaryKind]" />
-            <span class="pointer-status-count" v-if="activeCount > 1">{{ activeCount }}</span>
+            <span class="pointer-status-count" v-if="primaryKindCount > 1">{{ primaryKindCount }}</span>
+            <span class="pointer-status-total" v-if="activeCount > primaryKindCount">+{{ activeCount - primaryKindCount }}</span>
         </div>
         <span class="pointer-status-dims" v-if="primaryPointer">{{ dimensionsLabel }}</span>
     </div>
