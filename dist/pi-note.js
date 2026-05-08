@@ -36016,10 +36016,15 @@ var GP = {
 			label: "Vert"
 		}
 	],
-	maxPages: 0
+	maxPages: 0,
+	pointerThresholds: {
+		penMaxArea: 10,
+		palmMinArea: 400
+	}
 }, YP = {
 	...JP,
-	defaults: { ...JP.defaults }
+	defaults: { ...JP.defaults },
+	pointerThresholds: { ...JP.pointerThresholds }
 };
 function XP() {
 	return YP;
@@ -36033,18 +36038,22 @@ var ZP = {
 	mouse: 1,
 	unknown: 0
 }, QP = class {
-	_palmThreshold;
+	_penMaxArea;
+	_palmMinArea;
 	_pointers = /* @__PURE__ */ new Map();
 	_penEverSeen = !1;
 	_listeners = /* @__PURE__ */ new Set();
 	constructor(e = {}) {
-		this._palmThreshold = e.palmThreshold ?? 40;
+		this._penMaxArea = e.penMaxArea ?? 10, this._palmMinArea = e.palmMinArea ?? 400;
 	}
-	setPalmThreshold(e) {
-		this._palmThreshold = e;
+	setThresholds(e) {
+		e.penMaxArea !== void 0 && (this._penMaxArea = e.penMaxArea), e.palmMinArea !== void 0 && (this._palmMinArea = e.palmMinArea);
 	}
-	get palmThreshold() {
-		return this._palmThreshold;
+	get penMaxArea() {
+		return this._penMaxArea;
+	}
+	get palmMinArea() {
+		return this._palmMinArea;
 	}
 	onPointerDown(e) {
 		let t = this._classify(e);
@@ -36054,7 +36063,7 @@ var ZP = {
 		let t = this._pointers.get(e.pointerId);
 		if (!t) return;
 		let n = this._classify(e);
-		t.kind === "palm" && n.kind === "finger" && (n.kind = "palm"), this._pointers.set(e.pointerId, n), this._emit();
+		t.kind === "palm" && n.kind !== "mouse" && (n.kind = "palm"), this._pointers.set(e.pointerId, n), this._emit();
 	}
 	onPointerUp(e) {
 		this._pointers.delete(e.pointerId) && this._emit();
@@ -36077,17 +36086,10 @@ var ZP = {
 	}
 	_classify(e) {
 		let t = e.width ?? 0, n = e.height ?? 0, r;
-		switch (e.pointerType) {
-			case "pen":
-				r = "pen";
-				break;
-			case "mouse":
-				r = "mouse";
-				break;
-			case "touch":
-				r = Math.max(t, n) > this._palmThreshold ? "palm" : "finger";
-				break;
-			default: r = "unknown";
+		if (e.pointerType === "mouse") r = "mouse";
+		else {
+			let e = t * n;
+			r = e <= this._penMaxArea ? "pen" : e <= this._palmMinArea ? "finger" : "palm";
 		}
 		return {
 			pointerId: e.pointerId,
@@ -36650,7 +36652,7 @@ var OF = WP("note", () => {
 			}, 3e3);
 		}
 	}
-	let ve = j(!0), ye = "pi_note_palm_detection_enabled", be = new QP(), xe = te(be.snapshot());
+	let ve = j(!0), ye = "pi_note_palm_detection_enabled", be = new QP(r.pointerThresholds), xe = te(be.snapshot());
 	be.subscribe((e) => {
 		xe.value = e;
 	});

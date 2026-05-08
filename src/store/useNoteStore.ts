@@ -529,7 +529,7 @@ export const useNoteStore = defineStore('note', () => {
 
   const PALM_DETECTION_KEY = 'pi_note_palm_detection_enabled'
 
-  const pointerClassifier = new PointerClassifier()
+  const pointerClassifier = new PointerClassifier(_cfg.pointerThresholds)
 
   const pointerSnapshot = shallowRef<PointerSnapshot>(pointerClassifier.snapshot())
   pointerClassifier.subscribe((snap) => { pointerSnapshot.value = snap })

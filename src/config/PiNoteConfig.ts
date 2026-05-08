@@ -16,6 +16,13 @@ export interface PiNoteConfig {
     }
     colorPresets: { value: string; label: string }[]
     maxPages: number
+    /** Seuils de classification des pointers par aire de contact (px²) */
+    pointerThresholds: {
+        /** Aire max en deçà de laquelle un contact est classé `pen` */
+        penMaxArea: number
+        /** Aire min à partir de laquelle un contact est classé `palm` */
+        palmMinArea: number
+    }
 }
 
 export const defaultConfig: PiNoteConfig = {
@@ -39,15 +46,24 @@ export const defaultConfig: PiNoteConfig = {
         {value: '#43a047', label: 'Vert'},
     ],
     maxPages: 0,
+    pointerThresholds: {
+        penMaxArea: 10,
+        palmMinArea: 400,
+    },
 }
 
-let _config: PiNoteConfig = {...defaultConfig, defaults: {...defaultConfig.defaults}}
+let _config: PiNoteConfig = {
+    ...defaultConfig,
+    defaults: {...defaultConfig.defaults},
+    pointerThresholds: {...defaultConfig.pointerThresholds},
+}
 
 export function setConfig(c: Partial<PiNoteConfig>): void {
     _config = {
         ...defaultConfig,
         ...c,
         defaults: {...defaultConfig.defaults, ...(c.defaults ?? {})},
+        pointerThresholds: {...defaultConfig.pointerThresholds, ...(c.pointerThresholds ?? {})},
     }
 }
 

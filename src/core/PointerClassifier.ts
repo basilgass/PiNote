@@ -5,16 +5,19 @@
  * et expose un snapshot agrégé. **Aucune action** sur la FSM ou l'Engine :
  * cette couche est purement observationnelle.
  *
- * Heuristique paume : `pointerType === 'touch'` et `width > palmThreshold`
- * (ou `height > palmThreshold`). `event.width`/`height` est en pixels CSS,
- * indique la taille de la zone de contact. Doigt typique ≈ 20-30px,
- * paume ≈ 40px et plus. Le seuil est ajustable.
+ * Heuristique :
+ * - `pointerType === 'mouse'` → `mouse` (priorité absolue, pas d'aire fiable).
+ * - Sinon classification par aire de contact (`width × height` en pixels CSS²) :
+ *     - aire ≤ `penMaxArea` (défaut 10)   → `pen`
+ *     - aire ≤ `palmMinArea` (défaut 400) → `finger`
+ *     - aire > `palmMinArea`              → `palm`
  *
- * Limites connues :
- * - Sur desktop souris, `width/height` vaut 1 → toujours `mouse`.
- * - Certains pilotes stylet renvoient des valeurs de largeur élevées
- *   sur appui fort → faux positif paume. Le widget de visualisation
- *   sert à calibrer empiriquement le seuil.
+ * On ignore volontairement `pointerType === 'pen'` car certains pilotes/OS
+ * remontent les stylets comme `'touch'`. L'aire est le signal le plus fiable
+ * en pratique. Les seuils sont ajustables via `setThresholds`.
+ *
+ * Verrou anti-flicker : un pointer classé `palm` ne redescend pas vers
+ * `finger`/`pen` même si son aire diminue temporairement (la paume bouge).
  */
 
 export type PointerKind = 'pen' | 'finger' | 'palm' | 'mouse' | 'unknown'
@@ -43,8 +46,10 @@ export interface PointerSnapshot {
 }
 
 export interface PointerClassifierOptions {
-    /** Seuil en pixels CSS pour qu'un touch soit considéré comme une paume (défaut 40) */
-    palmThreshold?: number
+    /** Aire max (px²) en deçà de laquelle le contact est classé `pen` (défaut 10) */
+    penMaxArea?: number
+    /** Aire min (px²) à partir de laquelle le contact est classé `palm` (défaut 400) */
+    palmMinArea?: number
 }
 
 const KIND_PRIORITY: Record<PointerKind, number> = {
@@ -56,23 +61,25 @@ const KIND_PRIORITY: Record<PointerKind, number> = {
 }
 
 export class PointerClassifier {
-    private _palmThreshold: number
+    private _penMaxArea: number
+    private _palmMinArea: number
     private _pointers = new Map<number, PointerInfo>()
     private _penEverSeen = false
     private _listeners = new Set<(snap: PointerSnapshot) => void>()
 
     constructor(options: PointerClassifierOptions = {}) {
-        this._palmThreshold = options.palmThreshold ?? 40
+        this._penMaxArea = options.penMaxArea ?? 10
+        this._palmMinArea = options.palmMinArea ?? 400
     }
 
-    /** Modifie le seuil de détection paume à chaud (utile pour calibrage) */
-    setPalmThreshold(value: number): void {
-        this._palmThreshold = value
+    /** Modifie les seuils d'aire à chaud (utile pour calibrage) */
+    setThresholds(opts: { penMaxArea?: number; palmMinArea?: number }): void {
+        if (opts.penMaxArea !== undefined) this._penMaxArea = opts.penMaxArea
+        if (opts.palmMinArea !== undefined) this._palmMinArea = opts.palmMinArea
     }
 
-    get palmThreshold(): number {
-        return this._palmThreshold
-    }
+    get penMaxArea(): number { return this._penMaxArea }
+    get palmMinArea(): number { return this._palmMinArea }
 
     /** À appeler dans le handler `pointerdown` du canvas */
     onPointerDown(event: PointerEvent): void {
@@ -87,9 +94,9 @@ export class PointerClassifier {
         const existing = this._pointers.get(event.pointerId)
         if (!existing) return
         const updated = this._classify(event)
-        // Une fois qu'un pointer est classifié paume, on ne le rebascule pas
-        // en doigt (la zone de contact peut diminuer en cours de drag).
-        if (existing.kind === 'palm' && updated.kind === 'finger') {
+        // Anti-flicker : une fois classifié paume, on ne redescend pas vers
+        // finger/pen — la zone de contact d'une paume oscille en cours de drag.
+        if (existing.kind === 'palm' && updated.kind !== 'mouse') {
             updated.kind = 'palm'
         }
         this._pointers.set(event.pointerId, updated)
@@ -129,20 +136,13 @@ export class PointerClassifier {
         const height = event.height ?? 0
         let kind: PointerKind
 
-        switch (event.pointerType) {
-            case 'pen':
-                kind = 'pen'
-                break
-            case 'mouse':
-                kind = 'mouse'
-                break
-            case 'touch': {
-                const maxDim = Math.max(width, height)
-                kind = maxDim > this._palmThreshold ? 'palm' : 'finger'
-                break
-            }
-            default:
-                kind = 'unknown'
+        if (event.pointerType === 'mouse') {
+            kind = 'mouse'
+        } else {
+            const area = width * height
+            if (area <= this._penMaxArea)        kind = 'pen'
+            else if (area <= this._palmMinArea)  kind = 'finger'
+            else                                  kind = 'palm'
         }
 
         return {
