@@ -38,9 +38,8 @@ const primaryPointer = computed(() => {
 const dimensionsLabel = computed(() => {
     const p = primaryPointer.value
     if (!p) return ''
-    const w = p.width.toFixed(1).replace(/\.0$/, '')
-    const h = p.height.toFixed(1).replace(/\.0$/, '')
-    return `${w}×${h}`
+    const area = p.width * p.height
+    return `${Math.round(area)} px²`
 })
 
 const indicatorClass = computed(() => ({
@@ -56,11 +55,6 @@ function togglePalmDetection() {
 
 <template>
     <div class="pointer-status">
-        <div :class="indicatorClass" :title="`${KIND_LABEL[primaryKind]} — ${activeCount} pointer(s) actif(s)`">
-            <PiIcon :icon="KIND_ICON[primaryKind]" />
-            <span class="pointer-status-count" v-if="activeCount > 1">{{ activeCount }}</span>
-        </div>
-        <span class="pointer-status-dims" v-if="primaryPointer">{{ dimensionsLabel }}</span>
         <button
             class="pointer-status-toggle"
             :class="{ 'is-on': palmEnabled }"
@@ -69,5 +63,10 @@ function togglePalmDetection() {
         >
             <PiIcon icon="hand" />
         </button>
+        <div :class="indicatorClass" :title="`${KIND_LABEL[primaryKind]} — ${activeCount} pointer(s) actif(s)`">
+            <PiIcon :icon="KIND_ICON[primaryKind]" />
+            <span class="pointer-status-count" v-if="activeCount > 1">{{ activeCount }}</span>
+        </div>
+        <span class="pointer-status-dims" v-if="primaryPointer">{{ dimensionsLabel }}</span>
     </div>
 </template>

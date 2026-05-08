@@ -37962,13 +37962,13 @@ var mI = /* @__PURE__ */ d({
 			}, 3e3));
 		}), (e, t) => n.value ? (k(), s("div", hR, F(r.value), 1)) : o("", !0);
 	}
-}), _R = { class: "pointer-status" }, vR = ["title"], yR = {
+}), _R = { class: "pointer-status" }, vR = ["title"], yR = ["title"], bR = {
 	key: 0,
 	class: "pointer-status-count"
-}, bR = {
+}, xR = {
 	key: 0,
 	class: "pointer-status-dims"
-}, xR = ["title"], SR = /* @__PURE__ */ d({
+}, SR = /* @__PURE__ */ d({
 	__name: "PointerStatus",
 	setup(e) {
 		let t = OF(), n = {
@@ -37989,7 +37989,9 @@ var mI = /* @__PURE__ */ d({
 			return null;
 		}), p = i(() => {
 			let e = f.value;
-			return e ? `${e.width.toFixed(1).replace(/\.0$/, "")}×${e.height.toFixed(1).replace(/\.0$/, "")}` : "";
+			if (!e) return "";
+			let t = e.width * e.height;
+			return `${Math.round(t)} px²`;
 		}), m = i(() => ({
 			"pointer-status-indicator": !0,
 			"is-active": l.value > 0,
@@ -37999,16 +38001,16 @@ var mI = /* @__PURE__ */ d({
 			t.setPalmDetectionEnabled(!d.value);
 		}
 		return (e, t) => (k(), s("div", _R, [
-			c("div", {
-				class: C(m.value),
-				title: `${r[a.value]} — ${l.value} pointer(s) actif(s)`
-			}, [u(qP, { icon: n[a.value] }, null, 8, ["icon"]), l.value > 1 ? (k(), s("span", yR, F(l.value), 1)) : o("", !0)], 10, vR),
-			f.value ? (k(), s("span", bR, F(p.value), 1)) : o("", !0),
 			c("button", {
 				class: C(["pointer-status-toggle", { "is-on": d.value }]),
 				title: d.value ? "Détection paume activée — cliquer pour désactiver" : "Détection paume désactivée — cliquer pour activer",
 				onClick: h
-			}, [u(qP, { icon: "hand" })], 10, xR)
+			}, [u(qP, { icon: "hand" })], 10, vR),
+			c("div", {
+				class: C(m.value),
+				title: `${r[a.value]} — ${l.value} pointer(s) actif(s)`
+			}, [u(qP, { icon: n[a.value] }, null, 8, ["icon"]), l.value > 1 ? (k(), s("span", bR, F(l.value), 1)) : o("", !0)], 10, yR),
+			f.value ? (k(), s("span", xR, F(p.value), 1)) : o("", !0)
 		]));
 	}
 }), CR = { class: "pn-wd-body" }, wR = { class: "pn-wd-footer" }, TR = { class: "pn-wd-hint" }, ER = { class: "pn-wd-footer-actions" }, DR = /* @__PURE__ */ d({
