@@ -7,6 +7,7 @@ import type {BackgroundState, ToolConfig, ToolType} from '../types'
 import NoteTools from '@pi-vue/NoteTools.vue'
 import NoteSidebar from '@pi-vue/components/Sidebar/NoteSidebar.vue'
 import ToolHint from '@pi-vue/components/ToolHint.vue'
+import PointerStatus from '@pi-vue/components/PointerStatus.vue'
 import TextEditDialog from '@pi-vue/components/Widget/TextEditDialog.vue'
 import GraphEditDialog from '@pi-vue/components/Widget/GraphEditDialog.vue'
 import {useCanvasTransform} from '../composables/useCanvasTransform'
@@ -137,6 +138,7 @@ function toCanvasCoords(event: PointerEvent): { x: number; y: number } {
 // ── Logique de dessin ────────────────────────────────────────────────────────
 
 function onPointerDown(event: PointerEvent) {
+  store.pointerClassifier.onPointerDown(event)
   if (!event.isPrimary || event.button !== 0) return
   if (!canvasEl.value || !engine.value) return
   if (isWidgetEditing.value) return
@@ -232,6 +234,7 @@ function openWidgetDialog() {
 }
 
 function onPointerMove(event: PointerEvent) {
+  store.pointerClassifier.onPointerMove(event)
   if (!event.isPrimary) return
 
   if (isPanning) {
@@ -303,6 +306,7 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerUp(event: PointerEvent) {
+  store.pointerClassifier.onPointerUp(event)
   if (!event.isPrimary) return
 
   if (isPanning) {
@@ -546,6 +550,9 @@ defineExpose({engine})
 
 		<!-- Indication contextuelle de l'outil actif -->
 		<tool-hint />
+
+		<!-- Indicateur de classification des pointers (debug + toggle paume) -->
+		<pointer-status />
 
 		<!-- Barre d'outils -->
 		<note-tools />

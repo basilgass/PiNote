@@ -1321,3 +1321,94 @@
   }
 }
 
+
+/* === POINTER STATUS WIDGET ================================== */
+
+.pointer-status {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--pn-bg);
+  border: 1px solid var(--pn-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: var(--pn-shadow-sm);
+  font-size: 13px;
+  user-select: none;
+}
+
+.pointer-status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  color: var(--pn-text-faint);
+  background: var(--pn-bg-subtle);
+  transition: color 120ms, background 120ms;
+}
+
+.pointer-status-indicator svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pointer-status-indicator.is-active {
+  color: var(--pn-text);
+  background: var(--pn-bg-hover);
+}
+
+.pointer-status-indicator.kind-pen.is-active   { color: var(--pn-primary); }
+.pointer-status-indicator.kind-finger.is-active { color: #10b981; }
+.pointer-status-indicator.kind-palm.is-active   { color: var(--pn-danger); }
+
+.pointer-status-count {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.pointer-status-dims {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--pn-text-muted);
+  min-width: 56px;
+  padding: 0 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pointer-status-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--pn-border);
+  background: var(--pn-bg);
+  color: var(--pn-text-faint);
+  cursor: pointer;
+  transition: color 120ms, background 120ms, border-color 120ms;
+}
+
+.pointer-status-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pointer-status-toggle:hover {
+  background: var(--pn-bg-hover);
+}
+
+.pointer-status-toggle.is-on {
+  color: var(--pn-primary);
+  border-color: var(--pn-primary);
+  background: var(--pn-primary-bg);
+}

@@ -5,6 +5,7 @@ import type {Adaptable, ShapePatch} from '../shapes/Adaptable'
 import type {BackgroundState, LayerName, ToolConfig, ToolMemory, ToolType} from '../types'
 import {getConfig} from '../config/PiNoteConfig'
 import {ShapeFactory} from '@core/ShapeFactory'
+import {PointerClassifier, type PointerSnapshot} from '@core/PointerClassifier'
 import {usePdfStore} from './usePdfStore'
 import {clearPdfCache, clearPdfThumbnails} from '../services/PdfRenderer'
 import {pdfStorageRemove} from '../services/PdfStorage'
@@ -524,6 +525,24 @@ export const useNoteStore = defineStore('note', () => {
 
   const sidebarOpen = ref(true)
 
+  // ── Pointer classification (observation seule) ───────────────────────────
+
+  const PALM_DETECTION_KEY = 'pi_note_palm_detection_enabled'
+
+  const pointerClassifier = new PointerClassifier()
+
+  const pointerSnapshot = shallowRef<PointerSnapshot>(pointerClassifier.snapshot())
+  pointerClassifier.subscribe((snap) => { pointerSnapshot.value = snap })
+
+  const palmDetectionEnabled = ref<boolean>(
+    (localStorage.getItem(PALM_DETECTION_KEY) ?? 'true') === 'true'
+  )
+
+  function setPalmDetectionEnabled(value: boolean) {
+    palmDetectionEnabled.value = value
+    localStorage.setItem(PALM_DETECTION_KEY, String(value))
+  }
+
   // ── Zoom (délégués au composable useCanvasTransform) ────────────────────
 
   function zoomIn()    { _zoom.value?.zoomIn() }
@@ -555,5 +574,7 @@ export const useNoteStore = defineStore('note', () => {
     sidebarOpen,
     // Zoom
     zoomIn, zoomOut, resetView, fitView,
+    // Pointer classification
+    pointerClassifier, pointerSnapshot, palmDetectionEnabled, setPalmDetectionEnabled,
   }
 })
