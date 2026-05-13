@@ -38607,7 +38607,7 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 			};
 		}
 		function xe(e) {
-			if (ue(`DOWN pid=${e.pointerId} type=${e.pointerType} w×h=${e.width}×${e.height} prim=${e.isPrimary} btn=${e.button} shift=${e.shiftKey}`), e.shiftKey && e.pointerType === "mouse" && R.add(e.pointerId), l.pointerClassifier.onPointerDown(e), !e.isPrimary || e.button !== 0 || !p.value || !y.value || he.value) return;
+			if (ue(`DOWN pid=${e.pointerId} type=${e.pointerType} w×h=${e.width}×${e.height} prim=${e.isPrimary} btn=${e.button} shift=${e.shiftKey}`), e.shiftKey && e.pointerType === "mouse" && R.add(e.pointerId), e.button === 5 && R.add(e.pointerId), l.pointerClassifier.onPointerDown(e), !e.isPrimary || e.button !== 0 && e.button !== 5 || !p.value || !y.value || he.value) return;
 			if (l.tool.tool === "move") {
 				T = !0, D = {
 					x: e.clientX - m.x,

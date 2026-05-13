@@ -197,8 +197,14 @@ function onPointerDown(event: PointerEvent) {
   if (event.shiftKey && event.pointerType === 'mouse') {
     _forcedPalmIds.add(event.pointerId)
   }
+  // Bouton 5 = "Pen Eraser" du spec Pointer Events (palm-detection matérielle des TV/tableaux interactifs).
+  // On force la branche gomme via _forcedPalmIds — signal matériel plus fiable que la classification par aire.
+  if (event.button === 5) {
+    _forcedPalmIds.add(event.pointerId)
+  }
   store.pointerClassifier.onPointerDown(event)
-  if (!event.isPrimary || event.button !== 0) return
+  if (!event.isPrimary) return
+  if (event.button !== 0 && event.button !== 5) return
   if (!canvasEl.value || !engine.value) return
   if (isWidgetEditing.value) return
 
