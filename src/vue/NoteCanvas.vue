@@ -98,6 +98,17 @@ function cancelHold() {
   engine.value?.clearHoldIndicator()
 }
 
+/** DEV ONLY — pointerIds dont le pointerdown a été marqué "paume forcée" via Shift+souris */
+const _forcedPalmIds = new Set<number>()
+
+// DEV ONLY — HUD de debug paume
+const debugLog = ref<string[]>([])
+const debugVisible = ref(true)
+function dbg(msg: string) {
+  const t = new Date().toLocaleTimeString('fr-FR', { hour12: false }) + '.' + String(Date.now() % 1000).padStart(3, '0')
+  debugLog.value = [...debugLog.value.slice(-9), `${t} ${msg}`]
+}
+
 /**
  * Si la détection de paume est active et que ce pointer est classé `palm`,
  * substitue l'outil par `eraser` avec une largeur calibrée sur l'aire de contact.
@@ -107,13 +118,35 @@ function resolveToolForPointer(pointerId: number): { tool: ToolType; width: numb
   const tool = store.tool.tool
   const width = store.tool.width ?? 2
   if (!store.palmDetectionEnabled) return { tool, width }
+
+  // DEV : si Shift+souris a été détecté à pointerdown, on force la branche paume
+  // avec une aire de 1000 px² pour isoler l'origine du problème (filtre matériel vs logique).
+  if (_forcedPalmIds.has(pointerId)) {
+    const cfg = getConfig().pointerThresholds
+    const area = 1000
+    const equivDiameter = 2 * Math.sqrt(area / Math.PI)
+    const raw = equivDiameter * cfg.palmEraserScale
+    const clamped = Math.max(cfg.palmEraserMinWidth, Math.min(cfg.palmEraserMaxWidth, raw))
+    dbg(`FORCED palm pid=${pointerId} area=${area} w=${clamped.toFixed(1)}`)
+    return { tool: 'eraser', width: clamped }
+  }
+
   const info = store.pointerClassifier.snapshot().pointers.get(pointerId)
-  if (info?.kind !== 'palm') return { tool, width }
+  if (!info) {
+    dbg(`resolve pid=${pointerId} → NO INFO in snapshot, fallback tool=${tool}`)
+    return { tool, width }
+  }
+  if (info.kind !== 'palm') {
+    dbg(`resolve pid=${pointerId} kind=${info.kind} w×h=${info.width}×${info.height} → tool=${tool}`)
+    return { tool, width }
+  }
   const cfg = getConfig().pointerThresholds
-  const area = Math.max(1, info.width * info.height)
+  const rawArea = info.width * info.height
+  const area = Math.max(1, rawArea)
   const equivDiameter = 2 * Math.sqrt(area / Math.PI)
   const raw = equivDiameter * cfg.palmEraserScale
   const clamped = Math.max(cfg.palmEraserMinWidth, Math.min(cfg.palmEraserMaxWidth, raw))
+  dbg(`PALM pid=${pointerId} w×h=${info.width}×${info.height} area=${rawArea} → eraser w=${clamped.toFixed(1)}`)
   return { tool: 'eraser', width: clamped }
 }
 
@@ -159,6 +192,11 @@ function toCanvasCoords(event: PointerEvent): { x: number; y: number } {
 // ── Logique de dessin ────────────────────────────────────────────────────────
 
 function onPointerDown(event: PointerEvent) {
+  dbg(`DOWN pid=${event.pointerId} type=${event.pointerType} w×h=${event.width}×${event.height} prim=${event.isPrimary} btn=${event.button} shift=${event.shiftKey}`)
+  // DEV : Shift+souris simule une paume avec aire 1000 px²
+  if (event.shiftKey && event.pointerType === 'mouse') {
+    _forcedPalmIds.add(event.pointerId)
+  }
   store.pointerClassifier.onPointerDown(event)
   if (!event.isPrimary || event.button !== 0) return
   if (!canvasEl.value || !engine.value) return
@@ -331,6 +369,7 @@ function onPointerMove(event: PointerEvent) {
 
 function onPointerUp(event: PointerEvent) {
   store.pointerClassifier.onPointerUp(event)
+  _forcedPalmIds.delete(event.pointerId)
   if (!event.isPrimary) return
 
   if (isPanning) {
@@ -571,6 +610,16 @@ defineExpose({engine})
 			@confirm="commitWidget"
 			@cancel="cancelWidget"
 		/>
+
+		<!-- DEV HUD palm debug -->
+		<div
+			v-if="debugVisible"
+			style="position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#0f0;font-family:monospace;font-size:11px;line-height:1.35;padding:6px 10px;z-index:9999;pointer-events:none;white-space:pre-wrap;max-height:50vh;overflow:hidden"
+		>{{ debugLog.join('\n') || '(aucun event)' }}</div>
+		<button
+			style="position:fixed;top:4px;right:8px;z-index:10000;font-size:11px;padding:2px 6px;background:#222;color:#0f0;border:1px solid #0f0;border-radius:3px;font-family:monospace"
+			@click="debugVisible = !debugVisible"
+		>{{ debugVisible ? 'hide dbg' : 'show dbg' }}</button>
 
 		<!-- Indication contextuelle de l'outil actif -->
 		<tool-hint />

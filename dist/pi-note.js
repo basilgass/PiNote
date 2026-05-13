@@ -38466,9 +38466,28 @@ function az(e, t = {}) {
 //#endregion
 //#region src/vue/NoteCanvas.vue?vue&type=script&setup=true&lang.ts
 var oz = { class: "note-canvas-wrapper" }, sz = {
+	key: 1,
+	style: {
+		position: "fixed",
+		top: "0",
+		left: "0",
+		right: "0",
+		background: "rgba(0,0,0,0.78)",
+		color: "#0f0",
+		"font-family": "monospace",
+		"font-size": "11px",
+		"line-height": "1.35",
+		padding: "6px 10px",
+		"z-index": "9999",
+		"pointer-events": "none",
+		"white-space": "pre-wrap",
+		"max-height": "50vh",
+		overflow: "hidden"
+	}
+}, cz = {
 	key: 0,
 	class: "mini-panel"
-}, cz = { class: "mini-panel-row" }, lz = ["disabled"], uz = ["disabled"], dz = 500, fz = 200, pz = 6, mz = /* @__PURE__ */ d({
+}, lz = { class: "mini-panel-row" }, uz = ["disabled"], dz = ["disabled"], fz = 500, pz = 200, mz = 6, hz = /* @__PURE__ */ d({
 	__name: "NoteCanvas",
 	props: {
 		background: { default: () => ({
@@ -38505,46 +38524,62 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 		}, T = !1, D = {
 			x: 0,
 			y: 0
-		}, A = fz + dz, M = new Set([
+		}, A = pz + fz, M = new Set([
 			"pen",
 			"highlighter",
 			"eraser",
 			"move",
 			"select",
 			"text"
-		]), N = "idle", P = null, F = null, ne = {
+		]), N = "idle", P = null, ne = null, I = {
 			x: 0,
 			y: 0
-		}, I = {
+		}, re = {
 			x: 0,
 			y: 0
 		};
-		function re(e) {
+		function ie(e) {
 			return !M.has(e);
 		}
-		function ie() {
-			P !== null && (clearTimeout(P), P = null), F !== null && (clearTimeout(F), F = null), N = "idle", y.value?.clearHoldIndicator();
+		function ae() {
+			P !== null && (clearTimeout(P), P = null), ne !== null && (clearTimeout(ne), ne = null), N = "idle", y.value?.clearHoldIndicator();
 		}
-		function ae(e) {
+		let R = /* @__PURE__ */ new Set(), oe = j([]), ce = j(!0);
+		function ue(e) {
+			let t = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour12: !1 }) + "." + String(Date.now() % 1e3).padStart(3, "0");
+			oe.value = [...oe.value.slice(-9), `${t} ${e}`];
+		}
+		function fe(e) {
 			let t = l.tool.tool, n = l.tool.width ?? 2;
 			if (!l.palmDetectionEnabled) return {
 				tool: t,
 				width: n
 			};
+			if (R.has(e)) {
+				let t = XP().pointerThresholds, n = 1e3, r = 2 * Math.sqrt(n / Math.PI) * t.palmEraserScale, i = Math.max(t.palmEraserMinWidth, Math.min(t.palmEraserMaxWidth, r));
+				return ue(`FORCED palm pid=${e} area=${n} w=${i.toFixed(1)}`), {
+					tool: "eraser",
+					width: i
+				};
+			}
 			let r = l.pointerClassifier.snapshot().pointers.get(e);
-			if (r?.kind !== "palm") return {
+			if (!r) return ue(`resolve pid=${e} → NO INFO in snapshot, fallback tool=${t}`), {
 				tool: t,
 				width: n
 			};
-			let i = XP().pointerThresholds, a = Math.max(1, r.width * r.height), o = 2 * Math.sqrt(a / Math.PI) * i.palmEraserScale;
-			return {
+			if (r.kind !== "palm") return ue(`resolve pid=${e} kind=${r.kind} w×h=${r.width}×${r.height} → tool=${t}`), {
+				tool: t,
+				width: n
+			};
+			let i = XP().pointerThresholds, a = r.width * r.height, o = 2 * Math.sqrt(Math.max(1, a) / Math.PI) * i.palmEraserScale, s = Math.max(i.palmEraserMinWidth, Math.min(i.palmEraserMaxWidth, o));
+			return ue(`PALM pid=${e} w×h=${r.width}×${r.height} area=${a} → eraser w=${s.toFixed(1)}`), {
 				tool: "eraser",
-				width: Math.max(i.palmEraserMinWidth, Math.min(i.palmEraserMaxWidth, o))
+				width: s
 			};
 		}
-		function R(e) {
+		function pe(e) {
 			if (!y.value) return;
-			let t = ae(e);
+			let t = fe(e);
 			y.value.beginDraw({
 				layer: l.tool.layer,
 				color: l.tool.color ?? "black",
@@ -38556,11 +38591,11 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				toolMode: l.tool.toolModes[t.tool]
 			});
 		}
-		let oe = {
+		let me = {
 			text: MR,
 			graph: iz
-		}, ce = j(!1), ue = te(null), fe = te(null), pe = i(() => fe.value?.getDialogProps() ?? {}), me = !0;
-		function he(e) {
+		}, he = j(!1), ge = te(null), _e = te(null), ve = i(() => _e.value?.getDialogProps() ?? {}), ye = !0;
+		function be(e) {
 			if (!p.value) return {
 				x: 0,
 				y: 0
@@ -38571,8 +38606,8 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				y: (e.clientY - t.top - m.y) / m.scale
 			};
 		}
-		function ge(e) {
-			if (l.pointerClassifier.onPointerDown(e), !e.isPrimary || e.button !== 0 || !p.value || !y.value || ce.value) return;
+		function xe(e) {
+			if (ue(`DOWN pid=${e.pointerId} type=${e.pointerType} w×h=${e.width}×${e.height} prim=${e.isPrimary} btn=${e.button} shift=${e.shiftKey}`), e.shiftKey && e.pointerType === "mouse" && R.add(e.pointerId), l.pointerClassifier.onPointerDown(e), !e.isPrimary || e.button !== 0 || !p.value || !y.value || he.value) return;
 			if (l.tool.tool === "move") {
 				T = !0, D = {
 					x: e.clientX - m.x,
@@ -38580,7 +38615,7 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				};
 				return;
 			}
-			let t = he(e);
+			let t = be(e);
 			if (l.selectedShapeId) {
 				if (y.value.isOverDeleteHandle(t.x, t.y)) {
 					l.destroyShape(l.selectedShapeId);
@@ -38600,63 +38635,63 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				e && e === l.selectedShapeId ? (b = !0, w = t) : e ? l.highlightShape(e) : l.highlightShape(null);
 				return;
 			}
-			let n = ae(e.pointerId).tool;
-			if (!y.value.currentShape && re(n)) {
-				N = "pending", ne = {
+			let n = fe(e.pointerId).tool;
+			if (!y.value.currentShape && ie(n)) {
+				N = "pending", I = {
 					x: e.clientX,
 					y: e.clientY
-				}, I = t, F = setTimeout(() => {
-					F = null, N === "pending" && y.value.startHoldIndicator(I.x, I.y, dz);
-				}, fz), P = setTimeout(() => {
-					P = null, N === "pending" && (N = "adjusting", y.value.completeHoldIndicator(), y.value.hoverSnap(I.x, I.y, l.tool.tool));
+				}, re = t, ne = setTimeout(() => {
+					ne = null, N === "pending" && y.value.startHoldIndicator(re.x, re.y, fz);
+				}, pz), P = setTimeout(() => {
+					P = null, N === "pending" && (N = "adjusting", y.value.completeHoldIndicator(), y.value.hoverSnap(re.x, re.y, l.tool.tool));
 				}, A);
 				return;
 			}
-			y.value.currentShape || R(e.pointerId);
+			y.value.currentShape || pe(e.pointerId);
 			let r = y.value.pointerDown(t.x, t.y);
-			r === "closed" || r === "finished" ? l.syncFromEngine() : r === "dialog" && _e();
+			r === "closed" || r === "finished" ? l.syncFromEngine() : r === "dialog" && Se();
 		}
-		function _e() {
+		function Se() {
 			if (!y.value) return;
 			let e = y.value.currentShape;
 			if (!(e instanceof Oe)) return;
-			let t = oe[e.tool];
+			let t = me[e.tool];
 			if (!t) {
 				y.value.cancelDraw();
 				return;
 			}
-			fe.value = e, me = !0, ue.value = t, ce.value = !0;
+			_e.value = e, ye = !0, ge.value = t, he.value = !0;
 		}
-		function ve(e) {
+		function Ce(e) {
 			if (l.pointerClassifier.onPointerMove(e), !e.isPrimary) return;
 			if (T) {
 				m.x = e.clientX - D.x, m.y = e.clientY - D.y, y.value?.setViewTransform(m.x, m.y, m.scale), y.value?.draw();
 				return;
 			}
 			if (b && l.selectedShapeId) {
-				let t = he(e);
+				let t = be(e);
 				y.value?.moveShape(l.selectedShapeId, t.x - w.x, t.y - w.y), w = t;
 				return;
 			}
 			if (N === "pending") {
-				let t = e.clientX - ne.x, n = e.clientY - ne.y;
-				if (t * t + n * n > pz * pz) ie(), R(e.pointerId), y.value.pointerDown(I.x, I.y);
+				let t = e.clientX - I.x, n = e.clientY - I.y;
+				if (t * t + n * n > mz * mz) ae(), pe(e.pointerId), y.value.pointerDown(re.x, re.y);
 				else return;
 			}
 			if (N === "adjusting") {
-				let t = he(e);
+				let t = be(e);
 				y.value.updateHoldIndicator(t.x, t.y), y.value.hoverSnap(t.x, t.y, l.tool.tool);
 				return;
 			}
-			let t = he(e);
+			let t = be(e);
 			if (p.value && (y.value?.currentShape && y.value.isOverFirstPoint(t.x, t.y) || y.value?.currentShape && y.value.isOverLastPoint(t.x, t.y) ? p.value.style.cursor = "pointer" : l.selectedShapeId && y.value?.isOverMoveHandle(t.x, t.y) ? p.value.style.cursor = "grab" : l.selectedShapeId && y.value?.isOverDeleteHandle(t.x, t.y) ? p.value.style.cursor = "not-allowed" : l.selectedShapeId && y.value?.isOverDuplicateHandle(t.x, t.y) ? p.value.style.cursor = "copy" : l.tool.tool === "select" ? p.value.style.cursor = y.value?.findShapeAt(t.x, t.y) ? "pointer" : "" : p.value.style.cursor = ""), y.value?.currentShape) {
 				y.value.pointerMove(t.x, t.y);
 				return;
 			}
 			y.value?.hoverSnap(t.x, t.y, l.tool.tool);
 		}
-		function ye(e) {
-			if (l.pointerClassifier.onPointerUp(e), !e.isPrimary) return;
+		function we(e) {
+			if (l.pointerClassifier.onPointerUp(e), R.delete(e.pointerId), !e.isPrimary) return;
 			if (T) {
 				T = !1;
 				return;
@@ -38670,60 +38705,60 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				return;
 			}
 			if (N === "pending") {
-				ie();
-				let t = he(e);
-				R(e.pointerId), y.value.pointerDown(t.x, t.y);
+				ae();
+				let t = be(e);
+				pe(e.pointerId), y.value.pointerDown(t.x, t.y);
 				let n = y.value.pointerUp(t.x, t.y);
-				n === "finished" ? l.syncFromEngine() : n === "dialog" && _e();
+				n === "finished" ? l.syncFromEngine() : n === "dialog" && Se();
 				return;
 			}
 			if (N === "adjusting") {
-				let t = he(e), n = y.value.resolveSnap(t.x, t.y, l.tool.tool) ?? t;
-				ie(), R(e.pointerId), y.value.pointerDown(n.x, n.y);
+				let t = be(e), n = y.value.resolveSnap(t.x, t.y, l.tool.tool) ?? t;
+				ae(), pe(e.pointerId), y.value.pointerDown(n.x, n.y);
 				let r = y.value.pointerUp(n.x, n.y);
-				r === "finished" ? l.syncFromEngine() : r === "dialog" && _e();
+				r === "finished" ? l.syncFromEngine() : r === "dialog" && Se();
 				return;
 			}
 			if (!y.value?.currentShape) {
 				y.value?.clearHoverSnap();
 				return;
 			}
-			let t = he(e), n = y.value.pointerUp(t.x, t.y);
-			n === "finished" ? l.syncFromEngine() : n === "dialog" && _e();
+			let t = be(e), n = y.value.pointerUp(t.x, t.y);
+			n === "finished" ? l.syncFromEngine() : n === "dialog" && Se();
 		}
-		function be(e) {
-			if (!(!fe.value || !y.value)) {
-				if (fe.value.applyConfig(e), me) y.value.finalizeWidget(), l.syncFromEngine();
+		function Te(e) {
+			if (!(!_e.value || !y.value)) {
+				if (_e.value.applyConfig(e), ye) y.value.finalizeWidget(), l.syncFromEngine();
 				else {
 					y.value.draw();
 					try {
 						y.value.saveLocal();
 					} catch {}
 				}
-				fe.value = null, ue.value = null, ce.value = !1;
+				_e.value = null, ge.value = null, he.value = !1;
 			}
 		}
-		function xe() {
-			y.value && (me && y.value.cancelDraw(), fe.value = null, ue.value = null, ce.value = !1);
+		function Ee() {
+			y.value && (ye && y.value.cancelDraw(), _e.value = null, ge.value = null, he.value = !1);
 		}
-		function Se(e) {
-			e.key === "Escape" && (N !== "idle" && ie(), y.value?.currentShape && y.value.cancelDraw());
+		function De(e) {
+			e.key === "Escape" && (N !== "idle" && ae(), y.value?.currentShape && y.value.cancelDraw());
 		}
-		function Ce(e) {
-			if (!y.value || ce.value) return;
+		function ke(e) {
+			if (!y.value || he.value) return;
 			let t = p.value.getBoundingClientRect(), n = (e.clientX - t.left - m.x) / m.scale, r = (e.clientY - t.top - m.y) / m.scale, i = y.value.findShapeAt(n, r);
 			if (!i) return;
 			let a = y.value.getShapeById(i);
 			if (!(a instanceof Oe)) return;
-			let o = oe[a.tool];
-			o && (fe.value = a, me = !1, ue.value = o, ce.value = !0);
+			let o = me[a.tool];
+			o && (_e.value = a, ye = !1, ge.value = o, he.value = !0);
 		}
 		return se(() => l.tool.bezier, (e) => {
 			y.value && (y.value.bezier = e);
 		}), se(() => l.tool.toolModes, () => {
 			y.value?.currentShape && y.value.cancelDraw();
 		}, { deep: !0 }), se(() => l.tool.tool, (e) => {
-			N !== "idle" && ie(), y.value?.currentShape && y.value.cancelDraw(), e !== "select" && l.selectedShapeId && l.highlightShape(null);
+			N !== "idle" && ae(), y.value?.currentShape && y.value.cancelDraw(), e !== "select" && l.selectedShapeId && l.highlightShape(null);
 		}), se(() => ({ ...l.tool }), (e) => {
 			d("tool-change", e);
 		}, { deep: !0 }), se(() => f.background, (e) => {
@@ -38734,8 +38769,8 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 			l.snapGrid.enabled = e, y.value && (y.value.snapGridEnabled = e);
 		}), E(() => {
 			p.value && (p.value.addEventListener("touchstart", (e) => {
-				e.touches.length >= 2 && (N !== "idle" && ie(), y.value?.currentShape && y.value.cancelDraw());
-			}, { passive: !0 }), window.addEventListener("keydown", Se), y.value = new wk(p.value, f.background), y.value.bezier = l.tool.bezier, y.value.snapGridEnabled = f.snapGridEnabled, y.value.snapGridSize = f.snapGridSize, l.engine = y.value, l.initSession(), l.title = y.value.title, l.backgroundState = y.value.backgroundState, l.snapGrid.enabled = f.snapGridEnabled, l.snapGrid.size = f.snapGridSize, l.layers = y.value.layers.map((e) => e.name), l.syncFromEngine(), l.registerZoom({
+				e.touches.length >= 2 && (N !== "idle" && ae(), y.value?.currentShape && y.value.cancelDraw());
+			}, { passive: !0 }), window.addEventListener("keydown", De), y.value = new wk(p.value, f.background), y.value.bezier = l.tool.bezier, y.value.snapGridEnabled = f.snapGridEnabled, y.value.snapGridSize = f.snapGridSize, l.engine = y.value, l.initSession(), l.title = y.value.title, l.backgroundState = y.value.backgroundState, l.snapGrid.enabled = f.snapGridEnabled, l.snapGrid.size = f.snapGridSize, l.layers = y.value.layers.map((e) => e.name), l.syncFromEngine(), l.registerZoom({
 				zoomIn: h,
 				zoomOut: g,
 				resetView: _,
@@ -38753,7 +38788,7 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				}
 			}));
 		}), O(() => {
-			window.removeEventListener("keydown", Se), y.value?.destroy();
+			window.removeEventListener("keydown", De), y.value?.destroy();
 		}), t({ engine: y }), (e, t) => (k(), s("div", oz, [
 			c("div", {
 				ref_key: "canvasEl",
@@ -38762,39 +38797,56 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 					"cursor-grab": L(l).tool.tool === "move" && !L(T),
 					"cursor-grabbing": L(l).tool.tool === "move" && L(T)
 				}]),
-				onPointerdown: de(ge, ["prevent"]),
-				onPointermove: de(ve, ["prevent"]),
-				onPointerup: de(ye, ["prevent"]),
-				onPointerleave: de(ye, ["prevent"]),
-				onPointercancel: ye,
-				onDblclick: de(Ce, ["prevent"]),
+				onPointerdown: de(xe, ["prevent"]),
+				onPointermove: de(Ce, ["prevent"]),
+				onPointerup: de(we, ["prevent"]),
+				onPointerleave: de(we, ["prevent"]),
+				onPointercancel: we,
+				onDblclick: de(ke, ["prevent"]),
 				onContextmenu: t[0] ||= de(() => {}, ["prevent"])
 			}, null, 34),
-			ce.value && ue.value ? (k(), a(ee(ue.value), x({
+			he.value && ge.value ? (k(), a(ee(ge.value), x({
 				key: 0,
-				open: ce.value
-			}, pe.value, {
-				onConfirm: be,
-				onCancel: xe
+				open: he.value
+			}, ve.value, {
+				onConfirm: Te,
+				onCancel: Ee
 			}), null, 16, ["open"])) : o("", !0),
+			ce.value ? (k(), s("div", sz, F(oe.value.join("\n") || "(aucun event)"), 1)) : o("", !0),
+			c("button", {
+				style: {
+					position: "fixed",
+					top: "4px",
+					right: "8px",
+					"z-index": "10000",
+					"font-size": "11px",
+					padding: "2px 6px",
+					background: "#222",
+					color: "#0f0",
+					border: "1px solid #0f0",
+					"border-radius": "3px",
+					"font-family": "monospace"
+				},
+				onClick: t[1] ||= (e) => ce.value = !ce.value
+			}, F(ce.value ? "hide dbg" : "show dbg"), 1),
 			u(gR),
 			u(CR),
 			u(QF),
 			u(r, { name: "mini" }, {
-				default: le(() => [L(l).sidebarOpen ? o("", !0) : (k(), s("div", sz, [c("div", cz, [c("button", {
+				default: le(() => [L(l).sidebarOpen ? o("", !0) : (k(), s("div", cz, [c("div", lz, [c("button", {
 					class: "btn",
 					disabled: !L(l).canUndo,
 					title: "Annuler",
-					onClick: t[1] ||= (e) => L(l).undo()
-				}, [u(qP, { icon: "rotate-left" })], 8, lz), c("button", {
+					onClick: t[2] ||= (e) => L(l).undo()
+				}, [u(qP, { icon: "rotate-left" })], 8, uz), c("button", {
 					class: "btn",
 					disabled: !L(l).canRedo,
 					title: "Rétablir",
-					onClick: t[2] ||= (e) => L(l).redo()
-				}, [u(qP, { icon: "rotate-right" })], 8, uz)]), c("button", {
+					onClick: t[3] ||= (e) => L(l).redo()
+				}, [u(qP, { icon: "rotate-right" })], 8, dz)]), c("button", {
 					class: "btn mini-open",
 					title: "Ouvrir le panneau",
-					onClick: t[3] ||= (e) => L(l).sidebarOpen = !0
+					onClick: t[4] ||= (e) => L(l).sidebarOpen = !0
 				}, [u(qP, { icon: "chevron-left" })])]))]),
 				_: 1
 			}),
@@ -38803,4 +38855,4 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 	}
 });
 //#endregion
-export { wk as Engine, Ce as Layer, mz as NoteCanvas, qP as PiIcon, hF as initPdfWorker, be as t };
+export { wk as Engine, Ce as Layer, hz as NoteCanvas, qP as PiIcon, hF as initPdfWorker, be as t };
