@@ -38600,7 +38600,8 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				e && e === l.selectedShapeId ? (b = !0, w = t) : e ? l.highlightShape(e) : l.highlightShape(null);
 				return;
 			}
-			if (!y.value.currentShape && re(l.tool.tool)) {
+			let n = ae(e.pointerId).tool;
+			if (!y.value.currentShape && re(n)) {
 				N = "pending", ne = {
 					x: e.clientX,
 					y: e.clientY
@@ -38612,8 +38613,8 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 				return;
 			}
 			y.value.currentShape || R(e.pointerId);
-			let n = y.value.pointerDown(t.x, t.y);
-			n === "closed" || n === "finished" ? l.syncFromEngine() : n === "dialog" && _e();
+			let r = y.value.pointerDown(t.x, t.y);
+			r === "closed" || r === "finished" ? l.syncFromEngine() : r === "dialog" && _e();
 		}
 		function _e() {
 			if (!y.value) return;

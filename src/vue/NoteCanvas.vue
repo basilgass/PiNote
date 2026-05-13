@@ -203,8 +203,11 @@ function onPointerDown(event: PointerEvent) {
     return
   }
 
-  // Premier pointerdown d'un dessin : long-press tactile sur le 1er point
-  if (!engine.value.currentShape && isHoldEligible(store.tool.tool)) {
+  // Premier pointerdown d'un dessin : long-press tactile sur le 1er point.
+  // Important : on teste l'éligibilité sur l'outil RÉSOLU (override paume → eraser pris en compte)
+  // pour qu'une paume bypass directement le long-press et crée son trait gomme immédiatement.
+  const resolvedToolForHold = resolveToolForPointer(event.pointerId).tool
+  if (!engine.value.currentShape && isHoldEligible(resolvedToolForHold)) {
     holdPhase = 'pending'
     holdStartClient = { x: event.clientX, y: event.clientY }
     holdStartCanvas = pos
