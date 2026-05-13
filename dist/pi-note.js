@@ -36017,6 +36017,7 @@ var GP = {
 		}
 	],
 	maxPages: 0,
+	debug: { pointerHud: !1 },
 	pointerThresholds: {
 		penMaxArea: 10,
 		palmMinArea: 400,
@@ -36027,6 +36028,7 @@ var GP = {
 }, YP = {
 	...JP,
 	defaults: { ...JP.defaults },
+	debug: { ...JP.debug },
 	pointerThresholds: { ...JP.pointerThresholds }
 };
 function XP() {
@@ -38466,7 +38468,7 @@ function az(e, t = {}) {
 //#endregion
 //#region src/vue/NoteCanvas.vue?vue&type=script&setup=true&lang.ts
 var oz = { class: "note-canvas-wrapper" }, sz = {
-	key: 1,
+	key: 0,
 	style: {
 		position: "fixed",
 		top: "0",
@@ -38510,272 +38512,262 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 		}
 	},
 	emits: ["tool-change"],
-	setup(e, { expose: t, emit: n }) {
+	setup(e, { expose: n, emit: l }) {
 		RN() || LN(kP());
-		let l = OF(), d = n, f = e, p = j(null), { transform: m, zoomIn: h, zoomOut: g, resetView: _, fitView: v } = az(p, {
+		let d = OF(), f = l, p = e, m = j(null), { transform: h, zoomIn: g, zoomOut: _, resetView: v, fitView: y } = az(m, {
 			panButton: 2,
 			onTransformChange: () => {
-				l.engine?.setViewTransform(m.x, m.y, m.scale), l.engine?.draw();
+				d.engine?.setViewTransform(h.x, h.y, h.scale), d.engine?.draw();
 			},
-			canPan: () => l.tool.tool === "move"
-		}), y = te(void 0), b = !1, S = !1, w = {
+			canPan: () => d.tool.tool === "move"
+		}), b = te(void 0), S = !1, w = !1, T = {
 			x: 0,
 			y: 0
-		}, T = !1, D = {
+		}, D = !1, A = {
 			x: 0,
 			y: 0
-		}, A = pz + fz, M = new Set([
+		}, M = pz + fz, N = new Set([
 			"pen",
 			"highlighter",
 			"eraser",
 			"move",
 			"select",
 			"text"
-		]), N = "idle", P = null, ne = null, I = {
+		]), P = "idle", ne = null, I = null, re = {
 			x: 0,
 			y: 0
-		}, re = {
+		}, ie = {
 			x: 0,
 			y: 0
 		};
-		function ie(e) {
-			return !M.has(e);
+		function ae(e) {
+			return !N.has(e);
 		}
-		function ae() {
-			P !== null && (clearTimeout(P), P = null), ne !== null && (clearTimeout(ne), ne = null), N = "idle", y.value?.clearHoldIndicator();
+		function R() {
+			ne !== null && (clearTimeout(ne), ne = null), I !== null && (clearTimeout(I), I = null), P = "idle", b.value?.clearHoldIndicator();
 		}
-		let R = /* @__PURE__ */ new Set(), oe = j([]), ce = j(!0);
-		function ue(e) {
-			let t = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour12: !1 }) + "." + String(Date.now() % 1e3).padStart(3, "0");
-			oe.value = [...oe.value.slice(-9), `${t} ${e}`];
-		}
-		function fe(e) {
-			let t = l.tool.tool, n = l.tool.width ?? 2;
-			if (!l.palmDetectionEnabled) return {
-				tool: t,
-				width: n
-			};
-			if (R.has(e)) {
-				let t = XP().pointerThresholds, n = 1e3, r = 2 * Math.sqrt(n / Math.PI) * t.palmEraserScale, i = Math.max(t.palmEraserMinWidth, Math.min(t.palmEraserMaxWidth, r));
-				return ue(`FORCED palm pid=${e} area=${n} w=${i.toFixed(1)}`), {
-					tool: "eraser",
-					width: i
-				};
-			}
-			let r = l.pointerClassifier.snapshot().pointers.get(e);
-			if (!r) return ue(`resolve pid=${e} → NO INFO in snapshot, fallback tool=${t}`), {
-				tool: t,
-				width: n
-			};
-			if (r.kind !== "palm") return ue(`resolve pid=${e} kind=${r.kind} w×h=${r.width}×${r.height} → tool=${t}`), {
-				tool: t,
-				width: n
-			};
-			let i = XP().pointerThresholds, a = r.width * r.height, o = 2 * Math.sqrt(Math.max(1, a) / Math.PI) * i.palmEraserScale, s = Math.max(i.palmEraserMinWidth, Math.min(i.palmEraserMaxWidth, o));
-			return ue(`PALM pid=${e} w×h=${r.width}×${r.height} area=${a} → eraser w=${s.toFixed(1)}`), {
-				tool: "eraser",
-				width: s
-			};
-		}
+		let oe = /* @__PURE__ */ new Set(), ce = XP().debug.pointerHud, ue = j([]), fe = j(!0);
 		function pe(e) {
-			if (!y.value) return;
-			let t = fe(e);
-			y.value.beginDraw({
-				layer: l.tool.layer,
-				color: l.tool.color ?? "black",
+			if (!ce) return;
+			let t = (/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour12: !1 }) + "." + String(Date.now() % 1e3).padStart(3, "0");
+			ue.value = [...ue.value.slice(-9), `${t} ${e}`];
+		}
+		function me(e) {
+			let t = d.tool.tool, n = d.tool.width ?? 2;
+			if (!d.palmDetectionEnabled) return {
+				tool: t,
+				width: n
+			};
+			let r = d.pointerClassifier.snapshot().pointers.get(e), i = oe.has(e);
+			if (!(i || r?.kind === "palm")) return pe(`resolve pid=${e} kind=${r?.kind ?? "?"} w×h=${r?.width}×${r?.height} → tool=${t}`), {
+				tool: t,
+				width: n
+			};
+			let a = XP().pointerThresholds, o = r ? r.width * r.height : 0, s = Math.max(1, o > 0 ? o : 1e3), c = 2 * Math.sqrt(s / Math.PI) * a.palmEraserScale, l = Math.max(a.palmEraserMinWidth, Math.min(a.palmEraserMaxWidth, c));
+			return pe(`PALM pid=${e} forced=${i} kind=${r?.kind} w×h=${r?.width}×${r?.height} area=${s.toFixed(0)} → eraser w=${l.toFixed(1)}`), {
+				tool: "eraser",
+				width: l
+			};
+		}
+		function he(e) {
+			if (!b.value) return;
+			let t = me(e);
+			b.value.beginDraw({
+				layer: d.tool.layer,
+				color: d.tool.color ?? "black",
 				width: t.width,
 				tool: t.tool,
 				createdAt: Date.now(),
 				x: 0,
 				y: 0,
-				toolMode: l.tool.toolModes[t.tool]
+				toolMode: d.tool.toolModes[t.tool]
 			});
 		}
-		let me = {
+		let ge = {
 			text: MR,
 			graph: iz
-		}, he = j(!1), ge = te(null), _e = te(null), ve = i(() => _e.value?.getDialogProps() ?? {}), ye = !0;
-		function be(e) {
-			if (!p.value) return {
+		}, _e = j(!1), ve = te(null), ye = te(null), be = i(() => ye.value?.getDialogProps() ?? {}), xe = !0;
+		function Se(e) {
+			if (!m.value) return {
 				x: 0,
 				y: 0
 			};
-			let t = p.value.getBoundingClientRect();
+			let t = m.value.getBoundingClientRect();
 			return {
-				x: (e.clientX - t.left - m.x) / m.scale,
-				y: (e.clientY - t.top - m.y) / m.scale
+				x: (e.clientX - t.left - h.x) / h.scale,
+				y: (e.clientY - t.top - h.y) / h.scale
 			};
 		}
-		function xe(e) {
-			if (ue(`DOWN pid=${e.pointerId} type=${e.pointerType} w×h=${e.width}×${e.height} prim=${e.isPrimary} btn=${e.button} shift=${e.shiftKey}`), e.shiftKey && e.pointerType === "mouse" && R.add(e.pointerId), e.button === 5 && R.add(e.pointerId), l.pointerClassifier.onPointerDown(e), !e.isPrimary || e.button !== 0 && e.button !== 5 || !p.value || !y.value || he.value) return;
-			if (l.tool.tool === "move") {
-				T = !0, D = {
-					x: e.clientX - m.x,
-					y: e.clientY - m.y
+		function Ce(e) {
+			if (pe(`DOWN pid=${e.pointerId} type=${e.pointerType} w×h=${e.width}×${e.height} prim=${e.isPrimary} btn=${e.button} shift=${e.shiftKey}`), ce && e.shiftKey && e.pointerType === "mouse" && oe.add(e.pointerId), e.button === 5 && oe.add(e.pointerId), d.pointerClassifier.onPointerDown(e), !e.isPrimary || e.button !== 0 && e.button !== 5 || !m.value || !b.value || _e.value) return;
+			if (d.tool.tool === "move") {
+				D = !0, A = {
+					x: e.clientX - h.x,
+					y: e.clientY - h.y
 				};
 				return;
 			}
-			let t = be(e);
-			if (l.selectedShapeId) {
-				if (y.value.isOverDeleteHandle(t.x, t.y)) {
-					l.destroyShape(l.selectedShapeId);
+			let t = Se(e);
+			if (d.selectedShapeId) {
+				if (b.value.isOverDeleteHandle(t.x, t.y)) {
+					d.destroyShape(d.selectedShapeId);
 					return;
 				}
-				if (y.value.isOverDuplicateHandle(t.x, t.y)) {
-					S = !0;
+				if (b.value.isOverDuplicateHandle(t.x, t.y)) {
+					w = !0;
 					return;
 				}
-				if (y.value.isOverMoveHandle(t.x, t.y)) {
-					b = !0, w = t;
+				if (b.value.isOverMoveHandle(t.x, t.y)) {
+					S = !0, T = t;
 					return;
 				}
 			}
-			if (l.tool.tool === "select") {
-				let e = y.value.findShapeAt(t.x, t.y);
-				e && e === l.selectedShapeId ? (b = !0, w = t) : e ? l.highlightShape(e) : l.highlightShape(null);
+			if (d.tool.tool === "select") {
+				let e = b.value.findShapeAt(t.x, t.y);
+				e && e === d.selectedShapeId ? (S = !0, T = t) : e ? d.highlightShape(e) : d.highlightShape(null);
 				return;
 			}
-			let n = fe(e.pointerId).tool;
-			if (!y.value.currentShape && ie(n)) {
-				N = "pending", I = {
+			let n = me(e.pointerId).tool;
+			if (!b.value.currentShape && ae(n)) {
+				P = "pending", re = {
 					x: e.clientX,
 					y: e.clientY
-				}, re = t, ne = setTimeout(() => {
-					ne = null, N === "pending" && y.value.startHoldIndicator(re.x, re.y, fz);
-				}, pz), P = setTimeout(() => {
-					P = null, N === "pending" && (N = "adjusting", y.value.completeHoldIndicator(), y.value.hoverSnap(re.x, re.y, l.tool.tool));
-				}, A);
+				}, ie = t, I = setTimeout(() => {
+					I = null, P === "pending" && b.value.startHoldIndicator(ie.x, ie.y, fz);
+				}, pz), ne = setTimeout(() => {
+					ne = null, P === "pending" && (P = "adjusting", b.value.completeHoldIndicator(), b.value.hoverSnap(ie.x, ie.y, d.tool.tool));
+				}, M);
 				return;
 			}
-			y.value.currentShape || pe(e.pointerId);
-			let r = y.value.pointerDown(t.x, t.y);
-			r === "closed" || r === "finished" ? l.syncFromEngine() : r === "dialog" && Se();
+			b.value.currentShape || he(e.pointerId);
+			let r = b.value.pointerDown(t.x, t.y);
+			r === "closed" || r === "finished" ? d.syncFromEngine() : r === "dialog" && we();
 		}
-		function Se() {
-			if (!y.value) return;
-			let e = y.value.currentShape;
+		function we() {
+			if (!b.value) return;
+			let e = b.value.currentShape;
 			if (!(e instanceof Oe)) return;
-			let t = me[e.tool];
+			let t = ge[e.tool];
 			if (!t) {
-				y.value.cancelDraw();
+				b.value.cancelDraw();
 				return;
 			}
-			_e.value = e, ye = !0, ge.value = t, he.value = !0;
+			ye.value = e, xe = !0, ve.value = t, _e.value = !0;
 		}
-		function Ce(e) {
-			if (l.pointerClassifier.onPointerMove(e), !e.isPrimary) return;
-			if (T) {
-				m.x = e.clientX - D.x, m.y = e.clientY - D.y, y.value?.setViewTransform(m.x, m.y, m.scale), y.value?.draw();
+		function Te(e) {
+			if (d.pointerClassifier.onPointerMove(e), !e.isPrimary) return;
+			if (D) {
+				h.x = e.clientX - A.x, h.y = e.clientY - A.y, b.value?.setViewTransform(h.x, h.y, h.scale), b.value?.draw();
 				return;
 			}
-			if (b && l.selectedShapeId) {
-				let t = be(e);
-				y.value?.moveShape(l.selectedShapeId, t.x - w.x, t.y - w.y), w = t;
+			if (S && d.selectedShapeId) {
+				let t = Se(e);
+				b.value?.moveShape(d.selectedShapeId, t.x - T.x, t.y - T.y), T = t;
 				return;
 			}
-			if (N === "pending") {
-				let t = e.clientX - I.x, n = e.clientY - I.y;
-				if (t * t + n * n > mz * mz) ae(), pe(e.pointerId), y.value.pointerDown(re.x, re.y);
+			if (P === "pending") {
+				let t = e.clientX - re.x, n = e.clientY - re.y;
+				if (t * t + n * n > mz * mz) R(), he(e.pointerId), b.value.pointerDown(ie.x, ie.y);
 				else return;
 			}
-			if (N === "adjusting") {
-				let t = be(e);
-				y.value.updateHoldIndicator(t.x, t.y), y.value.hoverSnap(t.x, t.y, l.tool.tool);
+			if (P === "adjusting") {
+				let t = Se(e);
+				b.value.updateHoldIndicator(t.x, t.y), b.value.hoverSnap(t.x, t.y, d.tool.tool);
 				return;
 			}
-			let t = be(e);
-			if (p.value && (y.value?.currentShape && y.value.isOverFirstPoint(t.x, t.y) || y.value?.currentShape && y.value.isOverLastPoint(t.x, t.y) ? p.value.style.cursor = "pointer" : l.selectedShapeId && y.value?.isOverMoveHandle(t.x, t.y) ? p.value.style.cursor = "grab" : l.selectedShapeId && y.value?.isOverDeleteHandle(t.x, t.y) ? p.value.style.cursor = "not-allowed" : l.selectedShapeId && y.value?.isOverDuplicateHandle(t.x, t.y) ? p.value.style.cursor = "copy" : l.tool.tool === "select" ? p.value.style.cursor = y.value?.findShapeAt(t.x, t.y) ? "pointer" : "" : p.value.style.cursor = ""), y.value?.currentShape) {
-				y.value.pointerMove(t.x, t.y);
+			let t = Se(e);
+			if (m.value && (b.value?.currentShape && b.value.isOverFirstPoint(t.x, t.y) || b.value?.currentShape && b.value.isOverLastPoint(t.x, t.y) ? m.value.style.cursor = "pointer" : d.selectedShapeId && b.value?.isOverMoveHandle(t.x, t.y) ? m.value.style.cursor = "grab" : d.selectedShapeId && b.value?.isOverDeleteHandle(t.x, t.y) ? m.value.style.cursor = "not-allowed" : d.selectedShapeId && b.value?.isOverDuplicateHandle(t.x, t.y) ? m.value.style.cursor = "copy" : d.tool.tool === "select" ? m.value.style.cursor = b.value?.findShapeAt(t.x, t.y) ? "pointer" : "" : m.value.style.cursor = ""), b.value?.currentShape) {
+				b.value.pointerMove(t.x, t.y);
 				return;
 			}
-			y.value?.hoverSnap(t.x, t.y, l.tool.tool);
+			b.value?.hoverSnap(t.x, t.y, d.tool.tool);
 		}
-		function we(e) {
-			if (l.pointerClassifier.onPointerUp(e), R.delete(e.pointerId), !e.isPrimary) return;
-			if (T) {
-				T = !1;
+		function Ee(e) {
+			if (d.pointerClassifier.onPointerUp(e), oe.delete(e.pointerId), !e.isPrimary) return;
+			if (D) {
+				D = !1;
+				return;
+			}
+			if (w) {
+				w = !1, d.selectedShapeId &&= b.value?.duplicateShape(d.selectedShapeId) ?? null, d.syncFromEngine();
 				return;
 			}
 			if (S) {
-				S = !1, l.selectedShapeId &&= y.value?.duplicateShape(l.selectedShapeId) ?? null, l.syncFromEngine();
+				S = !1, m.value && (m.value.style.cursor = ""), b.value?.saveLocal(), d.syncFromEngine();
 				return;
 			}
-			if (b) {
-				b = !1, p.value && (p.value.style.cursor = ""), y.value?.saveLocal(), l.syncFromEngine();
+			if (P === "pending") {
+				R();
+				let t = Se(e);
+				he(e.pointerId), b.value.pointerDown(t.x, t.y);
+				let n = b.value.pointerUp(t.x, t.y);
+				n === "finished" ? d.syncFromEngine() : n === "dialog" && we();
 				return;
 			}
-			if (N === "pending") {
-				ae();
-				let t = be(e);
-				pe(e.pointerId), y.value.pointerDown(t.x, t.y);
-				let n = y.value.pointerUp(t.x, t.y);
-				n === "finished" ? l.syncFromEngine() : n === "dialog" && Se();
+			if (P === "adjusting") {
+				let t = Se(e), n = b.value.resolveSnap(t.x, t.y, d.tool.tool) ?? t;
+				R(), he(e.pointerId), b.value.pointerDown(n.x, n.y);
+				let r = b.value.pointerUp(n.x, n.y);
+				r === "finished" ? d.syncFromEngine() : r === "dialog" && we();
 				return;
 			}
-			if (N === "adjusting") {
-				let t = be(e), n = y.value.resolveSnap(t.x, t.y, l.tool.tool) ?? t;
-				ae(), pe(e.pointerId), y.value.pointerDown(n.x, n.y);
-				let r = y.value.pointerUp(n.x, n.y);
-				r === "finished" ? l.syncFromEngine() : r === "dialog" && Se();
+			if (!b.value?.currentShape) {
+				b.value?.clearHoverSnap();
 				return;
 			}
-			if (!y.value?.currentShape) {
-				y.value?.clearHoverSnap();
-				return;
-			}
-			let t = be(e), n = y.value.pointerUp(t.x, t.y);
-			n === "finished" ? l.syncFromEngine() : n === "dialog" && Se();
-		}
-		function Te(e) {
-			if (!(!_e.value || !y.value)) {
-				if (_e.value.applyConfig(e), ye) y.value.finalizeWidget(), l.syncFromEngine();
-				else {
-					y.value.draw();
-					try {
-						y.value.saveLocal();
-					} catch {}
-				}
-				_e.value = null, ge.value = null, he.value = !1;
-			}
-		}
-		function Ee() {
-			y.value && (ye && y.value.cancelDraw(), _e.value = null, ge.value = null, he.value = !1);
+			let t = Se(e), n = b.value.pointerUp(t.x, t.y);
+			n === "finished" ? d.syncFromEngine() : n === "dialog" && we();
 		}
 		function De(e) {
-			e.key === "Escape" && (N !== "idle" && ae(), y.value?.currentShape && y.value.cancelDraw());
+			if (!(!ye.value || !b.value)) {
+				if (ye.value.applyConfig(e), xe) b.value.finalizeWidget(), d.syncFromEngine();
+				else {
+					b.value.draw();
+					try {
+						b.value.saveLocal();
+					} catch {}
+				}
+				ye.value = null, ve.value = null, _e.value = !1;
+			}
 		}
-		function ke(e) {
-			if (!y.value || he.value) return;
-			let t = p.value.getBoundingClientRect(), n = (e.clientX - t.left - m.x) / m.scale, r = (e.clientY - t.top - m.y) / m.scale, i = y.value.findShapeAt(n, r);
+		function ke() {
+			b.value && (xe && b.value.cancelDraw(), ye.value = null, ve.value = null, _e.value = !1);
+		}
+		function Ae(e) {
+			e.key === "Escape" && (P !== "idle" && R(), b.value?.currentShape && b.value.cancelDraw());
+		}
+		function je(e) {
+			if (!b.value || _e.value) return;
+			let t = m.value.getBoundingClientRect(), n = (e.clientX - t.left - h.x) / h.scale, r = (e.clientY - t.top - h.y) / h.scale, i = b.value.findShapeAt(n, r);
 			if (!i) return;
-			let a = y.value.getShapeById(i);
+			let a = b.value.getShapeById(i);
 			if (!(a instanceof Oe)) return;
-			let o = me[a.tool];
-			o && (_e.value = a, ye = !1, ge.value = o, he.value = !0);
+			let o = ge[a.tool];
+			o && (ye.value = a, xe = !1, ve.value = o, _e.value = !0);
 		}
-		return se(() => l.tool.bezier, (e) => {
-			y.value && (y.value.bezier = e);
-		}), se(() => l.tool.toolModes, () => {
-			y.value?.currentShape && y.value.cancelDraw();
-		}, { deep: !0 }), se(() => l.tool.tool, (e) => {
-			N !== "idle" && ae(), y.value?.currentShape && y.value.cancelDraw(), e !== "select" && l.selectedShapeId && l.highlightShape(null);
-		}), se(() => ({ ...l.tool }), (e) => {
-			d("tool-change", e);
-		}, { deep: !0 }), se(() => f.background, (e) => {
-			l.setBackground(e), y.value?.setBackground(e);
-		}, { deep: !0 }), se(() => f.snapGridSize, (e) => {
-			l.snapGrid.size = e, y.value && (y.value.snapGridSize = e);
-		}), se(() => f.snapGridEnabled, (e) => {
-			l.snapGrid.enabled = e, y.value && (y.value.snapGridEnabled = e);
+		return se(() => d.tool.bezier, (e) => {
+			b.value && (b.value.bezier = e);
+		}), se(() => d.tool.toolModes, () => {
+			b.value?.currentShape && b.value.cancelDraw();
+		}, { deep: !0 }), se(() => d.tool.tool, (e) => {
+			P !== "idle" && R(), b.value?.currentShape && b.value.cancelDraw(), e !== "select" && d.selectedShapeId && d.highlightShape(null);
+		}), se(() => ({ ...d.tool }), (e) => {
+			f("tool-change", e);
+		}, { deep: !0 }), se(() => p.background, (e) => {
+			d.setBackground(e), b.value?.setBackground(e);
+		}, { deep: !0 }), se(() => p.snapGridSize, (e) => {
+			d.snapGrid.size = e, b.value && (b.value.snapGridSize = e);
+		}), se(() => p.snapGridEnabled, (e) => {
+			d.snapGrid.enabled = e, b.value && (b.value.snapGridEnabled = e);
 		}), E(() => {
-			p.value && (p.value.addEventListener("touchstart", (e) => {
-				e.touches.length >= 2 && (N !== "idle" && ae(), y.value?.currentShape && y.value.cancelDraw());
-			}, { passive: !0 }), window.addEventListener("keydown", De), y.value = new wk(p.value, f.background), y.value.bezier = l.tool.bezier, y.value.snapGridEnabled = f.snapGridEnabled, y.value.snapGridSize = f.snapGridSize, l.engine = y.value, l.initSession(), l.title = y.value.title, l.backgroundState = y.value.backgroundState, l.snapGrid.enabled = f.snapGridEnabled, l.snapGrid.size = f.snapGridSize, l.layers = y.value.layers.map((e) => e.name), l.syncFromEngine(), l.registerZoom({
-				zoomIn: h,
-				zoomOut: g,
-				resetView: _,
+			m.value && (m.value.addEventListener("touchstart", (e) => {
+				e.touches.length >= 2 && (P !== "idle" && R(), b.value?.currentShape && b.value.cancelDraw());
+			}, { passive: !0 }), window.addEventListener("keydown", Ae), b.value = new wk(m.value, p.background), b.value.bezier = d.tool.bezier, b.value.snapGridEnabled = p.snapGridEnabled, b.value.snapGridSize = p.snapGridSize, d.engine = b.value, d.initSession(), d.title = b.value.title, d.backgroundState = b.value.backgroundState, d.snapGrid.enabled = p.snapGridEnabled, d.snapGrid.size = p.snapGridSize, d.layers = b.value.layers.map((e) => e.name), d.syncFromEngine(), d.registerZoom({
+				zoomIn: g,
+				zoomOut: _,
+				resetView: v,
 				fitView: () => {
-					let e = y.value?.shapes ?? [], t = y.value?.referenceBitmap;
+					let e = b.value?.shapes ?? [], t = b.value?.referenceBitmap;
 					if (t) {
 						let n = { getBounds: () => ({
 							minX: 0,
@@ -38783,37 +38775,36 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 							maxX: t.width,
 							maxY: t.height
 						}) };
-						v([...e, n]);
-					} else v(e);
+						y([...e, n]);
+					} else y(e);
 				}
 			}));
 		}), O(() => {
-			window.removeEventListener("keydown", De), y.value?.destroy();
-		}), t({ engine: y }), (e, t) => (k(), s("div", oz, [
+			window.removeEventListener("keydown", Ae), b.value?.destroy();
+		}), n({ engine: b }), (e, n) => (k(), s("div", oz, [
 			c("div", {
 				ref_key: "canvasEl",
-				ref: p,
+				ref: m,
 				class: C(["note-canvas", {
-					"cursor-grab": L(l).tool.tool === "move" && !L(T),
-					"cursor-grabbing": L(l).tool.tool === "move" && L(T)
+					"cursor-grab": L(d).tool.tool === "move" && !L(D),
+					"cursor-grabbing": L(d).tool.tool === "move" && L(D)
 				}]),
-				onPointerdown: de(xe, ["prevent"]),
-				onPointermove: de(Ce, ["prevent"]),
-				onPointerup: de(we, ["prevent"]),
-				onPointerleave: de(we, ["prevent"]),
-				onPointercancel: we,
-				onDblclick: de(ke, ["prevent"]),
-				onContextmenu: t[0] ||= de(() => {}, ["prevent"])
+				onPointerdown: de(Ce, ["prevent"]),
+				onPointermove: de(Te, ["prevent"]),
+				onPointerup: de(Ee, ["prevent"]),
+				onPointerleave: de(Ee, ["prevent"]),
+				onPointercancel: Ee,
+				onDblclick: de(je, ["prevent"]),
+				onContextmenu: n[0] ||= de(() => {}, ["prevent"])
 			}, null, 34),
-			he.value && ge.value ? (k(), a(ee(ge.value), x({
+			_e.value && ve.value ? (k(), a(ee(ve.value), x({
 				key: 0,
-				open: he.value
-			}, ve.value, {
-				onConfirm: Te,
-				onCancel: Ee
+				open: _e.value
+			}, be.value, {
+				onConfirm: De,
+				onCancel: ke
 			}), null, 16, ["open"])) : o("", !0),
-			ce.value ? (k(), s("div", sz, F(oe.value.join("\n") || "(aucun event)"), 1)) : o("", !0),
-			c("button", {
+			L(ce) ? (k(), s(t, { key: 1 }, [fe.value ? (k(), s("div", sz, F(ue.value.join("\n") || "(aucun event)"), 1)) : o("", !0), c("button", {
 				style: {
 					position: "fixed",
 					top: "4px",
@@ -38827,30 +38818,30 @@ var oz = { class: "note-canvas-wrapper" }, sz = {
 					"border-radius": "3px",
 					"font-family": "monospace"
 				},
-				onClick: t[1] ||= (e) => ce.value = !ce.value
-			}, F(ce.value ? "hide dbg" : "show dbg"), 1),
+				onClick: n[1] ||= (e) => fe.value = !fe.value
+			}, F(fe.value ? "hide dbg" : "show dbg"), 1)], 64)) : o("", !0),
 			u(gR),
 			u(CR),
 			u(QF),
 			u(r, { name: "mini" }, {
-				default: le(() => [L(l).sidebarOpen ? o("", !0) : (k(), s("div", cz, [c("div", lz, [c("button", {
+				default: le(() => [L(d).sidebarOpen ? o("", !0) : (k(), s("div", cz, [c("div", lz, [c("button", {
 					class: "btn",
-					disabled: !L(l).canUndo,
+					disabled: !L(d).canUndo,
 					title: "Annuler",
-					onClick: t[2] ||= (e) => L(l).undo()
+					onClick: n[2] ||= (e) => L(d).undo()
 				}, [u(qP, { icon: "rotate-left" })], 8, uz), c("button", {
 					class: "btn",
-					disabled: !L(l).canRedo,
+					disabled: !L(d).canRedo,
 					title: "Rétablir",
-					onClick: t[3] ||= (e) => L(l).redo()
+					onClick: n[3] ||= (e) => L(d).redo()
 				}, [u(qP, { icon: "rotate-right" })], 8, dz)]), c("button", {
 					class: "btn mini-open",
 					title: "Ouvrir le panneau",
-					onClick: t[4] ||= (e) => L(l).sidebarOpen = !0
+					onClick: n[4] ||= (e) => L(d).sidebarOpen = !0
 				}, [u(qP, { icon: "chevron-left" })])]))]),
 				_: 1
 			}),
-			c("div", { class: C(["sidebar-wrapper", { closed: !L(l).sidebarOpen }]) }, [u(pR)], 2)
+			c("div", { class: C(["sidebar-wrapper", { closed: !L(d).sidebarOpen }]) }, [u(pR)], 2)
 		]));
 	}
 });

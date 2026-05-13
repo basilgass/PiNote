@@ -101,17 +101,21 @@ function cancelHold() {
 /** DEV ONLY — pointerIds dont le pointerdown a été marqué "paume forcée" via Shift+souris */
 const _forcedPalmIds = new Set<number>()
 
-// DEV ONLY — HUD de debug paume
+// HUD de debug pointer (gated par getConfig().debug.pointerHud — voir pinote.md §18).
+// Sert à diagnostiquer les interactions tactiles sur device sans devtools.
+const debugEnabled = getConfig().debug.pointerHud
 const debugLog = ref<string[]>([])
 const debugVisible = ref(true)
 function dbg(msg: string) {
+  if (!debugEnabled) return
   const t = new Date().toLocaleTimeString('fr-FR', { hour12: false }) + '.' + String(Date.now() % 1000).padStart(3, '0')
   debugLog.value = [...debugLog.value.slice(-9), `${t} ${msg}`]
 }
 
 /**
- * Si la détection de paume est active et que ce pointer est classé `palm`,
- * substitue l'outil par `eraser` avec une largeur calibrée sur l'aire de contact.
+ * Si la détection de paume est active et que ce pointer est classé `palm` (par aire de contact)
+ * ou marqué via _forcedPalmIds (signal matériel button=5 / Shift+souris dev),
+ * substitue l'outil par `eraser` avec une largeur calibrée sur l'aire réelle de contact.
  * Sinon retourne l'outil/largeur sélectionnés dans le store.
  */
 function resolveToolForPointer(pointerId: number): { tool: ToolType; width: number } {
@@ -119,34 +123,22 @@ function resolveToolForPointer(pointerId: number): { tool: ToolType; width: numb
   const width = store.tool.width ?? 2
   if (!store.palmDetectionEnabled) return { tool, width }
 
-  // DEV : si Shift+souris a été détecté à pointerdown, on force la branche paume
-  // avec une aire de 1000 px² pour isoler l'origine du problème (filtre matériel vs logique).
-  if (_forcedPalmIds.has(pointerId)) {
-    const cfg = getConfig().pointerThresholds
-    const area = 1000
-    const equivDiameter = 2 * Math.sqrt(area / Math.PI)
-    const raw = equivDiameter * cfg.palmEraserScale
-    const clamped = Math.max(cfg.palmEraserMinWidth, Math.min(cfg.palmEraserMaxWidth, raw))
-    dbg(`FORCED palm pid=${pointerId} area=${area} w=${clamped.toFixed(1)}`)
-    return { tool: 'eraser', width: clamped }
+  const info = store.pointerClassifier.snapshot().pointers.get(pointerId)
+  const forced = _forcedPalmIds.has(pointerId)
+  const isPalm = forced || info?.kind === 'palm'
+  if (!isPalm) {
+    dbg(`resolve pid=${pointerId} kind=${info?.kind ?? '?'} w×h=${info?.width}×${info?.height} → tool=${tool}`)
+    return { tool, width }
   }
 
-  const info = store.pointerClassifier.snapshot().pointers.get(pointerId)
-  if (!info) {
-    dbg(`resolve pid=${pointerId} → NO INFO in snapshot, fallback tool=${tool}`)
-    return { tool, width }
-  }
-  if (info.kind !== 'palm') {
-    dbg(`resolve pid=${pointerId} kind=${info.kind} w×h=${info.width}×${info.height} → tool=${tool}`)
-    return { tool, width }
-  }
   const cfg = getConfig().pointerThresholds
-  const rawArea = info.width * info.height
-  const area = Math.max(1, rawArea)
+  // Utilise l'aire réelle si dispo (info présente avec valeurs > 0), sinon 1000 px² (cas Shift+souris dev)
+  const realArea = info ? info.width * info.height : 0
+  const area = Math.max(1, realArea > 0 ? realArea : 1000)
   const equivDiameter = 2 * Math.sqrt(area / Math.PI)
   const raw = equivDiameter * cfg.palmEraserScale
   const clamped = Math.max(cfg.palmEraserMinWidth, Math.min(cfg.palmEraserMaxWidth, raw))
-  dbg(`PALM pid=${pointerId} w×h=${info.width}×${info.height} area=${rawArea} → eraser w=${clamped.toFixed(1)}`)
+  dbg(`PALM pid=${pointerId} forced=${forced} kind=${info?.kind} w×h=${info?.width}×${info?.height} area=${area.toFixed(0)} → eraser w=${clamped.toFixed(1)}`)
   return { tool: 'eraser', width: clamped }
 }
 
@@ -193,8 +185,8 @@ function toCanvasCoords(event: PointerEvent): { x: number; y: number } {
 
 function onPointerDown(event: PointerEvent) {
   dbg(`DOWN pid=${event.pointerId} type=${event.pointerType} w×h=${event.width}×${event.height} prim=${event.isPrimary} btn=${event.button} shift=${event.shiftKey}`)
-  // DEV : Shift+souris simule une paume avec aire 1000 px²
-  if (event.shiftKey && event.pointerType === 'mouse') {
+  // DEV (uniquement quand le HUD de debug est actif) : Shift+souris simule une paume.
+  if (debugEnabled && event.shiftKey && event.pointerType === 'mouse') {
     _forcedPalmIds.add(event.pointerId)
   }
   // Bouton 5 = "Pen Eraser" du spec Pointer Events (palm-detection matérielle des TV/tableaux interactifs).
@@ -617,15 +609,17 @@ defineExpose({engine})
 			@cancel="cancelWidget"
 		/>
 
-		<!-- DEV HUD palm debug -->
-		<div
-			v-if="debugVisible"
-			style="position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#0f0;font-family:monospace;font-size:11px;line-height:1.35;padding:6px 10px;z-index:9999;pointer-events:none;white-space:pre-wrap;max-height:50vh;overflow:hidden"
-		>{{ debugLog.join('\n') || '(aucun event)' }}</div>
-		<button
-			style="position:fixed;top:4px;right:8px;z-index:10000;font-size:11px;padding:2px 6px;background:#222;color:#0f0;border:1px solid #0f0;border-radius:3px;font-family:monospace"
-			@click="debugVisible = !debugVisible"
-		>{{ debugVisible ? 'hide dbg' : 'show dbg' }}</button>
+		<!-- HUD de debug pointer events. Activer via setConfig({debug:{pointerHud:true}}) ou la prop config. Voir pinote.md §18. -->
+		<template v-if="debugEnabled">
+			<div
+				v-if="debugVisible"
+				style="position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.78);color:#0f0;font-family:monospace;font-size:11px;line-height:1.35;padding:6px 10px;z-index:9999;pointer-events:none;white-space:pre-wrap;max-height:50vh;overflow:hidden"
+			>{{ debugLog.join('\n') || '(aucun event)' }}</div>
+			<button
+				style="position:fixed;top:4px;right:8px;z-index:10000;font-size:11px;padding:2px 6px;background:#222;color:#0f0;border:1px solid #0f0;border-radius:3px;font-family:monospace"
+				@click="debugVisible = !debugVisible"
+			>{{ debugVisible ? 'hide dbg' : 'show dbg' }}</button>
+		</template>
 
 		<!-- Indication contextuelle de l'outil actif -->
 		<tool-hint />

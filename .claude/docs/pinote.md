@@ -499,6 +499,16 @@ interface PiNoteConfig {
   }
   colorPresets: { value: string; label: string }[]
   maxPages: number               // défaut: 0 = illimité
+  debug: {
+    pointerHud: boolean          // défaut: false — affiche le HUD de debug pointer events (cf. §18)
+  }
+  pointerThresholds: {
+    penMaxArea: number           // défaut: 10  — aire ≤ → kind 'pen'
+    palmMinArea: number          // défaut: 400 — aire > → kind 'palm'
+    palmEraserScale: number      // défaut: 2   — multiplicateur diamètre équivalent → largeur gomme
+    palmEraserMinWidth: number   // défaut: 30
+    palmEraserMaxWidth: number   // défaut: 200
+  }
 }
 ```
 
@@ -660,3 +670,40 @@ Vue lecture seule. Désérialise via `ShapeFactory.fromJSON`, zoom/pan mais pas 
 - **`canHaveArrows` / `canBeFilled`** : toujours déclarés comme `readonly` sur l'instance (pas de getter de prototype) — requis pour que Vue les détecte dans `ShapeProperties`
 - **Pinia** : le store est initialisé dans `NoteCanvas.vue`. Tous les composants enfants appellent `useNoteStore()` sans argument — aucun prop drilling.
 - **Store en priorité** : dans les composants Vue de PiNote, toujours préférer `useNoteStore()` pour lire et écrire l'état partagé. Éviter les props et emits sauf pour des données vraiment locales au composant. Exemple : `ToolSelector` lit `store.tool.tool` et appelle `store.selectTool()` directement — pas de `modelValue` ni `@update`.
+
+---
+
+## 18. Détection de paume → gomme automatique
+
+Quand un pointer qui démarre un trait est classé `palm` (ou signalé matériellement comme effaceur), le trait est routé vers l'outil `eraser` avec une largeur calibrée sur l'aire de contact, **sans modifier `store.tool.tool`**. L'outil sélectionné par l'utilisateur reste intact.
+
+### Deux déclencheurs
+
+1. **Classification par aire** (`PointerClassifier`) — kind = `palm` quand `width × height > palmMinArea` (défaut 400 px²). Fonctionne pour le tactile capacitif standard.
+2. **Signal matériel** — `event.button === 5` (Pen Eraser du spec Pointer Events). Utilisé par les TV/tableaux interactifs (SMART, Promethean…) qui détectent la paume au niveau driver et la signalent comme l'effaceur d'un stylet. Plus fiable que l'aire.
+
+Les deux déclencheurs sont gated par `store.palmDetectionEnabled` (toggle persistant dans localStorage, exposé dans `PointerStatus.vue`).
+
+### Calibration
+
+Largeur de la gomme = `clamp(2 × √(area / π) × palmEraserScale, palmEraserMinWidth, palmEraserMaxWidth)`. Défauts : scale 2, min 30, max 200. Aire réelle utilisée quand `PointerInfo` est disponible ; fallback 1000 px² pour les déclencheurs sans info (Shift+souris dev).
+
+### Routage
+
+Le test de paume est appliqué côté Vue dans `NoteCanvas.startNewShape(pointerId)` et `resolveToolForPointer(pointerId)`. **L'Engine reste agnostique** — la sémantique "paume = gomme" est une règle UX, pas de rendu. La décision est **figée à `pointerdown`** : `event.button === 5` et la classification du pointer au moment du down déterminent le routing pour toute la durée du trait.
+
+L'éligibilité au long-press tactile (`HOLD_EXCLUDED_TOOLS`) est testée sur l'outil **résolu**, pas sur `store.tool.tool` — pour qu'une paume bypass le long-press et crée son trait gomme immédiatement.
+
+### HUD de debug pointer events
+
+`config.debug.pointerHud` (défaut `false`) active un overlay fixed en haut listant les 10 derniers events : `DOWN pid=X type=Y w×h=… btn=Z`, et la résolution d'outil (`PALM …`, `resolve kind=… → tool=…`). Sert à tester les interactions tactiles sur device sans accès aux devtools.
+
+**Activer pour une session de test sur écran tactile** :
+```ts
+setConfig({ debug: { pointerHud: true } })
+```
+Ou via console : `(await import('/src/config/PiNoteConfig.ts')).setConfig({ debug: { pointerHud: true } })` puis recharger.
+
+Quand le HUD est actif, **Shift+clic souris** simule aussi une paume (aire 1000 px²) — pratique pour debugger sur PC avant de tester sur device réel.
+
+**Toute session de debug d'interaction tactile (touch, stylet, palm) doit passer par ce HUD** plutôt que par des `console.log`, puisque les TV interactives, tablettes et tableaux ne permettent généralement pas l'ouverture des devtools.

@@ -16,6 +16,11 @@ export interface PiNoteConfig {
     }
     colorPresets: { value: string; label: string }[]
     maxPages: number
+    /** Flags de debug — utilisés pour tester les interactions sur device sans devtools */
+    debug: {
+        /** Affiche un HUD fixed en haut listant les derniers pointer events (type, button, aire, classification, override). */
+        pointerHud: boolean
+    }
     /** Seuils de classification des pointers par aire de contact (px²) */
     pointerThresholds: {
         /** Aire max en deçà de laquelle un contact est classé `pen` */
@@ -52,6 +57,9 @@ export const defaultConfig: PiNoteConfig = {
         {value: '#43a047', label: 'Vert'},
     ],
     maxPages: 0,
+    debug: {
+        pointerHud: false,
+    },
     pointerThresholds: {
         penMaxArea: 10,
         palmMinArea: 400,
@@ -64,6 +72,7 @@ export const defaultConfig: PiNoteConfig = {
 let _config: PiNoteConfig = {
     ...defaultConfig,
     defaults: {...defaultConfig.defaults},
+    debug: {...defaultConfig.debug},
     pointerThresholds: {...defaultConfig.pointerThresholds},
 }
 
@@ -72,6 +81,7 @@ export function setConfig(c: Partial<PiNoteConfig>): void {
         ...defaultConfig,
         ...c,
         defaults: {...defaultConfig.defaults, ...(c.defaults ?? {})},
+        debug: {...defaultConfig.debug, ...(c.debug ?? {})},
         pointerThresholds: {...defaultConfig.pointerThresholds, ...(c.pointerThresholds ?? {})},
     }
 }
