@@ -14,6 +14,7 @@ import {useCanvasTransform} from '../composables/useCanvasTransform'
 import {useNoteStore} from '../store/useNoteStore'
 import PiIcon from '@pi-vue/components/PiIcon.vue'
 import {AbstractWidgetShape} from '../shapes/AbstractWidgetShape'
+import {getConfig} from '../config/PiNoteConfig'
 
 // ── Initialisation Pinia (library-safe) ─────────────────────────────────────
 if (!getActivePinia()) setActivePinia(createPinia())
@@ -97,17 +98,37 @@ function cancelHold() {
   engine.value?.clearHoldIndicator()
 }
 
-function startNewShape() {
+/**
+ * Si la détection de paume est active et que ce pointer est classé `palm`,
+ * substitue l'outil par `eraser` avec une largeur calibrée sur l'aire de contact.
+ * Sinon retourne l'outil/largeur sélectionnés dans le store.
+ */
+function resolveToolForPointer(pointerId: number): { tool: ToolType; width: number } {
+  const tool = store.tool.tool
+  const width = store.tool.width ?? 2
+  if (!store.palmDetectionEnabled) return { tool, width }
+  const info = store.pointerClassifier.snapshot().pointers.get(pointerId)
+  if (info?.kind !== 'palm') return { tool, width }
+  const cfg = getConfig().pointerThresholds
+  const area = Math.max(1, info.width * info.height)
+  const equivDiameter = 2 * Math.sqrt(area / Math.PI)
+  const raw = equivDiameter * cfg.palmEraserScale
+  const clamped = Math.max(cfg.palmEraserMinWidth, Math.min(cfg.palmEraserMaxWidth, raw))
+  return { tool: 'eraser', width: clamped }
+}
+
+function startNewShape(pointerId: number) {
   if (!engine.value) return
+  const resolved = resolveToolForPointer(pointerId)
   engine.value.beginDraw({
     layer: store.tool.layer,
     color: store.tool.color ?? 'black',
-    width: store.tool.width ?? 2,
-    tool: store.tool.tool,
+    width: resolved.width,
+    tool: resolved.tool,
     createdAt: Date.now(),
     x: 0,
     y: 0,
-    toolMode: store.tool.toolModes[store.tool.tool],
+    toolMode: store.tool.toolModes[resolved.tool],
   })
 }
 
@@ -207,7 +228,7 @@ function onPointerDown(event: PointerEvent) {
 
   // Premier pointerdown d'un dessin (outils exclus du long-press) : crée la shape
   if (!engine.value.currentShape) {
-    startNewShape()
+    startNewShape(event.pointerId)
   }
 
   const result = engine.value.pointerDown(pos.x, pos.y)
@@ -260,7 +281,7 @@ function onPointerMove(event: PointerEvent) {
       // L'utilisateur a directement entamé un drag : annule le long-press,
       // démarre la shape au point initial et tombe dans le flux pointerMove normal.
       cancelHold()
-      startNewShape()
+      startNewShape(event.pointerId)
       engine.value!.pointerDown(holdStartCanvas.x, holdStartCanvas.y)
       // Tombe dans le pointerMove normal ci-dessous
     } else {
@@ -336,7 +357,7 @@ function onPointerUp(event: PointerEvent) {
   if (holdPhase === 'pending') {
     cancelHold()
     const pos = toCanvasCoords(event)
-    startNewShape()
+    startNewShape(event.pointerId)
     engine.value!.pointerDown(pos.x, pos.y)
     const status = engine.value!.pointerUp(pos.x, pos.y)
     if (status === 'finished') store.syncFromEngine()
@@ -349,7 +370,7 @@ function onPointerUp(event: PointerEvent) {
     const pos = toCanvasCoords(event)
     const snapped = engine.value!.resolveSnap(pos.x, pos.y, store.tool.tool) ?? pos
     cancelHold()
-    startNewShape()
+    startNewShape(event.pointerId)
     engine.value!.pointerDown(snapped.x, snapped.y)
     const status = engine.value!.pointerUp(snapped.x, snapped.y)
     if (status === 'finished') store.syncFromEngine()

@@ -22,6 +22,12 @@ export interface PiNoteConfig {
         penMaxArea: number
         /** Aire min à partir de laquelle un contact est classé `palm` */
         palmMinArea: number
+        /** Multiplicateur appliqué au diamètre équivalent pour obtenir la largeur de la gomme paume */
+        palmEraserScale: number
+        /** Largeur min (px) de la gomme paume après calibration */
+        palmEraserMinWidth: number
+        /** Largeur max (px) de la gomme paume après calibration */
+        palmEraserMaxWidth: number
     }
 }
 
@@ -49,6 +55,9 @@ export const defaultConfig: PiNoteConfig = {
     pointerThresholds: {
         penMaxArea: 10,
         palmMinArea: 400,
+        palmEraserScale: 2,
+        palmEraserMinWidth: 30,
+        palmEraserMaxWidth: 200,
     },
 }
 
