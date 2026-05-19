@@ -10,6 +10,7 @@ import {
 } from "../shapes/Adaptable"
 import {AbstractShape} from "../shapes/AbstractShape"
 import {AbstractWidgetShape} from "../shapes/AbstractWidgetShape"
+import {Stroke} from "../shapes/Stroke"
 import {Point} from "../shapes/GeometryTypes"
 import {SnapManager} from "../snap/SnapManager"
 import {type SnapGeometry, SnapWorkerClient} from "../snap/SnapWorkerClient"
@@ -46,12 +47,17 @@ function isBackgroundState(value: unknown): value is BackgroundState {
 type HandleKind = 'move' | 'duplicate' | 'delete'
 type SnapResolution = { x: number; y: number; snapResult: SnapResult | null }
 
+/** Entrée d'historique pour undo/redo. */
+type HistoryEntry =
+    | { type: 'add'; shape: Adaptable }
+    | { type: 'erase'; before: Adaptable[]; after: Adaptable[] }
+
 export class Engine {
     public bezier = false // toggle global
     private _title = ''
 
-    private static NO_SNAP_TOOLS = new Set<ToolType>(['pen', 'highlighter', 'eraser', 'text'])
-    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>([...Engine.NO_SNAP_TOOLS, 'move', 'select'])
+    private static NO_SNAP_TOOLS = new Set<ToolType>(['pen', 'highlighter', 'text'])
+    private static HOVER_SNAP_EXCLUDED = new Set<ToolType>([...Engine.NO_SNAP_TOOLS, 'eraser', 'move', 'select'])
 
     /** Délai max (ms) au-delà duquel un résultat de hover snap caché est considéré périmé. */
     private static SNAP_FRESHNESS_MS = 200
@@ -111,8 +117,11 @@ export class Engine {
     private _resizeObserver: ResizeObserver
     private _viewTransform = {x: 0, y: 0, scale: 1}
     private _referenceBitmap: ImageBitmap | null = null
-    private _undoStack: Adaptable[] = []
+    private _history: HistoryEntry[] = []
+    private _redoStack: HistoryEntry[] = []
     private _selectedShapeId: string | null = null
+    /** Session de gomme en cours : snapshot du _shapes array au début. */
+    private _eraseSession: { before: Adaptable[]; layer: LayerName | null } | null = null
     private _snapGridEnabled = false
     private _snapGridSize = 80
     private _gridPreviewTimer: ReturnType<typeof setTimeout> | null = null
@@ -244,7 +253,8 @@ export class Engine {
         if (isStrokeBased(shape)) {
             this._drawState = 'drawing-stroke'
             this._strokeStartTime = Date.now()
-            shape.onStart?.(this._buildDrawingContext())
+            // Propage le toggle bezier global sur le Stroke en cours
+            if (shape instanceof Stroke) shape.bezier = this.bezier
         } else {
             this._drawState = 'drawing-points'
         }
@@ -323,8 +333,6 @@ export class Engine {
             shape.addPoint({x, y, t, pressure: 0})
             this.overlay.clear()
             this._tempLayer.clear()
-            const handled = shape.onMove?.(x, y, this._buildDrawingContext())
-            if (handled) return
             const {x: tx, y: ty, scale} = this._viewTransform
             const ctx = this._tempLayer.ctx
             ctx.save()
@@ -386,6 +394,127 @@ export class Engine {
         }
         this._commitCurrentShape()
         return 'finished'
+    }
+
+    // --- Eraser (gomme destructive) ---
+
+    /**
+     * Démarre une session de gomme sur le layer donné.
+     * Snapshot du _shapes array pour permettre l'undo.
+     */
+    beginErase(layer: LayerName | null): void {
+        this._eraseSession = {
+            before: this._shapes.slice(),
+            layer,
+        }
+    }
+
+    /**
+     * Applique un coup de gomme circulaire (centre x,y, rayon r) sur le layer actif.
+     * Stroke : découpé via eraseInCircle.
+     * Autres shapes non-widget : si hitTest, rasterisées en Stroke puis découpées.
+     * Widgets (AbstractWidgetShape) : intouchables.
+     * Affiche un cercle pointillé sous le curseur sur l'overlay.
+     */
+    eraseAt(x: number, y: number, r: number): void {
+        if (!this._eraseSession) return
+        const layer = this._eraseSession.layer
+
+        for (let i = this._shapes.length - 1; i >= 0; i--) {
+            const shape = this._shapes[i]
+            if (shape.layer !== layer) continue
+            if (shape.hidden) continue
+            if (shape instanceof AbstractWidgetShape) continue
+
+            if (shape instanceof Stroke) {
+                const result = shape.eraseInCircle(x, y, r)
+                if (result === null) continue
+                this._shapes.splice(i, 1, ...result)
+            } else if ((shape as AbstractShape).hitTest(x, y, r)) {
+                // Conversion paramétrique → Stroke équivalent, puis découpe.
+                const converted = this._rasterizeToStroke(shape as AbstractShape)
+                if (!converted) {
+                    this._shapes.splice(i, 1)
+                    continue
+                }
+                const result = converted.eraseInCircle(x, y, r)
+                if (result === null) {
+                    // shape touchée mais aucun point dans le cercle (rare) : remplace par le stroke complet
+                    this._shapes.splice(i, 1, converted)
+                } else {
+                    this._shapes.splice(i, 1, ...result)
+                }
+            }
+        }
+
+        this._markGeometryDirty()
+        this.draw()
+        this._drawEraseCursor(x, y, r)
+    }
+
+    /** Finalise la session de gomme. Push une entrée d'historique si quelque chose a changé. */
+    endErase(): void {
+        const session = this._eraseSession
+        this._eraseSession = null
+        this.overlay.clear()
+        if (!session) return
+
+        const changed = session.before.length !== this._shapes.length
+            || session.before.some((s, i) => s !== this._shapes[i])
+
+        if (!changed) return
+
+        this._history.push({
+            type: 'erase',
+            before: session.before,
+            after: this._shapes.slice(),
+        })
+        this._redoStack = []
+        this._safeSave()
+    }
+
+    /**
+     * Convertit une shape paramétrique en Stroke équivalent par rasterisation.
+     * Hérite couleur/largeur/layer/lineStyle. Retourne null si la rasterisation
+     * ne produit pas assez de points pour former un Stroke valide.
+     */
+    private _rasterizeToStroke(shape: AbstractShape): Stroke | null {
+        const raw = shape.rasterize(2)
+        if (raw.length < 2) return null
+        // Simplification (Douglas-Peucker) : retire les points colinéaires
+        // pour limiter la taille du JSON sans perte visuelle.
+        const points = Stroke.simplify(raw, 0.5)
+        return new Stroke(
+            { tool: 'pen', bezier: false, points },
+            {
+                tool: 'pen',
+                layer: shape.layer,
+                color: shape.color,
+                width: shape.width,
+                hidden: false,
+                lineStyle: shape.lineStyle,
+                arrowStart: shape.arrowStart,
+                arrowEnd: shape.arrowEnd,
+                arrowStyle: shape.arrowStyle,
+            }
+        )
+    }
+
+    private _drawEraseCursor(x: number, y: number, r: number): void {
+        const { x: tx, y: ty, scale } = this._viewTransform
+        const ctx = this.overlay.ctx
+        this.overlay.clear()
+        ctx.save()
+        ctx.translate(tx, ty)
+        ctx.scale(scale, scale)
+        ctx.beginPath()
+        ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
+        ctx.lineWidth = 1 / scale
+        ctx.setLineDash([4 / scale, 4 / scale])
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.restore()
     }
 
     /** Annule le dessin en cours sans finaliser ni sauvegarder. */
@@ -505,7 +634,8 @@ export class Engine {
         }
 
         this._shapes.push(shape)
-        this._undoStack = []
+        this._history.push({ type: 'add', shape })
+        this._redoStack = []
         this._markGeometryDirty()
 
         const layer = this.getLayer(shape.layer)
@@ -525,6 +655,7 @@ export class Engine {
             this.saveLocal()
         } catch {
             this._shapes.pop()
+            this._history.pop()
             this.draw()
         }
     }
@@ -579,13 +710,6 @@ export class Engine {
             },
             get bezierEnabled() {
                 return self.bezier
-            },
-            getLayerSnapshot: (name) => {
-                const layer = self.getLayer(name)
-                return layer.ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height)
-            },
-            restoreLayerSnapshot: (name, data) => {
-                self.getLayer(name).ctx.putImageData(data, 0, 0)
             },
         }
     }
@@ -747,7 +871,8 @@ export class Engine {
 
     resetState() {
         this._shapes = []
-        this._undoStack = []
+        this._history = []
+        this._redoStack = []
         this._selectedShapeId = null
         this._title = ''
         this._markGeometryDirty()
@@ -800,7 +925,14 @@ export class Engine {
         if (background) this._applyBackground(background)
 
         let skipped = 0
+        let droppedEraser = 0
         this._shapes = shapesData.map((s) => {
+            // Anciens fichiers : les Stroke tool='eraser' ne sont plus persistés (gomme destructive).
+            const opts = (s as { options?: { tool?: string } } | null)?.options
+            if (opts?.tool === 'eraser') {
+                droppedEraser++
+                return null
+            }
             const shape = ShapeFactory.fromJSON(s)
             if (!shape) skipped++
             return shape
@@ -809,8 +941,12 @@ export class Engine {
         if (skipped > 0) {
             console.warn(`[PiNote] loadFromJSONData: ${skipped} forme(s) ignorée(s) (données invalides ou outil inconnu)`)
         }
+        if (droppedEraser > 0) {
+            console.info(`[PiNote] loadFromJSONData: ${droppedEraser} ancienne(s) gomme(s) ignorée(s) (format obsolète)`)
+        }
 
-        this._undoStack = []
+        this._history = []
+        this._redoStack = []
         this._selectedShapeId = null
         this._markGeometryDirty()
         this.draw()
@@ -928,26 +1064,42 @@ export class Engine {
 
     // --- Undo / Redo ---
     get canUndo(): boolean {
-        return this._shapes.length > 0
+        return this._history.length > 0
     }
 
     get canRedo(): boolean {
-        return this._undoStack.length > 0
+        return this._redoStack.length > 0
     }
 
     undo() {
         if (!this.canUndo) return
-        const removed = this._shapes.pop()!
-        this._undoStack.push(removed)
+        const entry = this._history.pop()!
+        if (entry.type === 'add') {
+            const idx = this._shapes.indexOf(entry.shape)
+            if (idx !== -1) this._shapes.splice(idx, 1)
+            if (this._selectedShapeId === entry.shape.id) this._selectedShapeId = null
+        } else {
+            this._shapes = entry.before.slice()
+            // désélectionne si la shape ne fait plus partie du _shapes
+            if (this._selectedShapeId && !this._shapes.some(s => s.id === this._selectedShapeId)) {
+                this._selectedShapeId = null
+            }
+        }
+        this._redoStack.push(entry)
         this._markGeometryDirty()
-        if (this._selectedShapeId === removed.id) this._selectedShapeId = null
         this.draw()
         this._safeSave()
     }
 
     redo() {
         if (!this.canRedo) return
-        this._shapes.push(this._undoStack.pop()!)
+        const entry = this._redoStack.pop()!
+        if (entry.type === 'add') {
+            this._shapes.push(entry.shape)
+        } else {
+            this._shapes = entry.after.slice()
+        }
+        this._history.push(entry)
         this._markGeometryDirty()
         this.draw()
         this._safeSave()
@@ -1082,7 +1234,8 @@ export class Engine {
         if (!clone) return null
         clone.translate(15, 15)
         this._shapes.push(clone)
-        this._undoStack = []
+        this._history.push({ type: 'add', shape: clone })
+        this._redoStack = []
         this._markGeometryDirty()
         this._selectedShapeId = clone.id
         this.draw()

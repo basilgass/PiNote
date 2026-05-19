@@ -11,6 +11,4 @@ export interface IDrawingContext {
     /** Dessine l'indicateur de snap — appeler avec le transform world déjà actif sur overlayCtx */
     drawSnapIndicator(result: SnapResult | null): void
     readonly bezierEnabled: boolean
-    getLayerSnapshot(name: LayerName): ImageData
-    restoreLayerSnapshot(name: LayerName, data: ImageData): void
 }

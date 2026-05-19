@@ -2,7 +2,7 @@ import {AbstractShape} from "./AbstractShape"
 import {AbstractPointShape} from "./AbstractPointShape"
 import {Bounds, CircleGeom, Point, Segment, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions} from "./Adaptable"
-import type {ToolMode} from "../types"
+import type {StrokePoint, ToolMode} from "../types"
 
 export interface CircleConfig {
     cx: number
@@ -201,5 +201,22 @@ export class Circle extends AbstractPointShape {
             maxX: this.cx + this.radius,
             maxY: this.cy + this.radius,
         }
+    }
+
+    override rasterize(step = 2): StrokePoint[] {
+        if (this.radius < 0.5) return []
+        const circumference = 2 * Math.PI * this.radius
+        const n = Math.max(8, Math.ceil(circumference / step))
+        const pts: StrokePoint[] = []
+        for (let i = 0; i <= n; i++) {
+            const a = (i / n) * 2 * Math.PI
+            pts.push({
+                x: this.cx + this.radius * Math.cos(a),
+                y: this.cy + this.radius * Math.sin(a),
+                t: 0,
+                pressure: 0,
+            })
+        }
+        return pts
     }
 }

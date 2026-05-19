@@ -1,4 +1,4 @@
-import {ArrowStyle, LayerName, LineStyle, ToolType} from "../types"
+import {ArrowStyle, LayerName, LineStyle, StrokePoint, ToolType} from "../types"
 import {Adaptable, ShapeOptions} from "./Adaptable"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
 
@@ -125,4 +125,31 @@ export abstract class AbstractShape implements Adaptable {
     abstract getBounds(): Bounds | null
 
     isEmpty(): boolean { return false }
+
+    /**
+     * Échantillonne la géométrie de la shape en une liste de StrokePoint
+     * pour permettre la conversion en Stroke (utilisé par la gomme destructive).
+     * Implémentation par défaut : itère sur getSegments() et sample chaque
+     * segment à ~2px. Les shapes courbes (Circle, Arc) doivent override.
+     */
+    rasterize(step = 2): StrokePoint[] {
+        const segments = this.getSegments()
+        if (segments.length === 0) return []
+        const pts: StrokePoint[] = []
+        let prevX = NaN, prevY = NaN
+        for (const seg of segments) {
+            const len = Math.hypot(seg.b.x - seg.a.x, seg.b.y - seg.a.y)
+            const n = Math.max(1, Math.ceil(len / step))
+            for (let i = 0; i <= n; i++) {
+                const t = i / n
+                const x = seg.a.x + t * (seg.b.x - seg.a.x)
+                const y = seg.a.y + t * (seg.b.y - seg.a.y)
+                if (Math.abs(x - prevX) < 1e-6 && Math.abs(y - prevY) < 1e-6) continue
+                pts.push({x, y, t: 0, pressure: 0})
+                prevX = x
+                prevY = y
+            }
+        }
+        return pts
+    }
 }

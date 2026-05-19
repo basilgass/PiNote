@@ -1,7 +1,8 @@
 import type {BackgroundState, ToolType} from '../types'
 
 export interface PiNoteConfig {
-    backendUrl: string
+    /** URL du backend pour la sync distante. `false` = mode local (pas de sync). */
+    backendUrl: string | false
     storageRetentionDays: number
     appTitle: string
     theme: 'light' | 'dark'
@@ -20,6 +21,8 @@ export interface PiNoteConfig {
     debug: {
         /** Affiche un HUD fixed en haut listant les derniers pointer events (type, button, aire, classification, override). */
         pointerHud: boolean
+        /** Affiche un petit point rose sur chaque point composant un Stroke (pour visualiser la densité). */
+        showPoints: boolean
     }
     /** Seuils de classification des pointers par aire de contact (px²) */
     pointerThresholds: {
@@ -37,7 +40,7 @@ export interface PiNoteConfig {
 }
 
 export const defaultConfig: PiNoteConfig = {
-    backendUrl: '',
+    backendUrl: false,
     storageRetentionDays: 30,
     appTitle: 'PiNote',
     theme: 'light',
@@ -59,6 +62,7 @@ export const defaultConfig: PiNoteConfig = {
     maxPages: 0,
     debug: {
         pointerHud: false,
+        showPoints: false,
     },
     pointerThresholds: {
         penMaxArea: 10,

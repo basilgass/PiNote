@@ -70,8 +70,12 @@ export class ShapeFactory {
         switch (tool) {
             case "pen":
             case "highlighter":
-            case "eraser":
                 return new Stroke((values as StrokeConfig) ?? {tool}, options)
+
+            case "eraser":
+                // La gomme n'est plus une shape persistée — c'est une opération destructive
+                // gérée directement par l'Engine (beginErase / eraseAt / endErase).
+                throw new Error(`ShapeFactory.create: tool "eraser" est destructif, ne crée pas de shape`)
 
             case "line":
                 return new Line((values as LineConfig) ?? {x1: x, y1: y, x2: x, y2: y}, options)

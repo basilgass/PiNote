@@ -504,7 +504,8 @@ export const useNoteStore = defineStore('note', () => {
 
   // ── Synchronisation distante ─────────────────────────────────────────────
 
-  const remoteUrl = ref(getConfig().backendUrl)
+  /** URL pilotée par la config (`false` = mode local, pas de sync). */
+  const remoteUrl = ref<string | false>(getConfig().backendUrl)
   const syncStatus = ref<'idle' | 'syncing' | 'ok' | 'error'>('idle')
   let _syncTimer: ReturnType<typeof setTimeout> | null = null
 

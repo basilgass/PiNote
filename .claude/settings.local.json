@@ -28,7 +28,8 @@
       "Bash(mkdir -p 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\Sidebar')",
       "Bash(mkdir -p 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\Widget')",
       "Bash(mv 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\ColorSelector.vue' 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\controls\\\\')",
-      "Bash(mv 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\LayerSelector.vue' 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\controls\\\\')"
+      "Bash(mv 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\LayerSelector.vue' 'C:\\\\websites\\\\PiNote\\\\src\\\\vue\\\\components\\\\controls\\\\')",
+      "Bash(git stash *)"
     ]
   }
 }

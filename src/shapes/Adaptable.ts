@@ -1,6 +1,5 @@
 import {ArrowStyle, LayerName, LineStyle, StrokePoint, ToolType} from "../types"
 import {Bounds, CircleGeom, Point, Segment, SnapCandidate} from "./GeometryTypes"
-import type {IDrawingContext} from "../core/DrawingContext"
 
 export interface ShapeOptions {
     id?: string
@@ -83,12 +82,10 @@ export interface PointBasedShape extends Adaptable {
     finalize(closed: boolean): void
 }
 
-/** Shape créée par geste continu (pen, highlighter, eraser). Hors contrat point-based. */
+/** Shape créée par geste continu (pen, highlighter). Hors contrat point-based. */
 export interface StrokeBasedShape extends Adaptable {
     addPoint(p: StrokePoint): void
-    /** Hooks spécifiques (eraser : snapshot/restore de layer). */
-    onStart?(ctx: IDrawingContext): void
-    onMove?(x: number, y: number, ctx: IDrawingContext): boolean
+    /** Hook optionnel de fin de tracé. */
     onEnd?(): void
 }
 

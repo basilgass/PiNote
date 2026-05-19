@@ -2,7 +2,7 @@ import {StrokePoint, ToolType} from "../types"
 import {AbstractShape} from "./AbstractShape"
 import {Bounds, CircleGeom, Segment, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions, StrokeBasedShape} from "./Adaptable"
-import type {IDrawingContext} from "../core/DrawingContext"
+import {getConfig} from "../config/PiNoteConfig"
 
 export interface StrokeConfig {
     tool: ToolType
@@ -17,7 +17,6 @@ export class Stroke extends AbstractShape implements StrokeBasedShape {
     override readonly canHaveArrows = false
 
     private _cachedPts: StrokePoint[] | null = null
-    private _eraserSnapshot: ImageData | null = null
 
     constructor(
         config: StrokeConfig,
@@ -36,51 +35,6 @@ export class Stroke extends AbstractShape implements StrokeBasedShape {
             y: Math.round(point.y * 10) / 10
         })
         this._cachedPts = null  // P1/A1: invalide le cache
-    }
-
-    onStart(ctx: IDrawingContext): void {
-        if (this.tool === 'eraser' && this.layer) {
-            this._eraserSnapshot = ctx.getLayerSnapshot(this.layer)
-        } else {
-            this.bezier = ctx.bezierEnabled
-        }
-    }
-
-    onMove(x: number, y: number, ctx: IDrawingContext): boolean {
-        if (this.tool !== 'eraser') return false
-
-        if (this._eraserSnapshot && this.layer) {
-            ctx.restoreLayerSnapshot(this.layer, this._eraserSnapshot)
-            const layer = ctx.getLayer(this.layer)
-            const { x: tx, y: ty, scale } = ctx.viewTransform
-            const lCtx = layer.ctx
-            lCtx.save()
-            if (this.layer !== 'BACKGROUND') {
-                lCtx.translate(tx, ty)
-                lCtx.scale(scale, scale)
-            }
-            this.draw(lCtx)
-            lCtx.restore()
-        }
-
-        const { x: tx, y: ty, scale } = ctx.viewTransform
-        const oCtx = ctx.overlayCtx
-        oCtx.save()
-        oCtx.translate(tx, ty)
-        oCtx.scale(scale, scale)
-        oCtx.beginPath()
-        oCtx.arc(x, y, this.width / 2, 0, Math.PI * 2)
-        oCtx.strokeStyle = 'rgba(0, 0, 0, 0.6)'
-        oCtx.lineWidth = 1 / scale
-        oCtx.setLineDash([4 / scale, 4 / scale])
-        oCtx.stroke()
-        oCtx.setLineDash([])
-        oCtx.restore()
-        return true
-    }
-
-    onEnd(): void {
-        this._eraserSnapshot = null
     }
 
     getPointsUntil(time: number): StrokePoint[] {
@@ -106,12 +60,176 @@ export class Stroke extends AbstractShape implements StrokeBasedShape {
         return this.points.length < 2
     }
 
+    /**
+     * Découpe ce Stroke par un cercle d'effacement.
+     * Retourne null si aucun point n'est dans le cercle, sinon la liste
+     * des sous-Strokes obtenus en retirant les points dans le cercle.
+     * Un run contigu de points restants devient un sous-Stroke s'il a ≥ 2 points.
+     * Le tableau retourné peut être vide (tout effacé).
+     *
+     * Procédé : densifie les points à step ≤ r/2 pour que le test point-cercle
+     * capture correctement les segments traversant le cercle (sans densification,
+     * un segment long dont les deux extrémités sont hors du cercle resterait intact
+     * même si sa partie centrale est gommée). Chaque sous-stroke résultant est
+     * ensuite simplifié (Douglas-Peucker) pour limiter la taille du JSON.
+     */
+    eraseInCircle(cx: number, cy: number, r: number): Stroke[] | null {
+        if (this.points.length === 0) return null
+
+        // Early-out : bounding box vs cercle
+        const b = this.getBounds()
+        if (!b) return null
+        if (b.maxX < cx - r || b.minX > cx + r || b.maxY < cy - r || b.minY > cy + r) return null
+
+        const step = Math.max(0.5, r / 2)
+        const dense = Stroke.densify(this.points, step)
+        const origStart = dense[0]
+        const origEnd = dense[dense.length - 1]
+
+        const r2 = r * r
+        let touched = false
+        const runs: StrokePoint[][] = []
+        let current: StrokePoint[] = []
+
+        for (const p of dense) {
+            const dx = p.x - cx, dy = p.y - cy
+            if (dx * dx + dy * dy <= r2) {
+                touched = true
+                if (current.length > 0) {
+                    runs.push(current)
+                    current = []
+                }
+            } else {
+                current.push(p)
+            }
+        }
+        if (current.length > 0) runs.push(current)
+
+        if (!touched) return null
+
+        const validRuns = runs
+            .filter(run => run.length >= 2)
+            .map(run => Stroke.simplify(run, 0.5))
+
+        // Conserve les flèches sur les sous-strokes qui contiennent encore les
+        // extrémités d'origine : arrowStart sur celui qui démarre à origStart,
+        // arrowEnd sur celui qui se termine à origEnd.
+        return validRuns.map(run => {
+            const hasStart = this.arrowStart && run[0].x === origStart.x && run[0].y === origStart.y
+            const hasEnd = this.arrowEnd && run[run.length - 1].x === origEnd.x && run[run.length - 1].y === origEnd.y
+            return this._cloneWithPoints(run, hasStart, hasEnd)
+        })
+    }
+
+    /**
+     * Insère des points intermédiaires de manière à ce qu'aucun segment ne dépasse `step`.
+     * Préserve les points d'origine. Interpole linéairement t (timestamp) et pressure=0.
+     */
+    static densify(points: StrokePoint[], step: number): StrokePoint[] {
+        if (points.length < 2) return points.slice()
+        const out: StrokePoint[] = [points[0]]
+        for (let i = 1; i < points.length; i++) {
+            const a = points[i - 1], b = points[i]
+            const len = Math.hypot(b.x - a.x, b.y - a.y)
+            if (len > step) {
+                const n = Math.ceil(len / step)
+                for (let j = 1; j < n; j++) {
+                    const t = j / n
+                    out.push({
+                        x: a.x + t * (b.x - a.x),
+                        y: a.y + t * (b.y - a.y),
+                        t: a.t + t * (b.t - a.t),
+                        pressure: 0,
+                    })
+                }
+            }
+            out.push(b)
+        }
+        return out
+    }
+
+    /**
+     * Simplification Douglas-Peucker : retire les points qui s'écartent de moins
+     * de `tolerance` de la corde reliant leurs voisins conservés. Préserve les
+     * extrémités. Itératif (pas de récursion profonde sur les longs strokes).
+     */
+    static simplify(points: StrokePoint[], tolerance: number): StrokePoint[] {
+        const n = points.length
+        if (n < 3) return points.slice()
+
+        const keep = new Uint8Array(n)
+        keep[0] = 1
+        keep[n - 1] = 1
+        const stack: [number, number][] = [[0, n - 1]]
+
+        while (stack.length > 0) {
+            const [s, e] = stack.pop()!
+            if (e - s < 2) continue
+            const ax = points[s].x, ay = points[s].y
+            const bx = points[e].x, by = points[e].y
+            const dx = bx - ax, dy = by - ay
+            const len2 = dx * dx + dy * dy
+            let maxDist = 0, maxIdx = -1
+            for (let i = s + 1; i < e; i++) {
+                let d2: number
+                if (len2 < 1e-10) {
+                    const ex = points[i].x - ax, ey = points[i].y - ay
+                    d2 = ex * ex + ey * ey
+                } else {
+                    const t = ((points[i].x - ax) * dx + (points[i].y - ay) * dy) / len2
+                    const tc = Math.max(0, Math.min(1, t))
+                    const px = ax + tc * dx, py = ay + tc * dy
+                    const ex = points[i].x - px, ey = points[i].y - py
+                    d2 = ex * ex + ey * ey
+                }
+                if (d2 > maxDist) { maxDist = d2; maxIdx = i }
+            }
+            if (maxIdx !== -1 && maxDist > tolerance * tolerance) {
+                keep[maxIdx] = 1
+                stack.push([s, maxIdx])
+                stack.push([maxIdx, e])
+            }
+        }
+
+        const out: StrokePoint[] = []
+        for (let i = 0; i < n; i++) if (keep[i]) out.push(points[i])
+        return out
+    }
+
+    /** Clone ce stroke avec un nouveau set de points et un nouvel id. */
+    private _cloneWithPoints(points: StrokePoint[], arrowStart = false, arrowEnd = false): Stroke {
+        const clone = new Stroke(
+            { tool: this.tool, bezier: this.bezier, points: points.map(p => ({...p})) },
+            {
+                tool: this.tool,
+                layer: this.layer,
+                color: this.color,
+                width: this.width,
+                hidden: this.hidden,
+                arrowStart,
+                arrowEnd,
+                arrowStyle: this.arrowStyle,
+                lineStyle: this.lineStyle,
+                fill: this.fill,
+                fillOpacity: this.fillOpacity,
+            }
+        )
+        return clone
+    }
+
     // P1/A1: calcul unique, mis en cache jusqu'au prochain addPoint
+    // Important : si bezier=false, on ne lisse pas — le Stroke représente une polyligne
+    // stricte (cas des shapes paramétriques converties et des sous-strokes issus de la gomme).
+    // Le moving average détruirait les coins sur ces strokes peu denses.
     private get processedPts(): StrokePoint[] {
         if (!this._cachedPts) {
-            let pts = this.filterMinDistance(this.points, 1.2)
-            pts = this.movingAverage(pts, 3)
-            this._cachedPts = pts
+            if (this.bezier) {
+                let pts = this.filterMinDistance(this.points, 1.2)
+                pts = this.movingAverage(pts, 3)
+                this._cachedPts = pts
+            } else {
+                this._cachedPts = this.points.slice()
+            }
         }
         return this._cachedPts
     }
@@ -130,16 +248,8 @@ export class Stroke extends AbstractShape implements StrokeBasedShape {
         ctx.globalAlpha = 1
         ctx.globalCompositeOperation = "source-over"
 
-        switch (this.tool) {
-            case "pen":
-                break
-            case "eraser":
-                ctx.strokeStyle = "rgba(0,0,0,1)"
-                ctx.globalCompositeOperation = "destination-out"
-                break
-            case "highlighter":
-                ctx.globalAlpha = 0.2
-                break
+        if (this.tool === "highlighter") {
+            ctx.globalAlpha = 0.2
         }
 
         AbstractShape.applyLineStyle(ctx, this.lineStyle, this.width, scale)
@@ -165,6 +275,18 @@ export class Stroke extends AbstractShape implements StrokeBasedShape {
 
         ctx.stroke()
         ctx.setLineDash([])
+
+        // Debug : visualise les points bruts du Stroke (densité de l'échantillonnage)
+        if (getConfig().debug.showPoints) {
+            const r = 2 / scale
+            ctx.fillStyle = '#ff3366'
+            ctx.globalAlpha = 1
+            for (const p of this.points) {
+                ctx.beginPath()
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+                ctx.fill()
+            }
+        }
 
         // Flèches sur le trait (orientation calculée sur les derniers/premiers points)
         if (this.arrowStart || this.arrowEnd) {

@@ -2,6 +2,7 @@ import {AbstractShape} from "./AbstractShape"
 import {AbstractPointShape} from "./AbstractPointShape"
 import {Bounds, CircleGeom, Point, Segment, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions} from "./Adaptable"
+import type {StrokePoint} from "../types"
 
 interface Pt { x: number; y: number }
 
@@ -257,5 +258,47 @@ export class Arc extends AbstractPointShape {
             maxX: Math.max(...pts.map(p => p.x)),
             maxY: Math.max(...pts.map(p => p.y)),
         }
+    }
+
+    override rasterize(step = 2): StrokePoint[] {
+        if (this.radius < 0.5) return []
+        const sweep = this._sweep()
+        if (sweep < 1e-6) return []
+        const arcLen = sweep * this.radius
+        const n = Math.max(8, Math.ceil(arcLen / step))
+        const pts: StrokePoint[] = []
+
+        if (this.sector) {
+            // radius from center to start point
+            const sxEnd = this.cx + this.radius * Math.cos(this.startAngle)
+            const syEnd = this.cy + this.radius * Math.sin(this.startAngle)
+            const radSteps = Math.max(1, Math.ceil(this.radius / step))
+            for (let i = 0; i <= radSteps; i++) {
+                const t = i / radSteps
+                pts.push({x: this.cx + t * (sxEnd - this.cx), y: this.cy + t * (syEnd - this.cy), t: 0, pressure: 0})
+            }
+        }
+
+        for (let i = 0; i <= n; i++) {
+            const a = this.startAngle - sweep * (i / n)
+            pts.push({
+                x: this.cx + this.radius * Math.cos(a),
+                y: this.cy + this.radius * Math.sin(a),
+                t: 0,
+                pressure: 0,
+            })
+        }
+
+        if (this.sector) {
+            const exEnd = this.cx + this.radius * Math.cos(this.endAngle)
+            const eyEnd = this.cy + this.radius * Math.sin(this.endAngle)
+            const radSteps = Math.max(1, Math.ceil(this.radius / step))
+            for (let i = 1; i <= radSteps; i++) {
+                const t = i / radSteps
+                pts.push({x: exEnd + t * (this.cx - exEnd), y: eyEnd + t * (this.cy - eyEnd), t: 0, pressure: 0})
+            }
+        }
+
+        return pts
     }
 }

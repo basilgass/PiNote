@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref, watch, watchEffect} from 'vue'
+import {ref, watch, watchEffect} from 'vue'
 import PagesDialog from '../PagesDialog.vue'
 import {usePdfStore} from "../../../store/usePdfStore"
 import {BackgroundMode} from "../../../types"
@@ -54,17 +54,6 @@ function confirmNewDocument() {
     store.newDocument()
   }
 }
-
-// ── Sync distante ─────────────────────────────────────────────────────────────
-const syncUrlLocal = ref(store.remoteUrl)
-watch(syncUrlLocal, (u) => { store.remoteUrl = u })
-
-const syncLabel = computed(() => {
-  if (store.syncStatus === 'syncing') return 'En cours…'
-  if (store.syncStatus === 'ok') return 'Synchronisé'
-  if (store.syncStatus === 'error') return 'Erreur'
-  return 'Synchroniser'
-})
 
 const BG_LABEL: Record<BackgroundMode, string> = {
   none: 'blanc', ruled: 'réglé', grid: 'grille', hex: 'hex',
@@ -463,30 +452,6 @@ function patchBackground(patch: Record<string, unknown>, section: 'grid' | 'rule
 			</button>
 		</div>
 
-		<!-- Synchronisation distante -->
-		<div class="canvas-field">
-			<span class="sec-label">Sync</span>
-			<input
-				class="title-input"
-				type="url"
-				placeholder="https://…"
-				:value="syncUrlLocal"
-				@input="syncUrlLocal = ($event.target as HTMLInputElement).value"
-			>
-		</div>
-		<div
-			v-if="syncUrlLocal"
-			class="canvas-field export-field"
-		>
-			<button
-				class="btn btn-sm"
-				:class="{ 'btn-active': store.syncStatus === 'ok' }"
-				:disabled="store.syncStatus === 'syncing'"
-				@click="store.syncRemote()"
-			>
-				{{ syncLabel }}
-			</button>
-		</div>
 	</div>
 </template>
 

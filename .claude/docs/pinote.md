@@ -76,7 +76,8 @@ Le BACKGROUND ne subit pas le `translate/scale` — il est rendu en coordonnées
 ## 4. Engine (`src/core/Engine.ts`)
 
 **Constantes :**
-- `NO_SNAP_TOOLS` = `{pen, highlighter, eraser}` → pas de snap pour ces outils
+- `NO_SNAP_TOOLS` = `{pen, highlighter, text}` → pas de snap pendant le tracé
+- `HOVER_SNAP_EXCLUDED` = `NO_SNAP_TOOLS ∪ {eraser, move, select}` → pas de snap de hover non plus
 
 **État interne :**
 - `_layers` — map name → Layer
@@ -86,7 +87,9 @@ Le BACKGROUND ne subit pas le `translate/scale` — il est rendu en coordonnées
 - `_pendingPoint: Point | null` — point en preview (commit au pointerup)
 - `_strokeStartTime` — t0 du tracé Stroke (pour `addPoint.t`)
 - `_selectedShapeId` — sélection courante (handles UI)
-- `_undoStack` — shapes supprimées (pour redo)
+- `_history: HistoryEntry[]` — historique pour undo (`{type:'add', shape}` ou `{type:'erase', before, after}`)
+- `_redoStack: HistoryEntry[]` — entrées rejouables après undo
+- `_eraseSession: {before, layer} | null` — session de gomme destructive en cours
 - `_viewTransform` — `{x, y, scale}`
 - `bezier` — lissage Catmull-Rom pour Stroke
 
@@ -106,6 +109,21 @@ isOverLastPoint(x, y)        → hit-test dernier point validé (tolérance 14px
 ```
 
 Voir `.claude/docs/migration-fsm.md` pour le détail du contrat point-based unifié.
+
+**Méthodes publiques — gomme destructive :**
+
+```
+beginErase(layer)            → ouvre une session, snapshot de _shapes pour undo
+eraseAt(x, y, r)             → applique un coup de gomme circulaire :
+                                  • Stroke : découpé via Stroke.eraseInCircle (sous-strokes)
+                                  • shape paramétrique touchée : rasterize() → Stroke → découpe
+                                  • AbstractWidgetShape : intouchable
+                                affiche un cercle pointillé sous le curseur (overlay)
+endErase()                   → ferme la session, push une entrée 'erase' dans l'historique
+                                si _shapes a changé, _safeSave()
+```
+
+La gomme **ne passe pas par la FSM de dessin** : elle est invoquée directement depuis `NoteCanvas` (`pointerdown` → `beginErase` + `eraseAt`, `pointermove` → `eraseAt`, `pointerup` → `endErase`). Les anciens Stroke avec `tool='eraser'` chargés depuis le JSON sont filtrés à la désérialisation (format obsolète, log info).
 
 **Méthodes publiques — sélection / handles :**
 
@@ -147,7 +165,7 @@ exportPNG() / exportA4()     → export PNG écran ou format A4
 
 **LocalStorage :** sauvegarde automatique à chaque finalisation de shape (via `_commitCurrentShape`), `moveShape`, `duplicateShape`, `destroyById`. Rollback silencieux si erreur.
 
-**Undo/Redo :** pile simple — undo retire le dernier shape vers `_undoStack`, redo le remet. Toute nouvelle shape invalide `_undoStack`.
+**Undo/Redo :** historique typé. `undo()` dépile `_history` et inverse l'entrée (retire la shape pour `'add'` ; restaure `before` pour `'erase'`), puis l'empile sur `_redoStack`. `redo()` fait l'inverse. Toute nouvelle action (`add`, `erase`, `duplicate`) vide `_redoStack`.
 
 ---
 
@@ -163,7 +181,8 @@ Factory statique. Génère les IDs `shape-N` (compteur statique).
 
 | ToolType | Classe | Notes |
 |---|---|---|
-| pen, highlighter, eraser | `Stroke` | |
+| pen, highlighter | `Stroke` | |
+| eraser | — | **throw** : la gomme est destructive (gérée par `Engine.beginErase/eraseAt/endErase`), elle ne crée pas de shape |
 | line | `Line` | droite infinie |
 | segment | `Segment` | |
 | vector | `Segment` | avec `arrowEnd: true` pré-appliqué |
@@ -209,19 +228,20 @@ previewWith(points: ReadonlyArray<Point>, cursor: Point): void
 finalize(closed: boolean): void
 ```
 
-Stroke (pen, highlighter, eraser) implémente `StrokeBasedShape extends Adaptable` :
+Stroke (pen, highlighter) implémente `StrokeBasedShape extends Adaptable` :
 ```typescript
 addPoint(p: StrokePoint): void
-onStart?(ctx: IDrawingContext): void
-onMove?(x, y, ctx): boolean
 onEnd?(): void
 ```
+(la gomme n'est plus une Stroke — voir §4 « Gomme destructive »)
 
 Type guards : `isPointBased(shape)`, `isStrokeBased(shape)` — utilisés par l'Engine pour aiguiller la FSM.
 
 ### `AbstractShape` — base commune
 
 Contient les champs partagés (`id`, `createdAt`, `tool`, `layer`, `color`, `width`, `hidden`, `arrowStart`, `arrowEnd`, `arrowStyle`, `lineStyle`, `fill`, `fillOpacity`) et la méthode statique `distToSegment()`.
+
+Méthode `rasterize(step = 2): StrokePoint[]` — échantillonne la géométrie de la shape en une liste de StrokePoint. Implémentation par défaut : itère sur `getSegments()` et sample chaque segment à `step` px. Utilisée par la gomme destructive pour convertir une shape paramétrique en Stroke avant découpe. `Circle` et `Arc` overrident cette méthode pour échantillonner la courbe (Arc avec `sector=true` ajoute les deux rayons).
 
 ### `AbstractPointShape extends AbstractShape` — base point-based
 
@@ -240,7 +260,7 @@ Ces propriétés sont des **champs propres** (`readonly` sur l'instance), pas de
 | Shape | `canHaveArrows` | `canBeFilled` |
 |---|---|---|
 | `AbstractShape` (base) | `false` | `false` |
-| `Stroke` (pen, highlighter, eraser) | `false` | — |
+| `Stroke` (pen, highlighter) | `false` | — |
 | `Line` | `false` | — |
 | `Segment` | `true` | — |
 | `Circle` | — | `true` |
@@ -252,12 +272,19 @@ Ces propriétés sont des **champs propres** (`readonly` sur l'instance), pas de
 
 ### Shapes concrètes
 
-**`Stroke`** (pen, highlighter, eraser) — `StrokeBasedShape`
-- `points: StrokePoint[]`. Hooks `onStart(ctx)`, `onMove(x,y,ctx)`, `onEnd()` ; ajout via `addPoint(p)`
-- Filtre de distance min 1.2px + lissage moyenne mobile (fenêtre 3) — **cache invalidé** à chaque `addPoint`/`translate`
-- Rendu Bézier : Catmull-Rom avec points fantômes aux extrémités
-- Eraser : `destination-out`; Highlighter : alpha 0.2
-- Snap points : premier + dernier point; Segments : toutes les 5 paires
+**`Stroke`** (pen, highlighter) — `StrokeBasedShape`
+- `points: StrokePoint[]` ; ajout via `addPoint(p)` ; hook optionnel `onEnd()`
+- Si `bezier=true` : filtre de distance min 1.2px + moving average (fenêtre 3) + rendu Catmull-Rom avec points fantômes
+- Si `bezier=false` : polyligne stricte (pas de lissage) — utilisé pour les sous-strokes issus de la gomme et pour les shapes paramétriques converties via `rasterize`
+- Cache `_cachedPts` invalidé à chaque `addPoint` / `translate`
+- Highlighter : `globalAlpha = 0.2`
+- Snap points : premier + dernier point ; Segments : toutes les 5 paires
+- Gomme destructive (`eraseInCircle`, statics `densify` / `simplify`) — voir bloc dédié ci-dessous
+
+**Gomme destructive sur Stroke :**
+- `eraseInCircle(cx, cy, r): Stroke[] | null` — retourne `null` si aucun point n'est dans le cercle (no-op), sinon la liste des sous-Strokes restants (peut être vide = tout effacé). Bounding-box vs cercle en early-out. Densifie les points à `step ≤ r/2` pour capturer les segments qui traversent le cercle sans extrémité dedans. Chaque sous-stroke est simplifié (Douglas-Peucker, tol 0.5). Les flèches `arrowStart`/`arrowEnd` sont conservées uniquement sur les sous-strokes contenant l'extrémité d'origine correspondante
+- `static densify(points, step)` — insère des points intermédiaires pour qu'aucun segment ne dépasse `step` (interpolation linéaire de `t`, `pressure=0`)
+- `static simplify(points, tolerance)` — Douglas-Peucker itératif, préserve les extrémités, retire les points colinéaires
 
 **`Line`** — droite infinie. `minPoints = maxPoints = 2`
 - Rendu coupé aux bords canvas (intersection ray-canvas)
@@ -484,7 +511,7 @@ Gère le cycle de vie des PDFs importés comme référence.
 
 ```typescript
 interface PiNoteConfig {
-  backendUrl: string
+  backendUrl: string | false     // `false` = mode local (pas de sync distante)
   storageRetentionDays: number   // défaut: 30
   appTitle: string               // défaut: 'PiNote'
   theme: 'light' | 'dark'
@@ -500,7 +527,8 @@ interface PiNoteConfig {
   colorPresets: { value: string; label: string }[]
   maxPages: number               // défaut: 0 = illimité
   debug: {
-    pointerHud: boolean          // défaut: false — affiche le HUD de debug pointer events (cf. §18)
+    pointerHud: boolean          // défaut: false — HUD de debug pointer events (cf. §18)
+    showPoints: boolean          // défaut: false — point rose sur chaque point brut d'un Stroke
   }
   pointerThresholds: {
     penMaxArea: number           // défaut: 10  — aire ≤ → kind 'pen'
@@ -543,14 +571,15 @@ pointerup   → onPointerUp
 pointerleave/cancel → onPointerUp
 ```
 
-**FSM unifiée** (toutes les shapes sauf Stroke) :
+**FSM unifiée** (toutes les shapes sauf Stroke et eraser) :
 - 1er `pointerdown` sur canvas vide d'outil → `engine.beginDraw(...)` puis `engine.pointerDown(x, y)` qui commit le 1er point
 - `pointerdown` suivants → set un pending point (preview)
 - `pointermove` → met à jour le pending + preview
 - `pointerup` → commit le pending si présent ; finalize si `maxPoints` atteint
 - Hit-test sur 1er/dernier point validé (≥ minPoints) au pointerdown → `finalize(closed=true|false)` (utilisé par Polygon ; sans effet visible pour les shapes à `minPoints == maxPoints`)
 - Tablette : 1 drag = 2 points (down=p0, up=p1). Souris : N clics = N points
-- Stroke (pen, highlighter, eraser) : flux continu inchangé (pointerdown=onStart+addPoint, pointermove=addPoint+onMove, pointerup=onEnd)
+- Stroke (pen, highlighter) : flux continu (pointerdown=beginDraw+addPoint, pointermove=addPoint, pointerup=endShape)
+- **Gomme** (hors FSM) : flag local `isErasing`. `pointerdown` (outil résolu = eraser) → `engine.beginErase(layer)` + `eraseAt`, return immédiat. `pointermove` → `eraseAt`. `pointerup` → `endErase` + `store.syncFromEngine()`. Escape / changement d'outil / multi-touch nettoient aussi la session
 - Widget (text, graph) : `pointerUp` retourne `'dialog'` à la fin → `openWidgetDialog()` ouvre le composant approprié, puis `commitWidget()` appelle `engine.finalizeWidget()`
 - `Esc` (window keydown) → `engine.cancelDraw()`
 - Watch `store.tool.tool` / `store.tool.toolModes` → `engine.cancelDraw()` à tout changement
@@ -658,10 +687,10 @@ Vue lecture seule. Désérialise via `ShapeFactory.fromJSON`, zoom/pan mais pas 
 
 ## 17. Règles de conduite
 
-- **Pas de snap** pour `pen`, `highlighter`, `eraser`
+- **Pas de snap** pendant le tracé pour `pen`, `highlighter`, `text` ; pas de hover-snap pour `eraser`, `move`, `select` en plus
 - **Snaps cross-layer** autorisés si `layer = null`
 - **BACKGROUND** : jamais de transform canvas
-- **Undo/Redo** : pile simple, toute nouvelle shape vide le redo
+- **Undo/Redo** : historique typé (`add` | `erase`), toute nouvelle action vide le redo
 - **IDs** : compteur statique `ShapeFactory`, format `shape-N` — ne pas manuellement assigner sauf pour `fromJSON`
 - **Cache Stroke** : invalider via `addPoint` ou `translate`, jamais manuellement
 - **localStorage** clé par page `'pi_note_draft_<pageId>'`, index `'pi_note_index'` — rollback silencieux
@@ -675,7 +704,7 @@ Vue lecture seule. Désérialise via `ShapeFactory.fromJSON`, zoom/pan mais pas 
 
 ## 18. Détection de paume → gomme automatique
 
-Quand un pointer qui démarre un trait est classé `palm` (ou signalé matériellement comme effaceur), le trait est routé vers l'outil `eraser` avec une largeur calibrée sur l'aire de contact, **sans modifier `store.tool.tool`**. L'outil sélectionné par l'utilisateur reste intact.
+Quand un pointer qui démarre un trait est classé `palm` (ou signalé matériellement comme effaceur), il est routé vers la **gomme destructive** (`Engine.beginErase` / `eraseAt` / `endErase`) avec une largeur calibrée sur l'aire de contact, **sans modifier `store.tool.tool`**. L'outil sélectionné par l'utilisateur reste intact. La gomme découpe les Strokes touchés et rasterise les shapes paramétriques touchées avant découpe (cf. §7).
 
 ### Deux déclencheurs
 

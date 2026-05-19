@@ -65,6 +65,9 @@ let movePrevPos = {x: 0, y: 0}
 let isPanning = false
 let panStart = {x: 0, y: 0}
 
+// Gomme destructive (hors FSM de dessin)
+let isErasing = false
+
 // ── Long-press tactile sur le 1er point ─────────────────────────────────────
 const HOLD_DELAY_MS = 500          // durée de remplissage de l'anneau
 const HOLD_VISUAL_DELAY_MS = 200   // délai avant d'afficher l'anneau (évite le flash sur tap court)
@@ -239,6 +242,15 @@ function onPointerDown(event: PointerEvent) {
     return
   }
 
+  // Gomme destructive : démarre une session, efface au point initial
+  const resolvedForErase = resolveToolForPointer(event.pointerId)
+  if (resolvedForErase.tool === 'eraser') {
+    isErasing = true
+    engine.value.beginErase(store.tool.layer)
+    engine.value.eraseAt(pos.x, pos.y, resolvedForErase.width / 2)
+    return
+  }
+
   // Premier pointerdown d'un dessin : long-press tactile sur le 1er point.
   // Important : on teste l'éligibilité sur l'outil RÉSOLU (override paume → eraser pris en compte)
   // pour qu'une paume bypass directement le long-press et crée son trait gomme immédiatement.
@@ -309,6 +321,13 @@ function onPointerMove(event: PointerEvent) {
     const pos = toCanvasCoords(event)
     engine.value?.moveShape(store.selectedShapeId, pos.x - movePrevPos.x, pos.y - movePrevPos.y)
     movePrevPos = pos
+    return
+  }
+
+  if (isErasing) {
+    const pos = toCanvasCoords(event)
+    const resolved = resolveToolForPointer(event.pointerId)
+    engine.value?.eraseAt(pos.x, pos.y, resolved.width / 2)
     return
   }
 
@@ -393,6 +412,13 @@ function onPointerUp(event: PointerEvent) {
     return
   }
 
+  if (isErasing) {
+    isErasing = false
+    engine.value?.endErase()
+    store.syncFromEngine()
+    return
+  }
+
   // Long-press : tap court (relâché avant 500ms sans bouger)
   if (holdPhase === 'pending') {
     cancelHold()
@@ -460,6 +486,11 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     if (holdPhase !== 'idle') cancelHold()
     if (engine.value?.currentShape) engine.value.cancelDraw()
+    if (isErasing) {
+      isErasing = false
+      engine.value?.endErase()
+      store.syncFromEngine()
+    }
   }
 }
 
@@ -495,6 +526,11 @@ watch(() => store.tool.toolModes, () => {
 watch(() => store.tool.tool, (newTool) => {
   if (holdPhase !== 'idle') cancelHold()
   if (engine.value?.currentShape) engine.value.cancelDraw()
+  if (isErasing) {
+    isErasing = false
+    engine.value?.endErase()
+    store.syncFromEngine()
+  }
   if (newTool !== 'select' && store.selectedShapeId) {
     store.highlightShape(null)
   }
@@ -531,6 +567,11 @@ onMounted(() => {
     if (e.touches.length >= 2) {
       if (holdPhase !== 'idle') cancelHold()
       if (engine.value?.currentShape) engine.value.cancelDraw()
+      if (isErasing) {
+        isErasing = false
+        engine.value?.endErase()
+        store.syncFromEngine()
+      }
     }
   }, {passive: true})
 
