@@ -2,6 +2,7 @@ import {AbstractShape} from "./AbstractShape"
 import {AbstractPointShape} from "./AbstractPointShape"
 import {Bounds, CircleGeom, Segment as SegmentGeom, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions} from "./Adaptable"
+import type {ToolMode} from "../types"
 
 export interface SegmentConfig {
     x1: number
@@ -16,14 +17,21 @@ export class Segment extends AbstractPointShape {
     public x2: number = 0
     public y2: number = 0
 
+    readonly mode: '2pts' | 'center-vertex'
     readonly minPoints = 2
     readonly maxPoints = 2
 
     override readonly canHaveArrows = true
 
+    static readonly modes: ToolMode[] = [
+        { id: '2pts', icon: 'tool-segment' },
+        { id: 'center-vertex', icon: 'tool-segment-cv' },
+    ]
+
     constructor(
         config: SegmentConfig,
-        options: Partial<ShapeOptions> = {}
+        options: Partial<ShapeOptions> = {},
+        mode: '2pts' | 'center-vertex' = '2pts'
     ) {
         super(options)
         const {x1, y1, x2, y2} = config
@@ -31,19 +39,33 @@ export class Segment extends AbstractPointShape {
         this.y1 = y1
         this.x2 = x2
         this.y2 = y2
+        this.mode = mode
         if (Math.hypot(x2 - x1, y2 - y1) > 0.01) {
             this._points = [{x: x1, y: y1}, {x: x2, y: y2}]
         }
     }
 
     protected _syncFromPoints(): void {
-        if (this._points.length >= 1) {
-            this.x1 = this._points[0].x
-            this.y1 = this._points[0].y
+        const pts = this._points
+        if (pts.length < 1) return
+        if (this.mode === 'center-vertex') {
+            if (pts.length >= 2) {
+                const cx = pts[0].x, cy = pts[0].y
+                this.x1 = 2 * cx - pts[1].x
+                this.y1 = 2 * cy - pts[1].y
+                this.x2 = pts[1].x
+                this.y2 = pts[1].y
+            } else {
+                this.x1 = this.x2 = pts[0].x
+                this.y1 = this.y2 = pts[0].y
+            }
+            return
         }
-        if (this._points.length >= 2) {
-            this.x2 = this._points[1].x
-            this.y2 = this._points[1].y
+        this.x1 = pts[0].x
+        this.y1 = pts[0].y
+        if (pts.length >= 2) {
+            this.x2 = pts[1].x
+            this.y2 = pts[1].y
         } else {
             this.x2 = this.x1
             this.y2 = this.y1

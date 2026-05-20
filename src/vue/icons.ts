@@ -131,9 +131,17 @@ export const ICONS: Record<string, IconDef> = {
     viewBox: '0 0 24 24',
     content: '<line x1="2" y1="22" x2="22" y2="2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="16" r="2.5"/><circle cx="16" cy="8" r="2.5"/>',
   },
+  'tool-line-ray': {
+    viewBox: '0 0 24 24',
+    content: '<line x1="5" y1="19" x2="22" y2="2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="5" cy="19" r="2.5"/><circle cx="13" cy="11" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  },
   'tool-segment': {
     viewBox: '0 0 24 24',
     content: '<line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="20" r="2.5"/><circle cx="20" cy="4" r="2.5"/>',
+  },
+  'tool-segment-cv': {
+    viewBox: '0 0 24 24',
+    content: '<line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="20" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="20" cy="4" r="2.5"/>',
   },
   'tool-vector': {
     viewBox: '0 0 24 24',

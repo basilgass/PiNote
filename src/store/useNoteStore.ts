@@ -81,6 +81,12 @@ export const useNoteStore = defineStore('note', () => {
 
   const toolSelectCount = ref(0)
 
+  /** Slot de couleur actif : 'global' (primaryColor partagé) ou 'dynamic' (toolMemory[tool].color) */
+  type ColorSlot = 'global' | 'dynamic'
+  const activeColorSlot = ref<ColorSlot>('dynamic')
+  /** Couleur globale partagée entre tous les outils (slot 'global') */
+  const primaryColor = ref<string>(_cfg.defaults.color)
+
   /** Change l'outil actif et restaure sa mémoire couleur/largeur */
   function selectTool(newTool: ToolType) {
     if (newTool === tool.tool) {
@@ -94,11 +100,17 @@ export const useNoteStore = defineStore('note', () => {
       }
     }
 
-    toolMemory[tool.tool].color = tool.color
+    // On ne mémorise tool.color → toolMemory que si on était sur le slot dynamic ;
+    // sinon tool.color venait de primaryColor et n'a pas à polluer toolMemory.
+    if (activeColorSlot.value === 'dynamic') {
+      toolMemory[tool.tool].color = tool.color
+    }
     toolMemory[tool.tool].width = tool.width
 
     tool.tool = newTool
-    tool.color = toolMemory[newTool].color
+    tool.color = activeColorSlot.value === 'global'
+      ? primaryColor.value
+      : toolMemory[newTool].color
     tool.width = toolMemory[newTool].width
     toolSelectCount.value++
   }
@@ -109,10 +121,22 @@ export const useNoteStore = defineStore('note', () => {
     toolMemory[tool.tool].width = width
   }
 
-  /** Met à jour la couleur de l'outil courant et la mémorise (sauf pour la gomme) */
+  /** Met à jour la couleur du slot actif (et de tool.color). La gomme ne mémorise jamais. */
   function setToolColor(color: string) {
     tool.color = color
-    if (tool.tool !== 'eraser') toolMemory[tool.tool].color = color
+    if (tool.tool === 'eraser') return
+    if (activeColorSlot.value === 'global') {
+      primaryColor.value = color
+    } else {
+      toolMemory[tool.tool].color = color
+    }
+  }
+
+  /** Bascule sur un slot de couleur : active la couleur correspondante pour l'outil courant. */
+  function setActiveColorSlot(slot: ColorSlot) {
+    activeColorSlot.value = slot
+    if (tool.tool === 'eraser') return
+    tool.color = slot === 'global' ? primaryColor.value : toolMemory[tool.tool].color
   }
 
   // ── Formes et sélection ──────────────────────────────────────────────────
@@ -557,6 +581,7 @@ export const useNoteStore = defineStore('note', () => {
     engine, registerZoom,
     // Outil
     tool, toolMemory, toolSelectCount, selectTool, setToolWidth, setToolColor,
+    primaryColor, activeColorSlot, setActiveColorSlot,
     // Formes
     shapes, selectedShapeId, canUndo, canRedo, layers,
     syncFromEngine, undo, redo,

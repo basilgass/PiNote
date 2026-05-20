@@ -2,6 +2,7 @@ import {AbstractShape} from "./AbstractShape"
 import {AbstractPointShape} from "./AbstractPointShape"
 import {Bounds, CircleGeom, Segment as SegmentGeom, SnapCandidate} from "./GeometryTypes"
 import {ShapeOptions} from "./Adaptable"
+import type {ToolMode} from "../types"
 
 export interface LineConfig {
     x1: number
@@ -16,14 +17,21 @@ export class Line extends AbstractPointShape {
     public x2: number = 0
     public y2: number = 0
 
+    readonly mode: 'line' | 'ray'
     readonly minPoints = 2
     readonly maxPoints = 2
 
     override readonly canHaveArrows = false
 
+    static readonly modes: ToolMode[] = [
+        { id: 'line', icon: 'tool-line' },
+        { id: 'ray', icon: 'tool-line-ray' },
+    ]
+
     constructor(
         config: LineConfig,
-        options: Partial<ShapeOptions> = {}
+        options: Partial<ShapeOptions> = {},
+        mode: 'line' | 'ray' = 'line'
     ) {
         super(options)
         const {x1, y1, x2, y2} = config
@@ -31,6 +39,7 @@ export class Line extends AbstractPointShape {
         this.y1 = y1
         this.x2 = x2
         this.y2 = y2
+        this.mode = mode
         // Si la config est non triviale (fromJSON), reconstruit _points
         if (Math.hypot(x2 - x1, y2 - y1) > 0.01) {
             this._points = [{x: x1, y: y1}, {x: x2, y: y2}]
@@ -79,11 +88,13 @@ export class Line extends AbstractPointShape {
 
         const EPS = 0.5 / scale
         const valid = ts.filter(t => {
+            if (this.mode === 'ray' && t < -1e-9) return false
             const x = this.x1 + t * dx
             const y = this.y1 + t * dy
             return x >= xMin - EPS && x <= xMax + EPS && y >= yMin - EPS && y <= yMax + EPS
         })
 
+        if (this.mode === 'ray') valid.push(0)
         if (valid.length < 2) return
         valid.sort((a, b) => a - b)
 
@@ -105,20 +116,28 @@ export class Line extends AbstractPointShape {
         ctx.stroke()
         ctx.setLineDash([])
 
-        if (this.arrowEnd)
-            AbstractShape.drawArrowHead(ctx, this.x2, this.y2, angle, arrowSize, this.arrowStyle, this.color, this.width)
-        if (this.arrowStart)
-            AbstractShape.drawArrowHead(ctx, this.x1, this.y1, angle + Math.PI, arrowSize, this.arrowStyle, this.color, this.width)
+        if (this.mode !== 'ray') {
+            if (this.arrowEnd)
+                AbstractShape.drawArrowHead(ctx, this.x2, this.y2, angle, arrowSize, this.arrowStyle, this.color, this.width)
+            if (this.arrowStart)
+                AbstractShape.drawArrowHead(ctx, this.x1, this.y1, angle + Math.PI, arrowSize, this.arrowStyle, this.color, this.width)
+        }
 
         ctx.restore()
     }
 
     hitTest(x: number, y: number, tolerance: number): boolean {
         const dx = this.x2 - this.x1, dy = this.y2 - this.y1
-        const len = Math.hypot(dx, dy)
-        if (len < 1e-10) return false
+        const len2 = dx * dx + dy * dy
+        if (len2 < 1e-20) return false
+        const len = Math.sqrt(len2)
         const dist = Math.abs(dy * x - dx * y + this.x2 * this.y1 - this.y2 * this.x1) / len
-        return dist <= this.width / 2 + tolerance
+        if (dist > this.width / 2 + tolerance) return false
+        if (this.mode === 'ray') {
+            const t = ((x - this.x1) * dx + (y - this.y1) * dy) / len2
+            if (t < 0) return false
+        }
+        return true
     }
 
     translate(dx: number, dy: number) {
@@ -135,15 +154,18 @@ export class Line extends AbstractPointShape {
     toJSON() {
         return {
             config: { x1: this.x1, y1: this.y1, x2: this.x2, y2: this.y2 },
-            options: super.toJSON()
+            options: { ...super.toJSON(), toolMode: this.mode }
         }
     }
 
     getSnapPoints(): SnapCandidate[] {
-        return [
+        const pts: SnapCandidate[] = [
             {x: this.x1, y: this.y1, type: 'endpoint', shapeId: this.id, layer: this.layer},
-            {x: this.x2, y: this.y2, type: 'endpoint', shapeId: this.id, layer: this.layer},
         ]
+        if (this.mode !== 'ray') {
+            pts.push({x: this.x2, y: this.y2, type: 'endpoint', shapeId: this.id, layer: this.layer})
+        }
+        return pts
     }
 
     getSegments(): SegmentGeom[] {

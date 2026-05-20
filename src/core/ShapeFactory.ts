@@ -78,10 +78,18 @@ export class ShapeFactory {
                 throw new Error(`ShapeFactory.create: tool "eraser" est destructif, ne crée pas de shape`)
 
             case "line":
-                return new Line((values as LineConfig) ?? {x1: x, y1: y, x2: x, y2: y}, options)
+                return new Line(
+                    (values as LineConfig) ?? {x1: x, y1: y, x2: x, y2: y},
+                    options,
+                    (config.toolMode as 'line' | 'ray') ?? 'line'
+                )
 
             case "segment":
-                return new Segment((values as SegmentConfig) ?? {x1: x, y1: y, x2: x, y2: y}, options)
+                return new Segment(
+                    (values as SegmentConfig) ?? {x1: x, y1: y, x2: x, y2: y},
+                    options,
+                    (config.toolMode as '2pts' | 'center-vertex') ?? '2pts'
+                )
 
             case "circle":
                 return new Circle(
@@ -132,6 +140,8 @@ export class ShapeFactory {
     static getModes(tool: ToolType): ToolMode[] {
         if (tool === 'rectangle') return Rectangle.modes
         if (tool === 'circle') return Circle.modes
+        if (tool === 'line') return Line.modes
+        if (tool === 'segment') return Segment.modes
         return []
     }
 
@@ -153,6 +163,7 @@ export class ShapeFactory {
                 lineStyle: options.lineStyle,
                 fill: options.fill,
                 fillOpacity: options.fillOpacity,
+                toolMode: options.toolMode,
             }
             return ShapeFactory.create(startConfig, config)
         } catch {
