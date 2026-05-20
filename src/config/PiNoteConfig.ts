@@ -8,7 +8,12 @@ export interface PiNoteConfig {
     theme: 'light' | 'dark'
     defaults: {
         tool: ToolType
-        color: string
+        colors: {
+            /** Couleur globale (slot 1, partagée entre tous les outils) */
+            global: string
+            /** Couleur par défaut attribuée à chaque outil pour son slot dynamique */
+            tool: string
+        }
         width: number
         background: Partial<BackgroundState>
         snapEnabled: boolean
@@ -46,7 +51,10 @@ export const defaultConfig: PiNoteConfig = {
     theme: 'light',
     defaults: {
         tool: 'pen',
-        color: '#000000',
+        colors: {
+            global: '#000000',
+            tool: '#1e88e5',
+        },
         width: 2,
         background: {mode: 'none'},
         snapEnabled: false,
@@ -84,7 +92,11 @@ export function setConfig(c: Partial<PiNoteConfig>): void {
     _config = {
         ...defaultConfig,
         ...c,
-        defaults: {...defaultConfig.defaults, ...(c.defaults ?? {})},
+        defaults: {
+            ...defaultConfig.defaults,
+            ...(c.defaults ?? {}),
+            colors: {...defaultConfig.defaults.colors, ...(c.defaults?.colors ?? {})},
+        },
         debug: {...defaultConfig.debug, ...(c.debug ?? {})},
         pointerThresholds: {...defaultConfig.pointerThresholds, ...(c.pointerThresholds ?? {})},
     }

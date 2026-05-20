@@ -52,30 +52,31 @@ export const useNoteStore = defineStore('note', () => {
   // ── Outil actif ──────────────────────────────────────────────────────────
 
   const _cfg = getConfig()
+  const _defaultToolColor = _cfg.defaults.colors.tool
   const tool = reactive<ToolConfig>({
     layer: 'MAIN',
     tool: _cfg.defaults.tool,
     width: _cfg.defaults.width,
-    color: _cfg.defaults.color,
+    color: _defaultToolColor,
     bezier: _cfg.defaults.bezier,
     toolModes: {},
   })
 
   /** Mémoire couleur/largeur par outil, pour restaurer la config au changement d'outil */
   const toolMemory = reactive<ToolMemory>({
-    pen:         { color: _cfg.defaults.color, width: _cfg.defaults.width },
+    pen:         { color: _defaultToolColor, width: _cfg.defaults.width },
     highlighter: { color: '#eab308', width: 12 },
     eraser:      { color: '', width: 2 },
     move:        { color: '', width: 0 },
     select:      { color: '', width: 0 },
-    line:        { color: '', width: 2 },
-    segment:     { color: '', width: 2 },
-    vector:      { color: '', width: 2 },
-    circle:      { color: '', width: 2 },
-    rectangle:   { color: '', width: 2 },
-    polygon:     { color: '', width: 2 },
-    arc:         { color: '', width: 2 },
-    text:        { color: _cfg.defaults.color, width: 24 },
+    line:        { color: _defaultToolColor, width: 2 },
+    segment:     { color: _defaultToolColor, width: 2 },
+    vector:      { color: _defaultToolColor, width: 2 },
+    circle:      { color: _defaultToolColor, width: 2 },
+    rectangle:   { color: _defaultToolColor, width: 2 },
+    polygon:     { color: _defaultToolColor, width: 2 },
+    arc:         { color: _defaultToolColor, width: 2 },
+    text:        { color: _defaultToolColor, width: 24 },
     graph:       { color: '#333333', width: 2 },
   })
 
@@ -85,7 +86,7 @@ export const useNoteStore = defineStore('note', () => {
   type ColorSlot = 'global' | 'dynamic'
   const activeColorSlot = ref<ColorSlot>('dynamic')
   /** Couleur globale partagée entre tous les outils (slot 'global') */
-  const primaryColor = ref<string>(_cfg.defaults.color)
+  const primaryColor = ref<string>(_cfg.defaults.colors.global)
 
   /** Change l'outil actif et restaure sa mémoire couleur/largeur */
   function selectTool(newTool: ToolType) {

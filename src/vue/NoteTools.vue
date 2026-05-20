@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onBeforeUnmount, onMounted, reactive, ref} from 'vue'
+import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue'
 import ToolSelector from '@pi-vue/components/controls/ToolSelector.vue'
 import ColorSelector from '@pi-vue/components/controls/ColorSelector.vue'
 import WidthSelector from '@pi-vue/components/controls/WidthSelector.vue'
@@ -65,6 +65,22 @@ const overflowTools = computed<ToolType[]>(() => {
 		return mainTools.value.slice(MOBILE_VISIBLE_MAIN)
 	}
 	return []
+})
+
+// ── Raccourci "dernier outil overflow" pour mobile ───────────────────────────
+
+const lastOverflowTool = ref<ToolType | null>(null)
+
+watch(() => store.tool.tool, (t) => {
+	if (overflowTools.value.includes(t)) lastOverflowTool.value = t
+})
+
+const quickTool = computed<ToolType | null>(() => {
+	const overflow = overflowTools.value
+	if (overflow.length === 0) return null
+	if (overflow.includes(store.tool.tool)) return store.tool.tool
+	if (lastOverflowTool.value && overflow.includes(lastOverflowTool.value)) return lastOverflowTool.value
+	return overflow[0]
 })
 
 // ── Popovers ─────────────────────────────────────────────────────────────────
@@ -242,6 +258,11 @@ const layerLabel = computed(() => {
 			<ToolSelector
 				class="nt-tools-main"
 				:tools="visibleMainTools"
+			/>
+			<ToolSelector
+				v-if="quickTool"
+				class="nt-tools-quick"
+				:tools="[quickTool]"
 			/>
 			<button
 				v-if="overflowTools.length > 0"

@@ -818,7 +818,26 @@
 /* ---- ColorSelector ---------------------------------------- */
 
 .color-selector { display: flex; flex-direction: column; gap: 12px; }
-.color-base-row { display: flex; gap: 10px; align-items: center; justify-content: center; }
+.color-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.color-base-row { display: flex; gap: 10px; align-items: center; }
+.color-preview {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--pn-border);
+  flex-shrink: 0;
+}
+.color-preview.empty {
+  background:
+    repeating-linear-gradient(45deg,
+      rgba(0,0,0,0.06) 0 6px,
+      rgba(0,0,0,0) 6px 12px);
+}
 
 .color-gradient {
   position: relative;
